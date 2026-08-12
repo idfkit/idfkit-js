@@ -1,0 +1,59 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Pack without publishing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  # Required for npm provenance.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      - name: Verify before publishing
+        run: |
+          npx tsc -p tsconfig.test.json
+          npm test
+
+      - run: npx tsc --build
+
+      - name: Set versions from the release tag
+        if: github.event_name == 'release'
+        # The git tag is the source of truth, matching how the Python package
+        # releases. package.json versions are placeholders in the repo.
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --workspaces --no-git-tag-version --allow-same-version
+          npm pkg set "dependencies.@idfkit/schemas=$VERSION" -w @idfkit/core
+
+      - name: Publish
+        if: github.event_name == 'release'
+        run: |
+          # schemas first: core depends on it by exact version.
+          npm publish -w @idfkit/schemas --provenance --access public
+          npm publish -w @idfkit/core --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Pack only
+        if: github.event_name == 'workflow_dispatch'
+        run: npm pack --workspaces --pack-destination /tmp

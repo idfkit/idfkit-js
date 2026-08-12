@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check the schema bundle is in sync with its build script
+        # The bundle is generated from idfkit's epJSON schemas and committed. If
+        # someone edits build.mjs without regenerating, every other check still
+        # passes against a stale bundle. The source schemas live in the Python
+        # repo, so fetch it shallowly and rebuild.
+        run: |
+          git clone --depth 1 https://github.com/idfkit/idfkit.git /tmp/idfkit-py
+          npm run build:schemas -- --source /tmp/idfkit-py/src/idfkit/schemas
+          git diff --exit-code -- packages/schemas/data \
+            || (echo "::error::Schema bundle is stale; run npm run build:schemas" && exit 1)
+
+      - run: npm run format:check
+
+      - name: Typecheck sources and tests
+        # tsconfig.test.json, not tsconfig.json: vitest transpiles without
+        # typechecking, so the `@ts-expect-error` assertions in typed.test.ts
+        # are only enforced here.
+        run: npx tsc -p tsconfig.test.json
+
+      - run: npx tsc --build
+
+  test:
+    name: Test (Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+        os: [ubuntu-latest]
+        include:
+          # The parser reads files as latin-1 and the writer emits it. Windows
+          # line endings and macOS defaults have both broken that before.
+          - node: 22
+            os: windows-latest
+          - node: 22
+            os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+  conformance:
+    name: Round-trip EnergyPlus example files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install EnergyPlus
+        # The example set is the real conformance suite: 760 files covering
+        # extensible shapes, blank names, and autosized fields that hand-written
+        # fixtures never reach. Unit tests skip these when absent, so this job
+        # exists to make sure they actually run somewhere.
+        run: |
+          VERSION=26.1.0
+          TAG=v26.1.0
+          curl -fsSL -o ep.tar.gz \
+            "https://github.com/NREL/EnergyPlus/releases/download/${TAG}/EnergyPlus-${VERSION}-Linux-Ubuntu22.04-x86_64.tar.gz"
+          mkdir -p "$HOME/EnergyPlus"
+          tar -xzf ep.tar.gz -C "$HOME/EnergyPlus" --strip-components=1
+          echo "ENERGYPLUS_DIR=$HOME/EnergyPlus" >> "$GITHUB_ENV"
+
+      - run: npm test
+
+      - name: Fail if the example files were not found
+        run: |
+          test -d "$ENERGYPLUS_DIR/ExampleFiles" \
+            || (echo "::error::ExampleFiles missing; conformance job proved nothing" && exit 1)

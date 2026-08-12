@@ -1,0 +1,21 @@
+{
+  // Typechecks tests as well as sources. Vitest transpiles without checking,
+  // so the `@ts-expect-error` and `expectTypeOf` assertions in typed.test.ts
+  // only mean something if this config runs. CI runs it.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"],
+    "paths": {
+      "@idfkit/schemas": ["./packages/schemas/src/index.ts"],
+      "@idfkit/schemas/node": ["./packages/schemas/src/node.ts"],
+      "@idfkit/core": ["./packages/core/src/index.ts"],
+      "@idfkit/core/node": ["./packages/core/src/node.ts"]
+    },
+    "baseUrl": "."
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/*/tests/**/*.ts", "vitest.config.ts"]
+}

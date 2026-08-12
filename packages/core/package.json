@@ -1,0 +1,38 @@
+{
+  "name": "@idfkit/core",
+  "version": "0.0.0",
+  "description": "Fast EnergyPlus IDF and epJSON parsing and manipulation for JavaScript",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "energyplus",
+    "idf",
+    "epjson",
+    "building-energy",
+    "simulation"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./types/*": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/types/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@idfkit/schemas": "0.0.0"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "codegen": "node scripts/emit-types.mjs"
+  }
+}

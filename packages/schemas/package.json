@@ -1,0 +1,25 @@
+{
+  "name": "@idfkit/schemas",
+  "version": "0.0.0",
+  "description": "Content-addressed EnergyPlus epJSON schemas for all supported versions",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./data/*": "./data/*"
+  },
+  "files": [
+    "dist",
+    "data"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs && tsc --build"
+  }
+}

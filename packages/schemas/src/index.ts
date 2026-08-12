@@ -1,0 +1,129 @@
+import { BlobStore, Schema } from './schema.js';
+import type { BundleIndex, Manifest, SlimType } from './types.js';
+
+export { BlobStore, Schema } from './schema.js';
+export type { SchemaDelta } from './schema.js';
+export type {
+  BundleIndex,
+  FieldKind,
+  Manifest,
+  SlimExtensible,
+  SlimField,
+  SlimType,
+} from './types.js';
+
+/**
+ * Where bundle files come from.
+ *
+ * The only runtime-specific part of this package. Node reads from disk, the
+ * browser fetches over HTTP, and a bundler-driven app can supply its own
+ * resolver backed by `import()`. Everything above this interface is portable.
+ */
+export interface BundleSource {
+  read(fileName: string): Promise<unknown>;
+}
+
+/**
+ * Fetch-based source, for browsers and any runtime with global `fetch`.
+ *
+ * Reads the gzipped bundle and inflates it with `DecompressionStream`, which is
+ * baseline-available in browsers. That keeps the served payload at roughly 1 MB
+ * for all 17 versions instead of the ~6 MB the raw JSON would cost, and it does
+ * not depend on the host serving the right `Content-Encoding`.
+ */
+export function httpSource(baseUrl: string): BundleSource {
+  const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  return {
+    async read(fileName) {
+      const response = await fetch(new URL(`${fileName}.gz`, base));
+      if (!response.ok) {
+        throw new Error(`Failed to load ${fileName}.gz: ${response.status} ${response.statusText}`);
+      }
+      if (response.body === null) {
+        throw new Error(`Empty response for ${fileName}.gz`);
+      }
+      const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
+      return JSON.parse(await new Response(stream).text()) as unknown;
+    },
+  };
+}
+
+/**
+ * Loads schemas from a bundle, sharing one blob store across every version.
+ *
+ * Hold one of these for the lifetime of the process. Loading 26.1.0 and then
+ * 9.4.0 costs far less than twice one version, because most definitions are
+ * byte-identical and already hydrated.
+ */
+export class SchemaBundle {
+  #source: BundleSource;
+  #index: BundleIndex | undefined;
+  #store: BlobStore | undefined;
+  #schemas = new Map<string, Schema>();
+  /** In-flight loads, so concurrent callers share one request. */
+  #pending = new Map<string, Promise<Schema>>();
+
+  constructor(source: BundleSource) {
+    this.#source = source;
+  }
+
+  /** Versions this bundle can serve, oldest first. */
+  async versions(): Promise<readonly string[]> {
+    return (await this.#loadIndex()).versions;
+  }
+
+  /** The newest version in the bundle. */
+  async latest(): Promise<string> {
+    const versions = await this.versions();
+    const last = versions.at(-1);
+    if (last === undefined) throw new Error('Schema bundle contains no versions');
+    return last;
+  }
+
+  /**
+   * Load one version's schema.
+   *
+   * Repeat calls return the same instance; concurrent calls share one fetch.
+   */
+  async load(version: string): Promise<Schema> {
+    const cached = this.#schemas.get(version);
+    if (cached !== undefined) return cached;
+
+    const inFlight = this.#pending.get(version);
+    if (inFlight !== undefined) return inFlight;
+
+    const promise = this.#load(version).finally(() => this.#pending.delete(version));
+    this.#pending.set(version, promise);
+    return promise;
+  }
+
+  /** A version already loaded, or undefined. Synchronous by design. */
+  loaded(version: string): Schema | undefined {
+    return this.#schemas.get(version);
+  }
+
+  async #load(version: string): Promise<Schema> {
+    const index = await this.#loadIndex();
+    const fileName = index.manifests[version];
+    if (fileName === undefined) {
+      throw new Error(
+        `EnergyPlus ${version} is not in this bundle. Available: ${index.versions.join(', ')}`
+      );
+    }
+
+    if (this.#store === undefined) {
+      const raw = (await this.#source.read('types.json')) as Record<string, SlimType>;
+      this.#store ??= new BlobStore(raw);
+    }
+
+    const manifest = (await this.#source.read(fileName)) as Manifest;
+    const schema = new Schema(version, manifest, this.#store);
+    this.#schemas.set(version, schema);
+    return schema;
+  }
+
+  async #loadIndex(): Promise<BundleIndex> {
+    this.#index ??= (await this.#source.read('index.json')) as BundleIndex;
+    return this.#index;
+  }
+}
