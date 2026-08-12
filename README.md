@@ -8,9 +8,10 @@ Python [idfkit](https://github.com/idfkit/idfkit), not a transliteration of it.
 | `packages/core`    | Parsing, the object model, references, writers    | [`@idfkit/core`](https://www.npmjs.com/package/@idfkit/core)       |
 | `packages/schemas` | Content-addressed epJSON schemas, all 17 versions | [`@idfkit/schemas`](https://www.npmjs.com/package/@idfkit/schemas) |
 
-It sits alongside [`@idfkit/engine`](https://github.com/idfkit/idfkit-engine),
+It sits alongside [`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine),
 which runs EnergyPlus itself in the browser via WebAssembly. This repository
-handles the model; that one handles the simulation.
+handles the model; that one handles the simulation. See
+[Running a simulation](#running-a-simulation) for how the two fit together.
 
 > **Status: prototype.** The core is complete and tested against the full
 > EnergyPlus example set, but nothing has been published and the API is not yet
@@ -51,11 +52,64 @@ const schema = await bundle.load('26.1.0');
 const { document } = parseIdf(idfText, schema);
 ```
 
+## Running a simulation
+
+This repository stops at the model. To simulate one, hand the IDF text to
+[`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine), which runs
+EnergyPlus in the browser via WebAssembly. The seam between the two libraries is
+plain IDF text, which is the practical payoff of keeping this core synchronous
+and string-based.
+
+```bash
+npm install @idfkit/core @idfkit/schemas @idfkit/engine @idfkit/engine-assets
+npx idfkit-engine-assets public/energyplus   # copy the WASM engine to your own origin
+```
+
+```ts
+import { parseIdf, writeIdf, SchemaBundle, httpSource } from '@idfkit/core';
+import { createEnergyPlus } from '@idfkit/engine';
+
+// 1. Edit the model here.
+const schema = await new SchemaBundle(httpSource('/schemas/')).load('26.1.0');
+const { document } = parseIdf(idfText, schema);
+document.require('Zone', 'SPACE1-1').ceiling_height = 3;
+
+// 2. Hand it over as IDF text. Loading compiles a ~28 MB binary, so create the
+//    engine once and reuse it across runs.
+const ep = await createEnergyPlus({ assetBaseUrl: '/energyplus' });
+const result = await ep.run({ idf: writeIdf(document), epw: epwText });
+
+// 3. A failed run is data, not an exception: the err report is worth reading.
+if (result.success) {
+  console.log(result.eso?.variables.size, 'output variables');
+} else {
+  console.error(result.fatalError, result.err?.entries);
+}
+ep.dispose();
+```
+
+Three things worth knowing at the boundary:
+
+**Keep the versions aligned.** `@idfkit/engine-assets` is versioned by the
+EnergyPlus release it carries, so `@idfkit/engine-assets@26.1.0` is EnergyPlus
+26.1.0, whereas a document here can be any of the 17 supported versions. Load the
+schema that matches the asset package you installed. Nothing checks this for you,
+and a mismatch means the engine reads a model written for a different release.
+
+**`HVACTemplate:*` objects need no special handling.** `run()` expands them with
+the bundled ExpandObjects preprocessor before simulating. Call `expandObjects`
+from `@idfkit/engine` yourself only when you want the expanded IDF back, and if
+you do, `parseIdf` will read it straight into a document.
+
+**Results do not come back through this library.** The engine returns its own
+parsed `err`, `eso`, and `mtr` structures, along with raw `sql` and `html`.
+idfkit-js has no output-reading API and is not planning one; re-parsing expanded
+IDF is the only return path that involves it.
+
 ## Design notes
 
-Five decisions distinguish this from a direct port. Each is a place where doing
-the JavaScript-native thing produces a better library than imitating the Python
-one would have.
+Five properties are worth knowing before you build on this. Each one is visible
+in how the API behaves, so they are easier to work with than to discover.
 
 ### 1. The core is synchronous and pure; I/O lives at the edges
 
@@ -69,15 +123,15 @@ rather than hidden inside `parse`.
 
 ### 2. Field access uses real accessors, not a `Proxy`
 
-Python resolves `zone.ceiling_height` through `__getattr__`. The mechanical
-translation is a `Proxy`, which we do not use: proxies defeat V8's inline caches,
-and they are invisible to TypeScript, so nothing would autocomplete.
+`zone.ceiling_height` is a real property, not a `Proxy` trap. That is what lets
+an editor autocomplete it and keeps reads on V8's fast path; a `Proxy` would give
+you neither, since proxies defeat inline caches and are invisible to TypeScript.
 
-Instead each object type gets one prototype carrying `Object.defineProperty`
-accessors, built once and shared by every instance. Property reads are ordinary
-monomorphic lookups, and writes route through a setter that keeps the reference
-graph live, which is what makes rename propagation work without asking callers to
-mutate through an explicit `update()` call.
+Each object type gets one prototype carrying `Object.defineProperty` accessors,
+built once and shared by every instance. Reads are ordinary monomorphic lookups,
+and writes route through a setter that keeps the reference graph live. That
+setter is why assigning a name propagates to every reference without you calling
+an explicit `update()`.
 
 ### 3. Static types are generated from the schema
 
@@ -95,9 +149,10 @@ doc.add('BuildingSurface:Detailed', 'S1', { sun_exposure: 'Sunny' }); // compile
 The map is a type, so it is erased at build time. A typed document and an untyped
 one are the same object graph at runtime.
 
-This has no Python counterpart, and it is the main reason to do this in
-TypeScript rather than treat JavaScript as a lesser target. In Python a
-misspelled field surfaces as `None` at simulation time; here it does not compile.
+So a misspelled field name is a build error rather than something you find at
+simulation time, which is the practical reason to pass the `TypeMap` even in a
+codebase that is otherwise loosely typed. The Python library has no equivalent:
+there, the same typo surfaces as a `None`.
 
 ### 4. All 17 versions ship together, content-addressed
 
@@ -146,18 +201,10 @@ objects        290,313
 throughput     ~36k objects/sec (parse + write + re-parse)
 ```
 
-Four bugs came out of that loop rather than from writing tests first, and each has
-a regression test in `packages/core/tests/regressions.test.ts`:
-
-- Trailing unset fields were trimmed even when an extensible group followed,
-  shifting every component of a `Branch` one slot and silently corrupting HVAC
-  topology.
-- `WeatherProperty:SkyTemperature` may have a legitimately blank name, which is
-  not the same as having no name field.
-- Integers are declared two ways in the schema (`"type": "integer"` and
-  `"type": "number"` with `data_type`); handling only one left values as strings.
-- `-0` in a source file round-tripped to `0`, which is equal but not identical,
-  producing phantom diffs.
+IDF is a positional format, so its edge cases corrupt a model quietly rather than
+failing: a trimmed empty field shifts an entire extensible group, and a blank name
+is not the same as no name. Every such case the example set has surfaced is pinned
+in `packages/core/tests/regressions.test.ts`.
 
 ## Development
 
@@ -188,13 +235,13 @@ Present:
 
 Deliberately absent, with reasons:
 
-| Area                         | Why                                                                                                                                                                                       |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Simulation                   | [`@idfkit/engine`](https://github.com/idfkit/idfkit-engine) already runs EnergyPlus in the browser via WASM. Shelling out to a local install would duplicate it for the smaller audience. |
-| Weather                      | Station index and EPW download want a service or a separate package, not the core.                                                                                                        |
-| Geometry, schedules, thermal | Pure math, ports cleanly, simply not written yet.                                                                                                                                         |
-| Validation                   | Beyond parse-time checks; the schema data needed for it is already in the bundle.                                                                                                         |
-| Formatting round-trip        | Requires a concrete syntax tree. `3.0` currently comes back as `3`: semantically identical, textually different.                                                                          |
+| Area                         | Why                                                                                                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Simulation                   | [`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine) already runs EnergyPlus in the browser via WASM, and [pairs with this library](#running-a-simulation) over IDF text. Shelling out to a local install would duplicate it for the smaller audience. |
+| Weather                      | Station index and EPW download want a service or a separate package, not the core.                                                                                                                                                                                 |
+| Geometry, schedules, thermal | Pure math, ports cleanly, simply not written yet.                                                                                                                                                                                                                  |
+| Validation                   | Beyond parse-time checks; the schema data needed for it is already in the bundle.                                                                                                                                                                                  |
+| Formatting round-trip        | Requires a concrete syntax tree. `3.0` currently comes back as `3`: semantically identical, textually different.                                                                                                                                                   |
 
 ### The drift problem
 

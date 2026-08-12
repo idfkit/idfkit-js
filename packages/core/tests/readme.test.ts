@@ -126,6 +126,33 @@ describe('core README usage', () => {
   });
 });
 
+describe('README simulation handoff', () => {
+  /**
+   * The engine half of the snippet cannot run here: `@idfkit/engine` is not a
+   * dependency of this repo, and it needs a browser and a ~28 MB WASM binary.
+   * What is testable is our side of the seam — that the IDF text handed to
+   * `ep.run({ idf })` is what the edited document actually says — and that is
+   * the half that breaks when this library changes.
+   */
+  it('produces the IDF text the engine is handed', async () => {
+    const schema = await new SchemaBundle({
+      read: (fileName) => Promise.resolve(readBundleFileSync(fileName)),
+    }).load('26.1.0');
+
+    const { document } = parseIdf<TypeMap>(MODEL, schema, { strict: false });
+    document.require('Zone', 'SPACE1-1').ceiling_height = 3;
+
+    const idf = writeIdf(document);
+
+    // Round-trips as a whole model, not just as a string containing the edit:
+    // this is exactly what the engine will parse.
+    const reparsed = parseIdf<TypeMap>(idf, schema, { strict: false });
+    expect(reparsed.diagnostics).toEqual([]);
+    expect(reparsed.document.require('Zone', 'SPACE1-1').ceiling_height).toBe(3);
+    expect(idf).toMatch(/^Version,/m);
+  });
+});
+
 describe('schemas README usage', () => {
   it('runs the bundle and diff examples', async () => {
     const bundle = new SchemaBundle({

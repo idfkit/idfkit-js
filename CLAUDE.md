@@ -15,9 +15,15 @@ manipulation. It is a deliberate re-design for JavaScript, not a transliteration
 | `packages/core`    | `@idfkit/core`    | Parser, object model, reference graph, writers    |
 | `packages/schemas` | `@idfkit/schemas` | Content-addressed epJSON schemas, all 17 versions |
 
-Related: [`@idfkit/engine`](https://github.com/idfkit/idfkit-engine) runs
+Related: [`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine) runs
 EnergyPlus in the browser via WASM. This repo handles the model, that one the
 simulation. Do not add simulation execution here.
+
+The two meet over IDF text: `writeIdf(document)` goes into `ep.run({ idf, epw })`,
+and results come back in the engine's own shapes, never through this library. The
+README's "Running a simulation" section is the documented contract; keep it in
+sync if the write path changes. Note `idfkit-engine` is a private repo, so link to
+npm rather than GitHub in anything public.
 
 ## Common Commands
 
