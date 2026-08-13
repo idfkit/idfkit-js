@@ -28,8 +28,14 @@ export interface BundleSource {
  *
  * Reads the gzipped bundle and inflates it with `DecompressionStream`, which is
  * baseline-available in browsers. That keeps the served payload at roughly 1 MB
- * for all 17 versions instead of the ~6 MB the raw JSON would cost, and it does
- * not depend on the host serving the right `Content-Encoding`.
+ * for all 17 versions instead of the ~6 MB the raw JSON would cost.
+ *
+ * The payload is sniffed for the gzip magic bytes before inflating. A host that
+ * maps the `.gz` extension to `Content-Encoding: gzip` (Vite's dev server,
+ * nginx with `gzip_static on`, and several static hosts) makes the HTTP client
+ * inflate the body itself, leaving plain JSON with nothing left to decompress.
+ * Feeding that to `DecompressionStream` fails with an opaque `incorrect header
+ * check`, so we only decompress when the bytes actually start with `1f 8b`.
  */
 export function httpSource(baseUrl: string): BundleSource {
   const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
@@ -39,10 +45,12 @@ export function httpSource(baseUrl: string): BundleSource {
       if (!response.ok) {
         throw new Error(`Failed to load ${fileName}.gz: ${response.status} ${response.statusText}`);
       }
-      if (response.body === null) {
-        throw new Error(`Empty response for ${fileName}.gz`);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      // The client already inflated the body (host set Content-Encoding: gzip).
+      if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
+        return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
       }
-      const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
       return JSON.parse(await new Response(stream).text()) as unknown;
     },
   };

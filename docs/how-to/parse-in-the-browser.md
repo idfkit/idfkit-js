@@ -24,8 +24,11 @@ const { document } = parseIdf(idfText, schema);
 ```
 
 `httpSource` fetches the gzipped files and inflates them with
-`DecompressionStream`, so the payload stays around 1 MB for all 17 versions and
-does not depend on your server setting `Content-Encoding`.
+`DecompressionStream`, so the payload stays around 1 MB for all 17 versions. It
+sniffs the gzip magic bytes first, so it works whether your host leaves
+`Content-Encoding` unset or maps the `.gz` extension to `Content-Encoding: gzip`
+(as Vite's dev server and nginx's `gzip_static` do), where the client inflates
+the body itself.
 
 Hold the `SchemaBundle` for the lifetime of the page. It caches by version,
 shares one blob store across versions, and collapses concurrent loads of the

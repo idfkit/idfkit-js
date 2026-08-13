@@ -26,8 +26,9 @@ flat `Record<typeName, hash>`. `types.json` is a flat `Record<hash, SlimType>`,
 shared by every version.
 
 Files are gzipped and inflated by the source. `httpSource` uses
-`DecompressionStream` so the payload stays around 1 MB regardless of whether the
-server sets `Content-Encoding`.
+`DecompressionStream` so the payload stays around 1 MB. It sniffs the gzip magic
+bytes first, so it works whether the server leaves `Content-Encoding` unset or
+sets it for the `.gz` extension, where the client inflates the body itself.
 
 ## `SlimType`
 
