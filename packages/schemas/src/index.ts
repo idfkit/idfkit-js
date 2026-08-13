@@ -32,7 +32,11 @@ export interface BundleSource {
  * not depend on the host serving the right `Content-Encoding`.
  */
 export function httpSource(baseUrl: string): BundleSource {
-  const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  // Resolve against the document base when there is one, so a same-origin
+  // path like '/schemas/' works the way `fetch('/schemas/...')` does. In Node
+  // there is no base, and a relative path stays an error — it cannot resolve.
+  const documentBase = (globalThis as { location?: { href: string } }).location?.href;
+  const base = new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`, documentBase).href;
   return {
     async read(fileName) {
       const response = await fetch(new URL(`${fileName}.gz`, base));
