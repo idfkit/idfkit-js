@@ -13,6 +13,8 @@ export default defineConfig({
       '@idfkit/schemas': here('./packages/schemas/src/index.ts'),
       '@idfkit/core/node': here('./packages/core/src/node.ts'),
       '@idfkit/core': here('./packages/core/src/index.ts'),
+      '@idfkit/weather/node': here('./packages/weather/src/node.ts'),
+      '@idfkit/weather': here('./packages/weather/src/index.ts'),
     },
   },
   test: {

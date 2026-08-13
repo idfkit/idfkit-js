@@ -6,6 +6,8 @@ new to the library, start with
 
 - [How to run a simulation](run-a-simulation.md) — hand a model to
   `@idfkit/engine` and read the results.
+- [How to fetch a weather file](fetch-weather-files.md) — find a station and pull
+  its EPW into a run.
 - [How to parse in the browser](parse-in-the-browser.md) — serve the schema
   bundle and keep the parse synchronous.
 - [How to collect diagnostics instead of throwing](collect-diagnostics.md) —

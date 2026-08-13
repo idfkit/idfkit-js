@@ -1,4 +1,8 @@
 {
   "files": [],
-  "references": [{ "path": "./packages/schemas" }, { "path": "./packages/core" }]
+  "references": [
+    { "path": "./packages/schemas" },
+    { "path": "./packages/core" },
+    { "path": "./packages/weather" }
+  ]
 }

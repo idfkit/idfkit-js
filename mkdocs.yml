@@ -22,6 +22,7 @@ nav:
   - How-to guides:
       - how-to/index.md
       - How to run a simulation: how-to/run-a-simulation.md
+      - How to fetch a weather file: how-to/fetch-weather-files.md
       - How to parse in the browser: how-to/parse-in-the-browser.md
       - How to collect diagnostics instead of throwing: how-to/collect-diagnostics.md
       - How to edit extensible groups: how-to/edit-extensible-groups.md
@@ -33,9 +34,11 @@ nav:
       - Supported versions: reference/versions.md
       - Slim schema format: reference/slim-schema-format.md
       - API:
-          - "@idfkit/core": reference/core.md
-          - "@idfkit/core/node": reference/core-node.md
-          - "@idfkit/schemas": reference/schemas.md
+          - '@idfkit/core': reference/core.md
+          - '@idfkit/core/node': reference/core-node.md
+          - '@idfkit/schemas': reference/schemas.md
+          - '@idfkit/weather': reference/weather.md
+          - '@idfkit/weather/node': reference/weather-node.md
 
   - Explanation:
       - explanation/index.md
@@ -91,14 +94,14 @@ theme:
     - search.suggest
     - toc.follow
   palette:
-    - media: "(prefers-color-scheme: light)"
+    - media: '(prefers-color-scheme: light)'
       scheme: default
       primary: custom
       accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
+    - media: '(prefers-color-scheme: dark)'
       scheme: slate
       primary: custom
       accent: custom
