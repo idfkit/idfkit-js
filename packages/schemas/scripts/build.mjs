@@ -221,7 +221,17 @@ function main() {
  */
 function writeBundleFile(name, value) {
   const text = canonical(value);
-  writeFileSync(join(OUT, `${name}.gz`), gzipSync(Buffer.from(text), { level: 9 }));
+  const gz = gzipSync(Buffer.from(text), { level: 9 });
+
+  // Byte 9 of the gzip header is the OS field, and zlib fills it in from the
+  // machine doing the compressing: 0x13 on macOS, 0x03 on Linux. The bundle is
+  // committed, and CI checks it by rebuilding and diffing, so that one byte
+  // made every file differ purely because it was built on a different OS.
+  // Overwrite it with 0xff ("unknown"), which is what a file belonging to no
+  // particular platform should say. Decompressors ignore the field entirely.
+  gz[9] = 0xff;
+
+  writeFileSync(join(OUT, `${name}.gz`), gz);
 }
 
 main();
