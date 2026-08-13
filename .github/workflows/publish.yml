@@ -54,7 +54,13 @@ jobs:
         # releases. package.json versions are placeholders in the repo.
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          npm version "$VERSION" --workspaces --no-git-tag-version --allow-same-version
+          # --workspaces-update=false is load-bearing. Without it, npm rewrites
+          # package-lock.json after the bump: core's lock entry still asks for
+          # @idfkit/schemas at the old placeholder version, the local workspace
+          # no longer satisfies it, so npm reaches for the registry and fails
+          # with ETARGET on a version that was never published. The lockfile is
+          # not part of any published tarball, so leaving it stale is harmless.
+          npm version "$VERSION" --workspaces --no-git-tag-version --allow-same-version --workspaces-update=false
           npm pkg set "dependencies.@idfkit/schemas=$VERSION" -w @idfkit/core
 
       - name: Publish
