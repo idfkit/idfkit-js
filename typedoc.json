@@ -1,0 +1,9 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": ["./typedoc.base.json"],
+  "entryPointStrategy": "packages",
+  "entryPoints": ["packages/schemas", "packages/core"],
+  "name": "idfkit-js",
+  "basePath": ".",
+  "readme": "none"
+}

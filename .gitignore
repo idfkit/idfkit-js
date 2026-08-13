@@ -3,3 +3,8 @@ dist/
 *.tsbuildinfo
 .DS_Store
 *.log
+
+# Documentation build output
+site/
+.typedoc.json
+__pycache__/

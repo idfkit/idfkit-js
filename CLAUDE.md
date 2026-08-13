@@ -20,10 +20,10 @@ EnergyPlus in the browser via WASM. This repo handles the model, that one the
 simulation. Do not add simulation execution here.
 
 The two meet over IDF text: `writeIdf(document)` goes into `ep.run({ idf, epw })`,
-and results come back in the engine's own shapes, never through this library. The
-README's "Running a simulation" section is the documented contract; keep it in
-sync if the write path changes. Note `idfkit-engine` is a private repo, so link to
-npm rather than GitHub in anything public.
+and results come back in the engine's own shapes, never through this library.
+`docs/how-to/run-a-simulation.md` is the documented contract; keep it in sync if
+the write path changes. Note `idfkit-engine` is a private repo, so link to npm
+rather than GitHub in anything public.
 
 ## Common Commands
 
@@ -36,6 +36,8 @@ npx tsc --build                              # build to dist/
 npm run format:check                         # prettier
 npm run build:schemas                        # regenerate the schema bundle
 npm run codegen -w @idfkit/core -- 26.1.0    # regenerate TypeScript interfaces
+npm run docs:serve                           # docs at 127.0.0.1:8000
+npm run docs:build                           # --strict; what CI runs
 ```
 
 **Before proposing changes:** `npm run format:check && npx tsc -p tsconfig.test.json && npm test`
@@ -111,8 +113,25 @@ cleanly when no EnergyPlus install is present, and CI installs one so it always
 runs somewhere. Every bug fixed so far came from that loop rather than from
 writing a test first; when you fix one, add a case to `regressions.test.ts`.
 
-`readme.test.ts` executes the published README snippets verbatim. If you change
-a documented API, that test should fail. Fix the README, not the test.
+`docs-snippets.test.ts` executes the published documentation snippets verbatim —
+both READMEs, the tutorial, and the simulation how-to. Each `describe` names the
+page that owns them. If you change a documented API, that test should fail. Fix
+the page, not the test.
+
+## Documentation
+
+MkDocs + Material, organised by [Diátaxis](https://diataxis.fr): a page is a
+tutorial, a how-to guide, reference, or explanation, and never two of them. If
+material belongs somewhere else, move it and leave a link rather than
+duplicating it. `mkdocs.yml` nav is the map.
+
+The three API pages under `docs/reference/` are generated from the sources by
+TypeDoc through `mkdocstrings-typescript`. Do not hand-maintain member tables
+anywhere; they drift. `docs/.hooks/typedoc_shim.py` patches `griffe-typedoc` so
+it can decode current TypeDoc output, and documents its own removal conditions.
+
+The READMEs are front doors, not documentation. Design rationale lives in
+`docs/explanation/`, contributor workflow in `CONTRIBUTING.md`.
 
 ## Version Support
 

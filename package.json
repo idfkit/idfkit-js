@@ -13,12 +13,16 @@
     "typecheck": "tsc --build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "format": "prettier --write \"packages/**/*.{ts,mjs,json,md}\"",
-    "format:check": "prettier --check \"packages/**/*.{ts,mjs,json,md}\""
+    "format": "prettier --write \"{packages,docs}/**/*.{ts,mjs,json,md,css}\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"{packages,docs}/**/*.{ts,mjs,json,md,css}\" \"*.{json,md}\"",
+    "docs:serve": "uv run --with-requirements docs-requirements.txt mkdocs serve",
+    "docs:build": "uv run --with-requirements docs-requirements.txt mkdocs build --strict",
+    "docs:api": "typedoc --json .typedoc.json"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "prettier": "^3.4.2",
+    "typedoc": "0.28.20",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },

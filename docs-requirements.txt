@@ -1,0 +1,13 @@
+# Documentation toolchain. This is a JavaScript repository, so nothing here is
+# a dependency of the packages themselves — it exists only to build the site.
+#
+# Run it through uv so no virtualenv has to be managed by hand:
+#
+#     npm run docs:serve
+#
+# The TypeScript handler shells out to TypeDoc, which comes from devDependencies
+# and is on PATH when invoked through an npm script.
+mkdocs-material>=9.6
+mkdocstrings-typescript>=0.1
+pydantic>=2               # opts mkdocstrings option validation in, so typos in
+                          # mkdocs.yml fail the build instead of being ignored

@@ -1,20 +1,22 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { parseIdf, SchemaBundle, writeIdf, type BundleSource } from '@idfkit/core';
-import { loadIdf, saveIdf } from '@idfkit/core/node';
+import { IDFDocument, parseIdf, SchemaBundle, writeIdf, type BundleSource } from '@idfkit/core';
+import { loadIdf, saveIdf, schemas } from '@idfkit/core/node';
 import { readBundleFileSync } from '@idfkit/schemas/node';
 
 import type { TypeMap } from '../src/types/v26-1.js';
 
 /**
- * The examples from the README and package docs, executed.
+ * The published documentation snippets, executed.
  *
  * Documentation that has never been run is documentation that is wrong, usually
- * within one refactor. These are the published snippets, not paraphrases.
+ * within one refactor. These are the published snippets, not paraphrases, and
+ * each `describe` names the page that owns them. When one of these fails, fix
+ * the page rather than the test.
  */
 let dir: string;
 let modelPath: string;
@@ -47,7 +49,7 @@ afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-describe('README quickstart', () => {
+describe('README + docs/index.md quickstart', () => {
   it('loads, iterates, renames, and saves', async () => {
     const doc = await loadIdf<TypeMap>(modelPath, { strict: false });
 
@@ -69,7 +71,7 @@ describe('README quickstart', () => {
   });
 });
 
-describe('core README usage', () => {
+describe('packages/core/README.md usage', () => {
   it('runs the collection and reference examples', async () => {
     const doc = await loadIdf<TypeMap>(modelPath, { strict: false });
 
@@ -126,7 +128,7 @@ describe('core README usage', () => {
   });
 });
 
-describe('README simulation handoff', () => {
+describe('docs/how-to/run-a-simulation.md', () => {
   /**
    * The engine half of the snippet cannot run here: `@idfkit/engine` is not a
    * dependency of this repo, and it needs a browser and a ~28 MB WASM binary.
@@ -153,7 +155,85 @@ describe('README simulation handoff', () => {
   });
 });
 
-describe('schemas README usage', () => {
+describe('docs/tutorials/first-model.md', () => {
+  /**
+   * The tutorial builds a model from nothing and is the page a reader meets
+   * first, so a broken step there costs more confidence than a broken step
+   * anywhere else. It is also the only page whose snippets accumulate into one
+   * script, which is why it is reproduced here in full rather than in pieces.
+   */
+  it('builds, renames, writes, and reads back the office model', async () => {
+    const schema = await schemas().load('26.1.0');
+    const doc = new IDFDocument<TypeMap>(schema);
+
+    doc.add('Version', null, { version_identifier: '26.1' });
+
+    const zone = doc.add('Zone', 'Open Office', {
+      ceiling_height: 2.7,
+      multiplier: 1,
+    });
+
+    doc.add('Material', 'Brick 100mm', {
+      roughness: 'MediumRough',
+      thickness: 0.1,
+      conductivity: 0.89,
+      density: 1920,
+      specific_heat: 790,
+    });
+
+    doc.add('Construction', 'Exterior Wall', { outside_layer: 'Brick 100mm' });
+
+    const wall = doc.add('BuildingSurface:Detailed', 'North Wall', {
+      surface_type: 'Wall',
+      construction_name: 'Exterior Wall',
+      zone_name: 'Open Office',
+      outside_boundary_condition: 'Outdoors',
+      sun_exposure: 'SunExposed',
+      wind_exposure: 'WindExposed',
+    });
+
+    wall.extensible.push(
+      { vertex_x_coordinate: 0, vertex_y_coordinate: 0, vertex_z_coordinate: 2.7 },
+      { vertex_x_coordinate: 0, vertex_y_coordinate: 0, vertex_z_coordinate: 0 },
+      { vertex_x_coordinate: 5, vertex_y_coordinate: 0, vertex_z_coordinate: 0 },
+      { vertex_x_coordinate: 5, vertex_y_coordinate: 0, vertex_z_coordinate: 2.7 }
+    );
+
+    // Step 5: the model hangs together.
+    expect(doc.size).toBe(5);
+    expect(doc.danglingReferences()).toEqual([]);
+
+    // Step 6: renaming rewrites what pointed at the old name.
+    expect(wall.zone_name).toBe('Open Office');
+    zone.name = 'Open Plan';
+    expect(wall.zone_name).toBe('Open Plan');
+    expect(doc.references.referencingObjects('Open Plan').map((o) => o.name)).toEqual([
+      'North Wall',
+    ]);
+
+    // Step 7: written IDF keeps the empty slots ahead of the extensible group,
+    // which is what stops the vertices shifting a field early.
+    const outPath = join(dir, 'office.idf');
+    await saveIdf(doc, outPath);
+    expect(readFileSync(outPath, 'latin1')).toContain('Open Plan,                !- Name');
+
+    // Step 8: reading it back.
+    const reloaded = await loadIdf<TypeMap>(outPath);
+    expect(reloaded.version).toBe('26.1.0');
+    expect(reloaded.size).toBe(5);
+    expect(reloaded.all('Zone').first?.ceiling_height).toBe(2.7);
+
+    const reloadedWall = reloaded.require('BuildingSurface:Detailed', 'North Wall');
+    expect(reloadedWall.extensible).toHaveLength(4);
+    expect(reloadedWall.extensible[0]).toEqual({
+      vertex_x_coordinate: 0,
+      vertex_y_coordinate: 0,
+      vertex_z_coordinate: 2.7,
+    });
+  });
+});
+
+describe('packages/schemas/README.md usage', () => {
   it('runs the bundle and diff examples', async () => {
     const bundle = new SchemaBundle({
       read: (fileName) => Promise.resolve(readBundleFileSync(fileName)),

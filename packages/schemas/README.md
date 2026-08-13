@@ -3,6 +3,10 @@
 EnergyPlus epJSON schemas for every supported version, in a form small enough to
 send to a browser.
 
+**[Documentation](https://js.idfkit.com/)** ·
+[API reference](https://js.idfkit.com/reference/schemas/) ·
+[Slim schema format](https://js.idfkit.com/reference/slim-schema-format/)
+
 ```bash
 npm install @idfkit/schemas
 ```
@@ -25,7 +29,8 @@ hash.
 
 Splitting per version would have been the obvious move and is the wrong one: it
 duplicates the shared 87% across packages and makes cross-version work require
-several installs.
+several installs. The longer argument is in [Content-addressed
+schemas](https://js.idfkit.com/explanation/content-addressed-schemas/).
 
 ## Usage
 
@@ -66,6 +71,9 @@ delta.removed;
 delta.changed;
 ```
 
+See [How to compare two EnergyPlus
+versions](https://js.idfkit.com/how-to/compare-versions/).
+
 ### Shared identity
 
 Definitions are frozen and shared by identity across every version that has the
@@ -90,15 +98,12 @@ Deliberately dropped: `note`, `memo`, `ip-units`, and `field_info`. That is
 documentation metadata and most of the weight, and it is on the critical path of
 every parse. Tooling that renders documentation should read the source schemas.
 
-`FieldKind` is `'a'` alpha, `'n'` real, `'i'` integer, `'arr'` extensible array.
-Keys are single letters because this file is parsed on every cold start.
+Keys are single letters because this file is parsed on every cold start. The full
+key-by-key description is in [Slim schema
+format](https://js.idfkit.com/reference/slim-schema-format/).
 
 ## Regenerating
 
-```bash
-node scripts/build.mjs --source ../../../idfkit/src/idfkit/schemas
-```
-
-Hashes are computed from a canonical serialization (sorted keys, fixed
-separators). That must stay stable across rebuilds or every regeneration churns
-the whole bundle and the diff becomes unreadable.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md#regenerating-the-schema-bundle).
+Hashes are computed from a canonical serialization and must stay stable across
+rebuilds.

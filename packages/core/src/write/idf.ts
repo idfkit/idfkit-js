@@ -7,24 +7,24 @@ import type { IdfObject, StoredValue } from '../object.js';
 export interface WriteIdfOptions {
   /**
    * Emit `!- Field Name` comments after each field.
-   * @default true
+   * @defaultValue true
    */
   comments?: boolean;
   /**
    * Column the field-name comments are aligned to.
-   * @default 30
+   * @defaultValue 30
    */
   commentColumn?: number;
   /**
    * Indent for field lines.
-   * @default '    '
+   * @defaultValue '    '
    */
   indent?: string;
   /**
    * Write `Version` first regardless of insertion order. EnergyPlus does not
    * require it, but every tool in the ecosystem expects it and diffs are
    * cleaner when it is stable.
-   * @default true
+   * @defaultValue true
    */
   versionFirst?: boolean;
 }
@@ -69,7 +69,7 @@ export function writeIdf<M extends AnyTypeMap>(
   return parts.join('\n');
 }
 
-interface ObjectWriteOptions {
+export interface ObjectWriteOptions {
   comments: boolean;
   commentColumn: number;
   indent: string;

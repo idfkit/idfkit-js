@@ -20,7 +20,7 @@ export type {
 export { ReferenceGraph } from './references.js';
 export type { ReferenceEdge } from './references.js';
 export { ObjectShape, shapeFor, shapeOf } from './shape.js';
-export type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap } from './typemap.js';
+export type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
 export { compareVersions, resolveVersion, versionKey } from './versions.js';
 
 export { lex } from './parse/lexer.js';
@@ -31,7 +31,7 @@ export { detectEpJsonVersion, parseEpJson } from './parse/epjson.js';
 export type { EpJson } from './parse/epjson.js';
 
 export { writeIdf, writeObject } from './write/idf.js';
-export type { WriteIdfOptions } from './write/idf.js';
+export type { ObjectWriteOptions, WriteIdfOptions } from './write/idf.js';
 export { toEpJson, writeEpJson } from './write/epjson.js';
 export type { WriteEpJsonOptions } from './write/epjson.js';
 

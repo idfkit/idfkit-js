@@ -5,7 +5,7 @@ import type { EpJson } from '../parse/epjson.js';
 export interface WriteEpJsonOptions {
   /**
    * Indent width. `0` emits compact JSON.
-   * @default 2
+   * @defaultValue 2
    */
   indent?: number;
 }

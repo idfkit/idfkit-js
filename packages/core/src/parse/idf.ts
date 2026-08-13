@@ -13,7 +13,7 @@ export interface ParseDiagnostic extends LexDiagnostic {
 export interface ParseOptions {
   /**
    * Throw on the first diagnostic instead of collecting them.
-   * @default true
+   * @defaultValue true
    */
   strict?: boolean;
   /** Collects diagnostics when `strict` is false. */

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "readme": "none",
+  "githubPages": false,
+  "sourceLinkTemplate": "https://github.com/idfkit/idfkit-js/blob/{gitRevision}/{path}#L{line}"
+}

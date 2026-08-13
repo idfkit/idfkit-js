@@ -6,6 +6,10 @@ Zero runtime dependencies apart from [`@idfkit/schemas`](../schemas). The main
 entry point is synchronous and free of I/O, so it runs unchanged in Node, a
 browser, a worker, or an edge runtime.
 
+**[Documentation](https://js.idfkit.com/)** ·
+[API reference](https://js.idfkit.com/reference/core/) ·
+[Tutorial](https://js.idfkit.com/tutorials/first-model/)
+
 ```bash
 npm install @idfkit/core @idfkit/schemas
 ```
@@ -68,6 +72,8 @@ const { document, diagnostics } = parseIdf(text, schema, { strict: false });
 const output = writeIdf(document);
 ```
 
+See [How to parse in the browser](https://js.idfkit.com/how-to/parse-in-the-browser/).
+
 ### Diagnostics
 
 `strict: true` (the default) throws an `IdfParseError` on the first problem.
@@ -81,43 +87,25 @@ for (const d of diagnostics) {
 }
 ```
 
+See [How to collect diagnostics instead of
+throwing](https://js.idfkit.com/how-to/collect-diagnostics/).
+
 ## API
 
-### `IDFDocument<M>`
+The full API is generated from the source and published at
+**[js.idfkit.com/reference/core](https://js.idfkit.com/reference/core/)**.
 
-| Member                                    | Description                                                   |
-| ----------------------------------------- | ------------------------------------------------------------- |
-| `all(type)`                               | Collection for a type. Creates an empty one if absent.        |
-| `get(type, name)` / `require(type, name)` | One object; `require` throws.                                 |
-| `add(type, name, values?)`                | Create and attach. `name` may be `null` for anonymous types.  |
-| `attach(obj)` / `remove(obj)`             | Move a detached object in, or take one out.                   |
-| `rename(obj, next)`                       | Rename with reference propagation. Same as `obj.name = next`. |
-| `objects()`                               | Generator over every object.                                  |
-| `references`                              | The live `ReferenceGraph`.                                    |
-| `danglingReferences()`                    | Edges whose target does not exist.                            |
-| `toJSON()`                                | epJSON representation.                                        |
+The main entry points:
 
-`M` is an optional generated type map. Omit it and everything still works, just
-untyped.
-
-### `IdfObject`
-
-Fields are real properties. `obj.get(field)` and `obj.set(field, value)` are the
-untyped equivalents, for version-generic code.
-
-| Member                 | Description                                            |
-| ---------------------- | ------------------------------------------------------ |
-| `name`                 | The name as written. Assigning renames and propagates. |
-| `typeName`, `schema`   | Canonical type name and its schema definition.         |
-| `extensible`           | Live array of repeat groups.                           |
-| `update(values)`       | Apply several fields at once.                          |
-| `clone(name?)`         | Detached deep copy.                                    |
-| `outgoingReferences()` | Fields that point at other objects.                    |
-
-### `IdfCollection`
-
-Iterable. `get`, `require`, `has`, `names`, `toArray`, `filter`, `map`, `find`,
-`where(field, value)`, `first`, `only`, `size`.
+- **`IDFDocument<M>`** — collections by type, a live reference graph, bound to
+  one EnergyPlus version. `M` is an optional generated type map; omit it and
+  everything still works, just untyped.
+- **`IdfObject`** — one EnergyPlus object. Fields are real properties;
+  `obj.get(field)` and `obj.set(field, value)` are the untyped equivalents for
+  version-generic code.
+- **`IdfCollection`** — name-indexed, insertion-ordered, case-insensitive.
+- **`parseIdf` / `writeIdf`** and **`parseEpJson` / `writeEpJson`** — synchronous,
+  string in and string out.
 
 ## Notes
 
@@ -130,5 +118,3 @@ Writing does not preserve source formatting. `3.0` comes back as `3`, since
 JavaScript has one number type and the distinction is gone once parsed. The
 models are semantically identical and EnergyPlus reads both, but a textual diff
 will show those fields.
-
-See the [repository README](../../README.md) for the design rationale.

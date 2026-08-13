@@ -73,6 +73,28 @@ jobs:
 
       - run: npm test
 
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: astral-sh/setup-uv@v5
+
+      - run: npm ci
+
+      - name: Build the documentation
+        # --strict, so a broken internal link or a nav entry pointing at a
+        # missing page fails here rather than shipping. This also exercises the
+        # generated API reference: mkdocstrings runs TypeDoc over both packages,
+        # so a source file that no longer compiles takes the docs down too.
+        run: npm run docs:build
+
   conformance:
     name: Round-trip EnergyPlus example files
     runs-on: ubuntu-latest

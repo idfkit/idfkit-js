@@ -1,0 +1,162 @@
+site_name: idfkit-js
+repo_url: https://github.com/idfkit/idfkit-js
+site_url: https://js.idfkit.com/
+site_description: EnergyPlus IDF and epJSON parsing and manipulation for JavaScript and TypeScript. Synchronous, dependency-free, all 17 EnergyPlus versions, with generated static types.
+site_author: Samuel Letellier-Duchesne
+edit_uri: edit/main/docs/
+repo_name: idfkit/idfkit-js
+copyright: Maintained by <a href="https://samuelduchesne.github.io">samuelduchesne</a>.
+
+nav:
+  - Home: index.md
+
+  # Organised by the Diataxis framework: Tutorials (learning), How-to guides
+  # (tasks), Reference (facts), and Explanation (understanding). A page belongs
+  # to exactly one of these. Material that lands in the wrong one gets moved,
+  # not duplicated.
+
+  - Tutorials:
+      - tutorials/index.md
+      - Build your first model: tutorials/first-model.md
+
+  - How-to guides:
+      - how-to/index.md
+      - How to run a simulation: how-to/run-a-simulation.md
+      - How to parse in the browser: how-to/parse-in-the-browser.md
+      - How to collect diagnostics instead of throwing: how-to/collect-diagnostics.md
+      - How to edit extensible groups: how-to/edit-extensible-groups.md
+      - How to handle a version you do not know ahead of time: how-to/handle-unknown-versions.md
+      - How to compare two EnergyPlus versions: how-to/compare-versions.md
+
+  - Reference:
+      - reference/index.md
+      - Supported versions: reference/versions.md
+      - Slim schema format: reference/slim-schema-format.md
+      - API:
+          - "@idfkit/core": reference/core.md
+          - "@idfkit/core/node": reference/core-node.md
+          - "@idfkit/schemas": reference/schemas.md
+
+  - Explanation:
+      - explanation/index.md
+      - A synchronous core with async edges: explanation/sync-core-async-edge.md
+      - Why accessors and not a Proxy: explanation/accessors-not-proxies.md
+      - Static types generated from the schema: explanation/generated-types.md
+      - Content-addressed schemas: explanation/content-addressed-schemas.md
+      - Why epJSON field names are used verbatim: explanation/epjson-field-names.md
+      - The hazards of a positional format: explanation/positional-format-hazards.md
+      - How conformance is established: explanation/conformance.md
+      - Parity with the Python library: explanation/parity.md
+
+# `griffe-typedoc` cannot decode current TypeDoc output unpatched. What the hook
+# does and when it can go away is documented in the file itself.
+hooks:
+  - docs/.hooks/typedoc_shim.py
+
+plugins:
+  - search
+  - mkdocstrings:
+      custom_templates: docs/.templates
+      default_handler: typescript
+      handlers:
+        typescript:
+          options:
+            heading_level: 3
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+
+theme:
+  name: material
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.code.select
+    - content.tooltips
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+    logo: material/language-typescript
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/idfkit/idfkit-js
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/package/@idfkit/core
+  generator: false
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
