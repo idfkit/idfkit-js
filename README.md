@@ -12,6 +12,7 @@ Python [idfkit](https://github.com/idfkit/idfkit), not a transliteration of it.
 | ------------------ | ------------------------------------------------- | ------------------------------------------------------------------ |
 | `packages/core`    | Parsing, the object model, references, writers    | [`@idfkit/core`](https://www.npmjs.com/package/@idfkit/core)       |
 | `packages/schemas` | Content-addressed epJSON schemas, all 17 versions | [`@idfkit/schemas`](https://www.npmjs.com/package/@idfkit/schemas) |
+| `packages/weather` | TMYx station index and browser EPW retrieval      | [`@idfkit/weather`](https://www.npmjs.com/package/@idfkit/weather) |
 
 It sits alongside [`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine),
 which runs EnergyPlus itself in the browser via WebAssembly. This repository
@@ -58,6 +59,20 @@ const bundle = new SchemaBundle(httpSource('/schemas/'));
 const schema = await bundle.load('26.1.0');
 const { document } = parseIdf(idfText, schema);
 ```
+
+Need a weather file too? [`@idfkit/weather`](https://www.npmjs.com/package/@idfkit/weather)
+searches the climate.onebuilding.org TMYx station index and pulls EPW files
+browser-side:
+
+```ts
+import { loadStationIndex, fetchEpw } from '@idfkit/weather';
+
+const index = await loadStationIndex('/stations.json.gz');
+const epw = await fetchEpw(index.search('chicago ohare')[0].station);
+```
+
+See [How to fetch a weather
+file](https://js.idfkit.com/how-to/fetch-weather-files/).
 
 New to the library? [Build your first
 model](https://js.idfkit.com/tutorials/first-model/) goes from nothing to a

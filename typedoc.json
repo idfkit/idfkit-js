@@ -2,7 +2,7 @@
   "$schema": "https://typedoc.org/schema.json",
   "extends": ["./typedoc.base.json"],
   "entryPointStrategy": "packages",
-  "entryPoints": ["packages/schemas", "packages/core"],
+  "entryPoints": ["packages/schemas", "packages/core", "packages/weather"],
   "name": "idfkit-js",
   "basePath": ".",
   "readme": "none"

@@ -13,7 +13,9 @@
       "@idfkit/schemas": ["./packages/schemas/src/index.ts"],
       "@idfkit/schemas/node": ["./packages/schemas/src/node.ts"],
       "@idfkit/core": ["./packages/core/src/index.ts"],
-      "@idfkit/core/node": ["./packages/core/src/node.ts"]
+      "@idfkit/core/node": ["./packages/core/src/node.ts"],
+      "@idfkit/weather": ["./packages/weather/src/index.ts"],
+      "@idfkit/weather/node": ["./packages/weather/src/node.ts"]
     },
     "baseUrl": "."
   },

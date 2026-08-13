@@ -14,6 +14,7 @@ manipulation. It is a deliberate re-design for JavaScript, not a transliteration
 | ------------------ | ----------------- | ------------------------------------------------- |
 | `packages/core`    | `@idfkit/core`    | Parser, object model, reference graph, writers    |
 | `packages/schemas` | `@idfkit/schemas` | Content-addressed epJSON schemas, all 17 versions |
+| `packages/weather` | `@idfkit/weather` | TMYx station index and browser EPW retrieval      |
 
 Related: [`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine) runs
 EnergyPlus in the browser via WASM. This repo handles the model, that one the
@@ -143,8 +144,11 @@ positional field instead of failing.
 
 ## Parity with Python idfkit
 
-Not implemented here: simulation, weather, geometry, schedules, thermal
+Not implemented here: simulation, geometry, schedules, thermal
 properties, full validation, formatting-preserving round-trip (needs a CST).
+Weather is partly ported in `@idfkit/weather` (station index + EPW retrieval);
+the Python library's DDY parsing, design-day injection, disk cache, and `tmy`
+CLI are not.
 
 Two implementations of a schema-driven format will drift silently. A shared
 conformance suite (fixture IDFs plus expected canonical epJSON and diagnostics,
