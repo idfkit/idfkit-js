@@ -46,6 +46,9 @@ export function httpSource(baseUrl: string): BundleSource {
         throw new Error(`Failed to load ${fileName}.gz: ${response.status} ${response.statusText}`);
       }
       const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length === 0) {
+        throw new Error(`Empty response for ${fileName}.gz`);
+      }
       // The client already inflated the body (host set Content-Encoding: gzip).
       if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
         return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
