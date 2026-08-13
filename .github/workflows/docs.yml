@@ -5,22 +5,21 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Only the contents read and the pages write are needed; id-token is required by
-# the deploy action to prove the artifact came from this workflow run.
+# Pushing the built site to the gh-pages branch, the same way idfkit (Python)
+# publishes py.idfkit.com. Hence contents: write rather than the pages/id-token
+# pair the artifact-based deployment needs.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 # Never cancel a deploy in flight — a half-published site is worse than a stale
 # one — but let a newer commit queue behind it.
 concurrency:
-  group: pages
+  group: gh-pages
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build
+  deploy:
+    name: Build and deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,17 +39,14 @@ jobs:
 
       - run: npm run docs:build
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: site
-
-  deploy:
-    name: Deploy
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          # force_orphan keeps a single commit on gh-pages: the branch is build
+          # output, so its history is worth nothing and grows without bound.
+          force_orphan: true
+          # Writes site/CNAME. docs/CNAME sets it too, so the custom domain
+          # survives a local build or a deploy by any other route.
+          cname: js.idfkit.com
