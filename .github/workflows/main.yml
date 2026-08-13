@@ -88,6 +88,11 @@ jobs:
 
       - run: npm ci
 
+      # TypeDoc resolves @idfkit/schemas through the "types" entry in its
+      # package.json, which points inside dist. Without this the reference pages
+      # collect nothing and the build dies decoding empty JSON.
+      - run: npx tsc --build
+
       - name: Build the documentation
         # --strict, so a broken internal link or a nav entry pointing at a
         # missing page fails here rather than shipping. This also exercises the
