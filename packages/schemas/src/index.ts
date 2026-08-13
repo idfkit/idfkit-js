@@ -35,10 +35,15 @@ export function httpSource(baseUrl: string): BundleSource {
   // Resolve against the document base when there is one, so a same-origin
   // path like '/schemas/' works the way `fetch('/schemas/...')` does. In Node
   // there is no base, and a relative path stays an error — it cannot resolve.
-  const documentBase = (globalThis as { location?: { href: string } }).location?.href;
-  const base = new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`, documentBase).href;
+  // Resolution is deferred to `read` so that merely constructing the source
+  // (e.g. `new SchemaBundle(httpSource('/schemas/'))` at module scope in an
+  // isomorphic app) never throws on the server; the error only surfaces if a
+  // relative base is actually read where it cannot resolve.
+  const normalized = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
   return {
     async read(fileName) {
+      const documentBase = (globalThis as { location?: { href: string } }).location?.href;
+      const base = new URL(normalized, documentBase).href;
       const response = await fetch(new URL(`${fileName}.gz`, base));
       if (!response.ok) {
         throw new Error(`Failed to load ${fileName}.gz: ${response.status} ${response.statusText}`);
