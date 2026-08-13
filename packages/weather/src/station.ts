@@ -193,22 +193,34 @@ export class WeatherStation implements Readonly<Required<WeatherStationFields>> 
    */
   static fromJSON(record: StationRecord): WeatherStation {
     const sourceWmo = record.design_conditions_source_wmo;
+    // Read required numeric fields through a finite-number guard: `Number(undefined)`
+    // and `Number("nope")` are `NaN`, and silently seating a `NaN` into a frozen
+    // station is exactly the corrupt-payload failure this is meant to catch.
+    const num = (value: unknown, field: string): number => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) {
+        throw new Error(
+          `Invalid station record: field ${JSON.stringify(field)} is not a finite number`
+        );
+      }
+      return n;
+    };
     return new WeatherStation({
       country: String(record.country),
       state: String(record.state),
       city: String(record.city),
       wmo: String(record.wmo),
       source: String(record.source),
-      latitude: Number(record.latitude),
-      longitude: Number(record.longitude),
+      latitude: num(record.latitude, 'latitude'),
+      longitude: num(record.longitude, 'longitude'),
       timezone: Number(record.timezone),
       elevation: Number(record.elevation),
       url: String(record.url),
       ashraeClimateZone: String(record.ashrae_climate_zone),
-      heatingDesignDbC: Number(record.heating_design_db_c),
-      coolingDesignDbC: Number(record.cooling_design_db_c),
-      hdd18: Number(record.hdd18),
-      cdd10: Number(record.cdd10),
+      heatingDesignDbC: num(record.heating_design_db_c, 'heating_design_db_c'),
+      coolingDesignDbC: num(record.cooling_design_db_c, 'cooling_design_db_c'),
+      hdd18: num(record.hdd18, 'hdd18'),
+      cdd10: num(record.cdd10, 'cdd10'),
       designConditionsSourceWmo: sourceWmo == null ? null : String(sourceWmo),
     });
   }

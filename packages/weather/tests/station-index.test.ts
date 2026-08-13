@@ -89,6 +89,17 @@ describe('StationIndex.nearest', () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.station.city).toBe('London.Heathrow.AP');
   });
+
+  it('finds a station across the antimeridian within maxDistanceKm', () => {
+    // A station just west of +180° must still be found from a query just east
+    // of it — the bounding-box pre-filter must not wrongly reject the wrap.
+    const acrossLine = makeStation({ wmo: '999001', latitude: 0, longitude: -179.7 });
+    const wrapIndex = StationIndex.fromStations([acrossLine]);
+    const results = wrapIndex.nearest(0, 179.9, { maxDistanceKm: 100 });
+    expect(results).toHaveLength(1);
+    expect(results[0]?.station.wmo).toBe('999001');
+    expect(results[0]?.distanceKm).toBeLessThan(100);
+  });
 });
 
 describe('StationIndex exact lookups', () => {

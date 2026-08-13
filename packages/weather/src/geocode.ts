@@ -96,8 +96,14 @@ export async function geocode(
       headers: { 'User-Agent': USER_AGENT },
       signal: options.signal,
     });
+    if (!response.ok) {
+      throw new GeocodingError(
+        `Failed to geocode address ${address}: ${response.status} ${response.statusText}`
+      );
+    }
     data = (await response.json()) as Array<{ lat?: string; lon?: string }>;
   } catch (cause) {
+    if (cause instanceof GeocodingError) throw cause;
     throw new GeocodingError(`Failed to geocode address: ${address}`, { cause });
   }
 
@@ -157,8 +163,14 @@ export async function detectLocation(
       headers: { 'User-Agent': USER_AGENT },
       signal: options.signal,
     });
+    if (!response.ok) {
+      throw new GeocodingError(
+        `Failed to detect location from IP: ${response.status} ${response.statusText}`
+      );
+    }
     data = (await response.json()) as typeof data;
   } catch (cause) {
+    if (cause instanceof GeocodingError) throw cause;
     throw new GeocodingError(`Failed to detect location from IP: ${String(cause)}`, { cause });
   }
 

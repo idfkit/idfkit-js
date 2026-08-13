@@ -226,6 +226,11 @@ export class StationIndex {
     let latMax = 0;
     let lonMin = 0;
     let lonMax = 0;
+    // When the longitude box would spill past ±180° the simple `min < x < max`
+    // test wrongly rejects stations on the far side of the antimeridian (a
+    // query at 179°E is ~78 km from one at 179°W). Skip the longitude pre-filter
+    // in that case and let the exact Haversine + radius check below decide.
+    let filterLongitude = false;
     if (maxDistanceKm !== undefined) {
       const deltaDeg = maxDistanceKm / 111.0 + 1.0; // ~111 km per degree of latitude, small margin
       latMin = latitude - deltaDeg;
@@ -234,6 +239,7 @@ export class StationIndex {
       const lonDelta = deltaDeg / Math.max(cosLat, 0.01);
       lonMin = longitude - lonDelta;
       lonMax = longitude + lonDelta;
+      filterLongitude = lonMin >= -180 && lonMax <= 180;
     }
 
     const results: SpatialResult[] = [];
@@ -241,7 +247,7 @@ export class StationIndex {
       if (country && station.country.toUpperCase() !== country.toUpperCase()) continue;
       if (maxDistanceKm !== undefined) {
         if (station.latitude < latMin || station.latitude > latMax) continue;
-        if (station.longitude < lonMin || station.longitude > lonMax) continue;
+        if (filterLongitude && (station.longitude < lonMin || station.longitude > lonMax)) continue;
       }
       const distanceKm = haversineKm(latitude, longitude, station.latitude, station.longitude);
       if (maxDistanceKm !== undefined && distanceKm > maxDistanceKm) continue;
