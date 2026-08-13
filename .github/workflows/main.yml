@@ -118,11 +118,35 @@ jobs:
         # extensible shapes, blank names, and autosized fields that hand-written
         # fixtures never reach. Unit tests skip these when absent, so this job
         # exists to make sure they actually run somewhere.
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=26.1.0
+          set -euo pipefail
           TAG=v26.1.0
+
+          # The asset name cannot be built from the version: it embeds a build
+          # hash (EnergyPlus-26.1.0-6f2e40d102-...) and names whichever Ubuntu
+          # that release targeted, which moves between releases. Ask the API.
+          ASSETS="$(gh api "repos/NREL/EnergyPlus/releases/tags/${TAG}" --jq '.assets[].name')"
+
+          # Prefer the build for the runner's own Ubuntu; a mismatched glibc
+          # fails at exec time, well after this step has reported success.
+          UBUNTU="$(. /etc/os-release && echo "$VERSION_ID")"
+          NAME="$(printf '%s\n' "$ASSETS" | grep -E "Linux-Ubuntu${UBUNTU}-x86_64\.tar\.gz$" || true)"
+          if [ -z "$NAME" ]; then
+            NAME="$(printf '%s\n' "$ASSETS" \
+              | grep -E 'Linux-Ubuntu[0-9.]+-x86_64\.tar\.gz$' | sort -V | tail -1 || true)"
+            echo "::warning::No ${TAG} build for Ubuntu ${UBUNTU}; falling back to ${NAME:-none}"
+          fi
+          if [ -z "$NAME" ]; then
+            echo "::error::No Linux x86_64 tarball on the ${TAG} release. Assets were:"
+            printf '%s\n' "$ASSETS"
+            exit 1
+          fi
+
+          echo "Installing $NAME"
           curl -fsSL -o ep.tar.gz \
-            "https://github.com/NREL/EnergyPlus/releases/download/${TAG}/EnergyPlus-${VERSION}-Linux-Ubuntu22.04-x86_64.tar.gz"
+            "https://github.com/NREL/EnergyPlus/releases/download/${TAG}/${NAME}"
           mkdir -p "$HOME/EnergyPlus"
           tar -xzf ep.tar.gz -C "$HOME/EnergyPlus" --strip-components=1
           echo "ENERGYPLUS_DIR=$HOME/EnergyPlus" >> "$GITHUB_ENV"
