@@ -12,7 +12,9 @@ on:
 
 permissions:
   contents: read
-  # Required for npm provenance.
+  # Required for npm trusted publishing: GitHub mints a short-lived OIDC token
+  # that npm exchanges for publish rights, so there is no long-lived NPM_TOKEN
+  # to store or rotate. Same arrangement as idfkit-engine.
   id-token: write
 
 jobs:
@@ -23,9 +25,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
+          # Trusted publishing needs Node >= 22.14.0; '22' resolves to the
+          # latest 22.x, which satisfies it.
           node-version: 22
           cache: npm
           registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm >= 11.5.1, newer than the npm bundled with
+      # Node 22. Without this the publish falls back to looking for a token and
+      # fails with an authentication error rather than anything self-explanatory.
+      - name: Use an npm that supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       - run: npm ci
 
@@ -47,12 +59,13 @@ jobs:
 
       - name: Publish
         if: github.event_name == 'release'
+        # No --provenance flag and no NODE_AUTH_TOKEN: with OIDC on a public
+        # repository publishing a public package, npm generates and publishes
+        # the provenance attestation by default.
         run: |
           # schemas first: core depends on it by exact version.
-          npm publish -w @idfkit/schemas --provenance --access public
-          npm publish -w @idfkit/core --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish -w @idfkit/schemas --access public
+          npm publish -w @idfkit/core --access public
 
       - name: Pack only
         if: github.event_name == 'workflow_dispatch'
