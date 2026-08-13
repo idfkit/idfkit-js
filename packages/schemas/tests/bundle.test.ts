@@ -1,8 +1,46 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { httpSource } from '@idfkit/schemas';
 import { localBundle } from '@idfkit/schemas/node';
 
 const bundle = localBundle();
+
+describe('httpSource', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('resolves a relative base against the document base, like fetch does', async () => {
+    // Regression: `new URL(fileName, base)` threw "Invalid URL" for a relative
+    // base such as '/schemas/' — the natural thing to write in a browser app,
+    // and the schemas README's own example.
+    const seen: string[] = [];
+    vi.stubGlobal('location', { href: 'https://app.example/demo/' });
+    vi.stubGlobal('fetch', async (url: URL) => {
+      seen.push(url.href);
+      return new Response('', { status: 200 });
+    });
+
+    const source = httpSource('/schemas/');
+    await source.read('index.json').catch(() => undefined);
+
+    expect(seen).toEqual(['https://app.example/schemas/index.json.gz']);
+  });
+
+  it('leaves an absolute base untouched', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('location', { href: 'https://app.example/demo/' });
+    vi.stubGlobal('fetch', async (url: URL) => {
+      seen.push(url.href);
+      return new Response('', { status: 200 });
+    });
+
+    const source = httpSource('https://cdn.example/schemas');
+    await source.read('index.json').catch(() => undefined);
+
+    expect(seen).toEqual(['https://cdn.example/schemas/index.json.gz']);
+  });
+});
 
 describe('SchemaBundle', () => {
   it('ships every supported EnergyPlus version', async () => {
