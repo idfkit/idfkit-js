@@ -66,6 +66,8 @@ jobs:
           # schemas first: core depends on it by exact version.
           npm publish -w @idfkit/schemas --access public
           npm publish -w @idfkit/core --access public
+          # weather has no workspace dependencies, so order does not matter.
+          npm publish -w @idfkit/weather --access public
 
       - name: Pack only
         if: github.event_name == 'workflow_dispatch'

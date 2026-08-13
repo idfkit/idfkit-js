@@ -20,20 +20,6 @@ npm pkg set type=module
 npm install @idfkit/core @idfkit/schemas
 ```
 
-!!! warning "While the packages are unpublished"
-
-    idfkit-js is a prototype and nothing is on npm yet. Until it is, build the
-    tarballs from a checkout and install those instead of the last line above:
-
-    ```bash
-    git clone https://github.com/idfkit/idfkit-js.git
-    (cd idfkit-js && npm install && npx tsc --build \
-      && npm pack -w @idfkit/schemas -w @idfkit/core --pack-destination ..)
-    npm install ./idfkit-schemas-0.0.0.tgz ./idfkit-core-0.0.0.tgz
-    ```
-
-    Everything after this point is identical either way.
-
 ## Step 2: Create an empty model
 
 Every model is bound to one EnergyPlus version, because field order genuinely

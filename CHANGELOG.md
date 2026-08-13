@@ -10,6 +10,8 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-13
+
 ### Added
 
 - `@idfkit/weather`, a new package for finding an EnergyPlus weather file and
@@ -47,6 +49,10 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
   where there is no document base, a relative base remains an error but is only
   raised when a schema is read, so constructing a `SchemaBundle` at module scope is
   safe in server-rendered apps.
+- `@idfkit/weather` carries a real version number. Its first upload to npm went out
+  under the in-repo placeholder `0.0.0`, which the release tooling treats as "not a
+  release". Anyone who installed that build should move to `0.1.0`; the code is the
+  same, the version is not.
 
 ## [0.0.1] - 2026-08-13
 
@@ -76,5 +82,6 @@ First published release. The API is not yet stable.
   no schema matches, because loading the wrong schema mis-maps every positional
   field instead of failing.
 
-[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.0.1...HEAD
+[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/idfkit/idfkit-js/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/idfkit/idfkit-js/releases/tag/v0.0.1
