@@ -1,0 +1,169 @@
+/* ===========================================================================
+   idfkit-js brand
+   ---------------------------------------------------------------------------
+   Same visual family as its siblings, deliberately a different hue so the three
+   sites are never mistaken for one another:
+
+     idfkit (Python)  warm orange   material/fire
+     idfkit-docs      teal          material/flash
+     idfkit-js        TypeScript blue, amber accent   material/language-typescript
+
+   The shared family signature is the treatment, not the colour: gradient hero
+   headline, feature chips, lifting grid cards, Inter + JetBrains Mono.
+   =========================================================================== */
+
+:root {
+  /* Cool primary. #3178c6 is the TypeScript blue; the ramp darkens it enough
+     for white header text to clear contrast in light mode. */
+  --md-primary-fg-color: #1f5fa9;
+  --md-primary-fg-color--light: #3178c6;
+  --md-primary-fg-color--dark: #14406f;
+
+  /* Warm accent, as the counterweight that keeps the palette from reading cold. */
+  --md-accent-fg-color: #d97706;
+  --md-accent-fg-color--transparent: rgba(217, 119, 6, 0.1);
+
+  --idfkit-hero-gradient: linear-gradient(135deg, #14406f 0%, #3178c6 55%, #0ea5e9 100%);
+}
+
+[data-md-color-scheme='slate'] {
+  --md-primary-fg-color: #3178c6;
+  --md-primary-fg-color--light: #7db8ee;
+  --md-primary-fg-color--dark: #1f5fa9;
+
+  --md-accent-fg-color: #f59e0b;
+  --md-accent-fg-color--transparent: rgba(245, 158, 11, 0.14);
+
+  --idfkit-hero-gradient: linear-gradient(135deg, #4d9bea 0%, #7dd3fc 55%, #a5f3fc 100%);
+}
+
+/* ===== Hero section on the landing page ===== */
+
+/* The edit/view buttons float right and visually offset a centred hero. */
+.md-content__inner:has(> .hero) > .md-content__button {
+  display: none;
+}
+
+.md-typeset .hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem 1rem 3rem;
+  margin-bottom: 2rem;
+}
+
+.md-typeset .hero h1 {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  background: var(--idfkit-hero-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.md-typeset .hero h1 .headerlink {
+  display: none;
+}
+
+.md-typeset .hero .hero-tagline {
+  font-size: 1.25rem;
+  color: var(--md-default-fg-color--light);
+  max-width: 40rem;
+  margin-bottom: 1.5rem;
+}
+
+.md-typeset .hero .hero-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.md-typeset .hero .hero-buttons .md-button {
+  font-weight: 600;
+}
+
+/* ===== Feature highlight chips ===== */
+
+.md-typeset .feature-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.md-typeset .feature-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--md-accent-fg-color--transparent);
+  color: var(--md-accent-fg-color);
+  border: 1px solid var(--md-accent-fg-color);
+}
+
+/* ===== Feature grid cards ===== */
+
+.md-typeset .grid.cards > ul > li {
+  border-radius: 0.75rem;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+[data-md-color-scheme='slate'] .md-typeset .grid.cards > ul > li:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ===== Rounded surfaces, matching the sibling sites ===== */
+
+.md-typeset pre > code {
+  border-radius: 0.5rem;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.5rem;
+}
+
+.md-typeset .tabbed-labels > label {
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.md-social__link svg {
+  fill: currentcolor;
+}
+
+/* ===== Generated API reference =====
+   mkdocstrings renders symbol headings; keep them distinguishable from prose
+   headings without shouting. */
+
+.md-typeset .doc-symbol-module,
+.md-typeset .doc-symbol-class,
+.md-typeset .doc-symbol-interface,
+.md-typeset .doc-symbol-function,
+.md-typeset .doc-symbol-method,
+.md-typeset .doc-symbol-property,
+.md-typeset .doc-symbol-accessor,
+.md-typeset .doc-symbol-type-alias,
+.md-typeset .doc-symbol-variable {
+  font-family: var(--md-code-font-family);
+  font-size: 0.72em;
+  font-weight: 700;
+  padding: 0 0.35em;
+  border-radius: 0.25rem;
+  background: var(--md-accent-fg-color--transparent);
+  color: var(--md-accent-fg-color);
+}
