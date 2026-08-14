@@ -5,10 +5,13 @@ on:
     types: [published]
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: Pack without publishing
-        type: boolean
-        default: true
+      version:
+        description: >
+          Version to publish, e.g. 0.1.0. Leave empty to pack without
+          publishing. Use this to finish a release whose publish partially
+          failed, without deleting and recreating the release.
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -48,12 +51,29 @@ jobs:
 
       - run: npx tsc --build
 
-      - name: Set versions from the release tag
-        if: github.event_name == 'release'
+      - name: Resolve the version to publish
+        # A release publishes its own tag. A manual run publishes only when
+        # given an explicit version, and otherwise just packs.
+        run: |
+          if [ "${{ github.event_name }}" = 'release' ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          if [ -n "$VERSION" ]; then
+            echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+            echo "PUBLISH=true" >> "$GITHUB_ENV"
+            echo "Publishing $VERSION"
+          else
+            echo "PUBLISH=false" >> "$GITHUB_ENV"
+            echo "No version given; packing only."
+          fi
+
+      - name: Set versions
+        if: env.PUBLISH == 'true'
         # The git tag is the source of truth, matching how the Python package
         # releases. package.json versions are placeholders in the repo.
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
           # --workspaces-update=false is load-bearing. Without it, npm rewrites
           # package-lock.json after the bump: core's lock entry still asks for
           # @idfkit/schemas at the old placeholder version, the local workspace
@@ -64,17 +84,25 @@ jobs:
           npm pkg set "dependencies.@idfkit/schemas=$VERSION" -w @idfkit/core
 
       - name: Publish
-        if: github.event_name == 'release'
+        if: env.PUBLISH == 'true'
         # No --provenance flag and no NODE_AUTH_TOKEN: with OIDC on a public
         # repository publishing a public package, npm generates and publishes
         # the provenance attestation by default.
         run: |
-          # schemas first: core depends on it by exact version.
-          npm publish -w @idfkit/schemas --access public
-          npm publish -w @idfkit/core --access public
-          # weather has no workspace dependencies, so order does not matter.
-          npm publish -w @idfkit/weather --access public
+          # Skip anything already on the registry. npm refuses to republish a
+          # version, and without this the whole step aborts on the first
+          # already-published package, so a release that failed partway can
+          # never be completed by re-running it.
+          # schemas first: core depends on it by exact version. weather has no
+          # workspace dependencies, so its position does not matter.
+          for pkg in @idfkit/schemas @idfkit/core @idfkit/weather; do
+            if npm view "$pkg@$VERSION" version >/dev/null 2>&1; then
+              echo "$pkg@$VERSION is already published; skipping."
+            else
+              npm publish -w "$pkg" --access public
+            fi
+          done
 
       - name: Pack only
-        if: github.event_name == 'workflow_dispatch'
+        if: env.PUBLISH != 'true'
         run: npm pack --workspaces --pack-destination /tmp
