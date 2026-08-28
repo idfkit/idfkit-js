@@ -153,6 +153,41 @@ describe('docs/how-to/run-a-simulation.md', () => {
     expect(reparsed.document.require('Zone', 'SPACE1-1').ceiling_height).toBe(3);
     expect(idf).toMatch(/^Version,/m);
   });
+
+  /**
+   * The page tells readers to key the engine's `files` map off the document
+   * rather than hardcoding the path, so that the two cannot drift apart. That
+   * advice is only good while `get('file_name')` returns the path verbatim --
+   * which is a claim about this library, and therefore testable here even
+   * though the engine half is not.
+   */
+  it('reads the external file name back exactly as written', async () => {
+    const schema = await new SchemaBundle({
+      read: (fileName) => Promise.resolve(readBundleFileSync(fileName)),
+    }).load('26.1.0');
+
+    const model = `${MODEL}
+Schedule:File,
+  Occupancy,        !- Name
+  Fraction,         !- Schedule Type Limits Name
+  data/Occupancy.CSV, !- File Name
+  1, 1, 8760, Comma, No, 60;
+`;
+
+    const { document } = parseIdf<TypeMap>(model, schema, { strict: false });
+    const name = document.require('Schedule:File', 'Occupancy').get('file_name');
+
+    // Case and subdirectory both survive. The simulation filesystem is
+    // case-sensitive, so a normalising read here would hand the engine a key
+    // that silently fails to match what the model says.
+    expect(name).toBe('data/Occupancy.CSV');
+
+    // And it survives the round trip the engine actually receives.
+    const reparsed = parseIdf<TypeMap>(writeIdf(document), schema, { strict: false });
+    expect(reparsed.document.require('Schedule:File', 'Occupancy').get('file_name')).toBe(
+      'data/Occupancy.CSV'
+    );
+  });
 });
 
 describe('docs/tutorials/first-model.md', () => {
