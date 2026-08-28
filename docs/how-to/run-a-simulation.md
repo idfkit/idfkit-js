@@ -40,7 +40,7 @@ if (result.success) {
 ep.dispose();
 ```
 
-## Three things to know at the boundary
+## Four things to know at the boundary
 
 ### Keep the versions aligned
 
@@ -58,6 +58,36 @@ for a different release.
 simulating. Call `expandObjects` from `@idfkit/engine` yourself only when you
 want the expanded IDF back — and if you do, `parseIdf` reads it straight into a
 document.
+
+### A model that reads a file needs that file handed over too
+
+The seam is IDF text plus, when the model needs them, the files it names.
+`Schedule:File`, `Table:Lookup` and `Chiller:Electric:ASHRAE205` all point at
+something on disk, and the engine cannot open a file nobody gave it.
+
+Pass the contents in `files`, keyed by exactly the path written in the model —
+relative to it, and case-sensitive, because the simulation filesystem is:
+
+```ts
+const result = await ep.run({
+  idf: writeIdf(document),
+  epw: epwText,
+  files: { 'occupancy.csv': csvText },
+});
+```
+
+Read the key off the document rather than hardcoding it, and the two cannot
+drift apart:
+
+```ts
+const name = document.require('Schedule:File', 'Occupancy').get('file_name');
+```
+
+A model naming a file that is not in `files` fails before the engine starts,
+with `success: false` and a `fatalError` naming the object and the path — so
+you get "you forgot occupancy.csv" rather than an error from inside the engine.
+`detectExternalFileReferences(idf)`, also from `@idfkit/engine`, lists what a
+model needs before you run it.
 
 ### Results do not come back through this library
 
