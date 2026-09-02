@@ -169,10 +169,12 @@ WeatherProperty:SkyTemperature,
     expect(padded.require('BuildingSurface:Detailed', 'S2').extensible).toHaveLength(1);
   });
 
-  it('does not let an anonymous key collide with a real name in epJSON', () => {
-    // epJSON has no blank key, so blank-named objects get "<Type> N" — the same
-    // name a real object is allowed to have. Minting it blind overwrote the
-    // real object and dropped it from the saved model.
+  it('keeps a blank name as the epJSON key rather than inventing one', () => {
+    // A blank name used to be handed the "<Type> N" key that belongs to types
+    // with no name field at all. That manufactures an identity: nothing stops a
+    // user from naming an object "WeatherProperty:SkyTemperature 1", so the
+    // minted key either overwrote real user data or skipped past it to a name
+    // the file never contained. The blank is the object's identity and is kept.
     const doc = new IDFDocument(v26);
     doc.add('WeatherProperty:SkyTemperature', 'WeatherProperty:SkyTemperature 1', {
       calculation_type: 'ScheduleValue',
@@ -184,9 +186,23 @@ WeatherProperty:SkyTemperature,
     });
 
     const body = doc.toJSON()['WeatherProperty:SkyTemperature']!;
-    expect(Object.keys(body)).toHaveLength(2);
+    expect(Object.keys(body)).toEqual(['WeatherProperty:SkyTemperature 1', '']);
     expect(body['WeatherProperty:SkyTemperature 1']?.['schedule_name']).toBe('S1');
-    expect(body['WeatherProperty:SkyTemperature 2']?.['schedule_name']).toBe('S2');
+    expect(body['']?.['schedule_name']).toBe('S2');
+  });
+
+  it('numbers types with no name field from 1 in document order', () => {
+    // The other half of the same rule: Output:Variable declares no name, so it
+    // has nothing to key on and takes the counted key EnergyPlus itself emits.
+    const doc = new IDFDocument(v26);
+    doc.add('Output:Variable', null, { variable_name: 'Site Outdoor Air Drybulb Temperature' });
+    doc.add('Output:Variable', null, { variable_name: 'Zone Air Temperature' });
+
+    const body = doc.toJSON()['Output:Variable']!;
+    expect(Object.keys(body)).toEqual(['Output:Variable 1', 'Output:Variable 2']);
+    expect(body['Output:Variable 1']?.['variable_name']).toBe(
+      'Site Outdoor Air Drybulb Temperature'
+    );
   });
 
   it('does not report field-declared names as dangling', () => {

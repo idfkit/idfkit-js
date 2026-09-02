@@ -1,5 +1,12 @@
 name: Conformance
 
+# Runs the shared cross-language corpus (idfkit/idfkit-conformance) against this workspace at the
+# level pinned in packages/core/package.json, plus the two governance gates that read the register
+# and the ledger at the pinned governance tag.
+#
+# Every job here is blocking. A disagreement with the corpus, an unregistered public name, or a
+# capability the ledger and the exports disagree about all stop the merge.
+
 on:
   push:
     branches: [main]
@@ -14,23 +21,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pins:
+    name: Pinned levels
+    runs-on: ubuntu-latest
+    outputs:
+      conformance: ${{ steps.pin.outputs.conformance }}
+      governance: ${{ steps.pin.outputs.governance }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve the pinned levels
+        id: pin
+        # Each pin is one declared value, read here and by the release check, so what CI runs and
+        # what a release claims cannot drift apart (FR-024). Hence reading them out of package.json
+        # rather than writing the tags into this file: a literal here would be a second place to
+        # forget. The values are the full tag forms, conformance-YYYY.N and governance-YYYY.N, and
+        # they are used verbatim as the refs the corpus is checked out at.
+        run: |
+          set -euo pipefail
+          PKG=packages/core/package.json
+          CONFORMANCE="$(node -p "JSON.parse(require('fs').readFileSync('$PKG', 'utf8')).idfkit?.conformance ?? ''")"
+          GOVERNANCE="$(node -p "JSON.parse(require('fs').readFileSync('$PKG', 'utf8')).idfkit?.governance ?? ''")"
+
+          # A level is an immutable git tag, so the declared value is the ref to check out. Checking
+          # the shape here rather than letting checkout fail: a typo otherwise reports as a missing
+          # ref, which reads like the corpus is broken.
+          case "$CONFORMANCE" in
+            conformance-[0-9][0-9][0-9][0-9].[0-9]*) ;;
+            '') echo "::error::No idfkit.conformance in $PKG; nothing to pin to" && exit 1 ;;
+            *) echo "::error::idfkit.conformance is '$CONFORMANCE'; expected conformance-YYYY.N" && exit 1 ;;
+          esac
+
+          case "$GOVERNANCE" in
+            governance-[0-9][0-9][0-9][0-9].[0-9]*) ;;
+            '') echo "::error::No idfkit.governance in $PKG; nothing to pin to" && exit 1 ;;
+            *) echo "::error::idfkit.governance is '$GOVERNANCE'; expected governance-YYYY.N" && exit 1 ;;
+          esac
+
+          echo "Pinned conformance level: $CONFORMANCE"
+          echo "Pinned governance level: $GOVERNANCE"
+          {
+            echo "conformance=$CONFORMANCE"
+            echo "governance=$GOVERNANCE"
+          } >> "$GITHUB_OUTPUT"
+
   conformance:
     name: Cross-library conformance
+    needs: pins
     runs-on: ubuntu-latest
 
-    # SKELETON (T017). T044 finishes this job and makes it blocking. Until then
-    # continue-on-error keeps it advisory: the corpus repository and the tag it
-    # is pinned to do not exist yet, so a red run here would say nothing about
-    # the change that triggered it. T044 deletes this line, at which point a
-    # conformance failure blocks the merge.
-    continue-on-error: true
-
-    # No EnergyPlus is installed anywhere in this job, and none is needed. Every
-    # case's expected epJSON is produced offline by ConvertInputFormat and
-    # committed to the corpus, so CI compares against committed files rather
-    # than running the oracle (FR-013, SC-005). A full set of EnergyPlus
-    # installs is roughly 13.6 GB; regenerating expectations is a maintainer
-    # task, run locally through the corpus's tools/regenerate.sh.
+    # No EnergyPlus is installed anywhere in this job, and none is needed. Every case's expected
+    # epJSON is produced offline by ConvertInputFormat and committed to the corpus (FR-013), so CI
+    # compares against committed files rather than running the oracle. Installing EnergyPlus would
+    # also be ruinous: a full set of supported releases is roughly 13.6 GB, and the corpus is
+    # required to run in under five minutes on a machine with no simulation software installed
+    # (SC-005). Regenerating expectations is a maintainer task, run locally through the corpus's
+    # tools/regenerate.sh.
     steps:
       - uses: actions/checkout@v4
 
@@ -39,46 +89,96 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Resolve the pinned conformance level
-        # The pin is one declared value, read here and by the release check, so
-        # what CI runs and what a release claims cannot drift apart (FR-024).
-        # Hence reading it out of package.json rather than writing the tag into
-        # this file: a literal here would be a second place to forget.
-        run: |
-          set -euo pipefail
-          PKG=packages/core/package.json
-          TAG="$(node -p "JSON.parse(require('fs').readFileSync('$PKG', 'utf8')).idfkit?.conformance ?? ''")"
-
-          # A level is the immutable git tag conformance-YYYY.N, so the declared
-          # value is the ref to check out. Checking the shape here rather than
-          # letting checkout fail: a typo otherwise reports as a missing ref,
-          # which reads like the corpus is broken.
-          case "$TAG" in
-            conformance-[0-9][0-9][0-9][0-9].[0-9]*) ;;
-            '') echo "::error::No idfkit.conformance in $PKG; nothing to pin to" && exit 1 ;;
-            *) echo "::error::idfkit.conformance is '$TAG'; expected conformance-YYYY.N" && exit 1 ;;
-          esac
-
-          echo "Pinned conformance level: $TAG"
-          echo "CONFORMANCE_TAG=$TAG" >> "$GITHUB_ENV"
-
-      - name: Check out the conformance corpus at the pinned tag
+      - name: Check out the conformance corpus at the pinned level
+        # idfkit/idfkit-conformance is public, so the default GITHUB_TOKEN reads it and no extra
+        # credential is configured here.
         uses: actions/checkout@v4
         with:
           repository: idfkit/idfkit-conformance
-          ref: ${{ env.CONFORMANCE_TAG }}
+          ref: ${{ needs.pins.outputs.conformance }}
           path: conformance
 
       - run: npm ci
 
-      # The runner imports the built package, not the sources: @idfkit/core
-      # resolves through the "exports" entry in its package.json, which points
-      # inside dist. Without this it finds nothing to test.
+      # The runner imports the built package, not the sources: @idfkit/core resolves through the
+      # "exports" entry in its package.json, which points inside dist. Without this it finds
+      # nothing to test.
       - run: npx tsc --build
 
       - name: Run the corpus against this workspace
-        # --library takes the path to the library under test, as documented in
-        # the corpus quickstart. T044 confirms this against the runner that
-        # actually ships and pins the rest of its command-line surface.
+        # --library takes the path to the library under test, never a language word: the runner
+        # file already fixes the language, run.mjs for JavaScript and run.py for Python. The runner
+        # is invoked from the corpus checkout, which is where it defaults --corpus to.
         working-directory: conformance
         run: node runners/run.mjs --library "$GITHUB_WORKSPACE"
+
+  naming:
+    name: Naming register
+    needs: pins
+    runs-on: ubuntu-latest
+
+    # BLOCKING, AND CURRENTLY RED ON PURPOSE. The gate reports IDFDocument, detectVersion and
+    # detectEpJsonVersion as public names the pinned register does not cover, and the three
+    # register entries they are behind. The rename batch is what turns this job green, by landing
+    # IdfDocument, getIdfVersion and getEpJsonVersion. Do not add continue-on-error and do not
+    # weaken the gate to get a green build: a naming gate that never fails is a naming gate that
+    # never caught anything.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check out the governance register at the pinned level
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: ${{ needs.pins.outputs.governance }}
+          path: conformance
+          # The gate reads the register with "git show <tag>:governance/naming.toml" and compares
+          # it against the governance tag before it, so the checkout needs every tag rather than
+          # only the commit this ref lands on. Without the history the rename check silently
+          # degrades to "no earlier governance tag".
+          fetch-depth: 0
+
+      - run: npm ci
+
+      # The gate reads built output, not sources: the .d.ts files each package's "exports" map
+      # points at, plus the TypeDoc JSON. Both are absent on a clean checkout, and the gate exits 2
+      # rather than guessing, so produce them here instead of letting the check be skipped.
+      - run: npx tsc --build
+
+      - run: npm run docs:api
+
+      - name: Check the public surface against the naming register
+        run: npm run check:naming -- --corpus conformance
+
+  parity:
+    name: Parity ledger
+    needs: pins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check out the parity ledger at the pinned level
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: ${{ needs.pins.outputs.governance }}
+          path: conformance
+          fetch-depth: 0
+
+      - run: npm ci
+
+      # No build step. This gate derives the exported capability set from each package's "exports"
+      # map, resolving a ./dist/x.js target back to src/x.ts, so it runs against the sources on a
+      # clean checkout.
+      - name: Check the exported capabilities against the parity ledger
+        run: npm run check:parity -- --corpus conformance
