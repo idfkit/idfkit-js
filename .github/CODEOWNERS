@@ -1,0 +1,56 @@
+# Code owners for idfkit-js.
+#
+# The teams below must exist in the `idfkit` GitHub organization, and every
+# person named by them must have write access to this repository. GitHub
+# silently ignores an owner it cannot resolve, so a missing or misspelled team
+# turns this file into a no-op rather than an error.
+#
+#   @idfkit/javascript-maintainers   maintainers of idfkit-js
+#   @idfkit/python-maintainers       maintainers of idfkit (Python)
+#
+# The stanzas marked "cross-language review" implement FR-067: a change to the
+# shared surface, meaning public names, corpus cases, the parity record, or the
+# naming register, requires review from a maintainer of the other language.
+# FR-091 gives that rule no override. An unavailable reviewer blocks the merge.
+# Branch protection must therefore keep "Require review from Code Owners" on,
+# with no bypass list and no administrator exemption.
+#
+# The Python mirror of this file lives at `idfkit/.github/CODEOWNERS`, and the
+# register, the ledger, and the corpus cases are owned in `idfkit-conformance`.
+#
+# Order matters: GitHub applies the last matching pattern only, so each
+# cross-language stanza repeats @idfkit/javascript-maintainers rather than
+# relying on the default rule above it.
+
+# Default owner for everything not named below.
+*                                     @idfkit/javascript-maintainers
+
+# ---------------------------------------------------------------------------
+# Cross-language review (FR-067, FR-091)
+# ---------------------------------------------------------------------------
+
+# The public export barrel of every published package. `packages/core/src/index.ts`
+# is the surface the naming register governs directly; the sibling packages
+# publish through the same shape and carry the same rule. `node.ts` is the second
+# public entry point, exposed as the `./node` subpath.
+packages/*/src/index.ts               @idfkit/javascript-maintainers @idfkit/python-maintainers
+packages/*/src/node.ts                @idfkit/javascript-maintainers @idfkit/python-maintainers
+
+# Generated per-version object interfaces, published as the `./types/*` subpath
+# of `@idfkit/core`, plus the generator that emits them. These declarations name
+# EnergyPlus fields in both libraries, so their shape is a shared decision.
+packages/core/src/types/              @idfkit/javascript-maintainers @idfkit/python-maintainers
+packages/core/scripts/emit-types.mjs  @idfkit/javascript-maintainers @idfkit/python-maintainers
+
+# Package manifests. The `exports` map is what makes a module importable at all,
+# and `name`, `version`, and `files` decide what ships to npm.
+packages/*/package.json               @idfkit/javascript-maintainers @idfkit/python-maintainers
+
+# Declaration emission. `dist/` is not tracked, so the published `.d.ts` files are
+# produced by `tsc` from the configuration below. A change here can alter the
+# declaration surface without touching a single source file.
+tsconfig.base.json                    @idfkit/javascript-maintainers @idfkit/python-maintainers
+packages/*/tsconfig.json              @idfkit/javascript-maintainers @idfkit/python-maintainers
+
+# Any hand-written declaration file, should one ever be added.
+*.d.ts                                @idfkit/javascript-maintainers @idfkit/python-maintainers

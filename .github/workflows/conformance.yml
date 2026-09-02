@@ -1,0 +1,84 @@
+name: Conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    name: Cross-library conformance
+    runs-on: ubuntu-latest
+
+    # SKELETON (T017). T044 finishes this job and makes it blocking. Until then
+    # continue-on-error keeps it advisory: the corpus repository and the tag it
+    # is pinned to do not exist yet, so a red run here would say nothing about
+    # the change that triggered it. T044 deletes this line, at which point a
+    # conformance failure blocks the merge.
+    continue-on-error: true
+
+    # No EnergyPlus is installed anywhere in this job, and none is needed. Every
+    # case's expected epJSON is produced offline by ConvertInputFormat and
+    # committed to the corpus, so CI compares against committed files rather
+    # than running the oracle (FR-013, SC-005). A full set of EnergyPlus
+    # installs is roughly 13.6 GB; regenerating expectations is a maintainer
+    # task, run locally through the corpus's tools/regenerate.sh.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Resolve the pinned conformance level
+        # The pin is one declared value, read here and by the release check, so
+        # what CI runs and what a release claims cannot drift apart (FR-024).
+        # Hence reading it out of package.json rather than writing the tag into
+        # this file: a literal here would be a second place to forget.
+        run: |
+          set -euo pipefail
+          PKG=packages/core/package.json
+          TAG="$(node -p "JSON.parse(require('fs').readFileSync('$PKG', 'utf8')).idfkit?.conformance ?? ''")"
+
+          # A level is the immutable git tag conformance-YYYY.N, so the declared
+          # value is the ref to check out. Checking the shape here rather than
+          # letting checkout fail: a typo otherwise reports as a missing ref,
+          # which reads like the corpus is broken.
+          case "$TAG" in
+            conformance-[0-9][0-9][0-9][0-9].[0-9]*) ;;
+            '') echo "::error::No idfkit.conformance in $PKG; nothing to pin to" && exit 1 ;;
+            *) echo "::error::idfkit.conformance is '$TAG'; expected conformance-YYYY.N" && exit 1 ;;
+          esac
+
+          echo "Pinned conformance level: $TAG"
+          echo "CONFORMANCE_TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Check out the conformance corpus at the pinned tag
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: ${{ env.CONFORMANCE_TAG }}
+          path: conformance
+
+      - run: npm ci
+
+      # The runner imports the built package, not the sources: @idfkit/core
+      # resolves through the "exports" entry in its package.json, which points
+      # inside dist. Without this it finds nothing to test.
+      - run: npx tsc --build
+
+      - name: Run the corpus against this workspace
+        # --library takes the path to the library under test, as documented in
+        # the corpus quickstart. T044 confirms this against the runner that
+        # actually ships and pins the rest of its command-line surface.
+        working-directory: conformance
+        run: node runners/run.mjs --library "$GITHUB_WORKSPACE"

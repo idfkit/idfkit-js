@@ -45,6 +45,10 @@
   "engines": {
     "node": ">=20"
   },
+  "idfkit": {
+    "conformance": "conformance-2026.3",
+    "governance": "governance-2026.4"
+  },
   "dependencies": {
     "@idfkit/schemas": "0.0.0"
   },
