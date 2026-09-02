@@ -28,11 +28,11 @@ differs between releases. So the first thing to get is a schema.
 Create `build-model.mjs`:
 
 ```js
-import { IDFDocument } from '@idfkit/core';
+import { IdfDocument } from '@idfkit/core';
 import { schemas } from '@idfkit/core/node';
 
 const schema = await schemas().load('26.1.0');
-const doc = new IDFDocument(schema);
+const doc = new IdfDocument(schema);
 
 doc.add('Version', null, { version_identifier: '26.1' });
 

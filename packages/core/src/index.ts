@@ -8,7 +8,7 @@
  */
 
 export { IdfCollection } from './collection.js';
-export { IDFDocument } from './document.js';
+export { IdfDocument } from './document.js';
 export { IdfObject } from './object.js';
 export type {
   ExtensibleGroup,
@@ -25,9 +25,9 @@ export { compareVersions, resolveVersion, versionKey } from './versions.js';
 
 export { lex } from './parse/lexer.js';
 export type { LexDiagnostic, LexOptions, RawObject } from './parse/lexer.js';
-export { detectVersion, IdfParseError, parseIdf } from './parse/idf.js';
+export { getIdfVersion, IdfParseError, parseIdf } from './parse/idf.js';
 export type { ParseDiagnostic, ParseOptions, ParseResult } from './parse/idf.js';
-export { detectEpJsonVersion, parseEpJson } from './parse/epjson.js';
+export { getEpJsonVersion, parseEpJson } from './parse/epjson.js';
 export type { EpJson } from './parse/epjson.js';
 
 export { writeIdf, writeObject } from './write/idf.js';

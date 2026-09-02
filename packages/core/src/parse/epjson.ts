@@ -1,6 +1,6 @@
 import type { Schema } from '@idfkit/schemas';
 
-import { IDFDocument } from '../document.js';
+import { IdfDocument } from '../document.js';
 import type { FieldValues } from '../object.js';
 import type { AnyTypeMap, UntypedMap } from '../typemap.js';
 import type { ParseDiagnostic, ParseOptions, ParseResult } from './idf.js';
@@ -40,7 +40,7 @@ export function parseEpJson<M extends AnyTypeMap = UntypedMap>(
     });
   }
 
-  const document = new IDFDocument<M>(schema);
+  const document = new IdfDocument<M>(schema);
 
   for (const [typeName, body] of Object.entries(root)) {
     const canonical = schema.resolve(typeName);
@@ -84,7 +84,7 @@ export function parseEpJson<M extends AnyTypeMap = UntypedMap>(
 }
 
 /** Read the version identifier from epJSON without a schema. */
-export function detectEpJsonVersion(source: string | EpJson): string | undefined {
+export function getEpJsonVersion(source: string | EpJson): string | undefined {
   let root: EpJson;
   try {
     root = typeof source === 'string' ? (JSON.parse(source) as EpJson) : source;

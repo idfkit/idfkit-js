@@ -52,7 +52,7 @@ typechecking, so the `@ts-expect-error` assertions in `packages/core/tests/typed
 
 ### Core object model
 
-- **`IDFDocument<M>`** — collections by type, live reference graph, bound to one
+- **`IdfDocument<M>`** — collections by type, live reference graph, bound to one
   EnergyPlus version. `M` is an optional generated type map (see below).
 - **`IdfObject`** — one EnergyPlus object. Fields are real accessors on a
   per-type prototype, built in `shape.ts`.

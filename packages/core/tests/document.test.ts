@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { IDFDocument, shapeOf } from '@idfkit/core';
+import { IdfDocument, shapeOf } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema } from './helpers.js';
@@ -10,12 +10,12 @@ beforeAll(async () => {
   v26 = await schema('26.1.0');
 });
 
-let doc: IDFDocument;
+let doc: IdfDocument;
 beforeEach(() => {
-  doc = new IDFDocument(v26);
+  doc = new IdfDocument(v26);
 });
 
-describe('IDFDocument.add', () => {
+describe('IdfDocument.add', () => {
   it('creates an object with schema-named fields', () => {
     const zone = doc.add('Zone', 'Z1', { x_origin: 3, ceiling_height: 2.7 });
 
@@ -80,7 +80,7 @@ describe('field access', () => {
     // between two releases, both versions resolve to the same frozen definition
     // and therefore the same prototype, so mixed-version work stays monomorphic.
     const v25 = await schema('25.2.0');
-    const other = new IDFDocument(v25);
+    const other = new IdfDocument(v25);
 
     const a = doc.add('Zone', 'Z1');
     const b = other.add('Zone', 'Z1');

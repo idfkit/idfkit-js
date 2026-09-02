@@ -117,12 +117,14 @@ jobs:
     needs: pins
     runs-on: ubuntu-latest
 
-    # BLOCKING, AND CURRENTLY RED ON PURPOSE. The gate reports IDFDocument, detectVersion and
-    # detectEpJsonVersion as public names the pinned register does not cover, and the three
-    # register entries they are behind. The rename batch is what turns this job green, by landing
-    # IdfDocument, getIdfVersion and getEpJsonVersion. Do not add continue-on-error and do not
-    # weaken the gate to get a green build: a naming gate that never fails is a naming gate that
-    # never caught anything.
+    # BLOCKING. The rename batch has landed: IdfDocument, getIdfVersion and getEpJsonVersion are
+    # public, collection() is withdrawn to in-package use, and all six findings that named them are
+    # gone. One finding remains and it is on the register's side, not this repository's: the
+    # [register] governs list is [idfkit, @idfkit/core] while seven entries name @idfkit/weather
+    # members, which the gate reports as a governs gap. It clears when the register either widens
+    # that list or moves those entries, under cross-language review. Do not add continue-on-error
+    # and do not weaken the gate to get a green build: a naming gate that never fails is a naming
+    # gate that never caught anything.
     steps:
       - uses: actions/checkout@v4
 

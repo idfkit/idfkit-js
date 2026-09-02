@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { IDFDocument, parseIdf, SchemaBundle, writeIdf, type BundleSource } from '@idfkit/core';
+import { IdfDocument, parseIdf, SchemaBundle, writeIdf, type BundleSource } from '@idfkit/core';
 import { loadIdf, saveIdf, schemas } from '@idfkit/core/node';
 import { readBundleFileSync } from '@idfkit/schemas/node';
 
@@ -199,7 +199,7 @@ describe('docs/tutorials/first-model.md', () => {
    */
   it('builds, renames, writes, and reads back the office model', async () => {
     const schema = await schemas().load('26.1.0');
-    const doc = new IDFDocument<TypeMap>(schema);
+    const doc = new IdfDocument<TypeMap>(schema);
 
     doc.add('Version', null, { version_identifier: '26.1' });
 

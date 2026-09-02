@@ -25,11 +25,11 @@ you obtained some other way.
 Three steps, because each can fail differently:
 
 ```ts
-import { detectVersion, parseIdf, resolveVersion, SchemaBundle, httpSource } from '@idfkit/core';
+import { getIdfVersion, parseIdf, resolveVersion, SchemaBundle, httpSource } from '@idfkit/core';
 
 const bundle = new SchemaBundle(httpSource('/schemas/'));
 
-const detected = detectVersion(text); // '9.0', or undefined
+const detected = getIdfVersion(text); // '9.0', or undefined
 if (detected === undefined) {
   throw new Error('No Version object; ask the user which release this is.');
 }
@@ -53,10 +53,10 @@ versions](../reference/versions.md#matching-a-files-version-to-a-schema).
 `schemaFor` is the same three steps, exported for exactly this case:
 
 ```ts
-import { parseIdf, detectVersion } from '@idfkit/core';
+import { parseIdf, getIdfVersion } from '@idfkit/core';
 import { schemaFor } from '@idfkit/core/node';
 
-const schema = await schemaFor(detectVersion(text));
+const schema = await schemaFor(getIdfVersion(text));
 const { document } = parseIdf(text, schema);
 ```
 
@@ -78,9 +78,9 @@ the resolution logic exists to prevent.
 Same shape, different detector:
 
 ```ts
-import { detectEpJsonVersion, parseEpJson } from '@idfkit/core';
+import { getEpJsonVersion, parseEpJson } from '@idfkit/core';
 
-const schema = await schemaFor(detectEpJsonVersion(text));
+const schema = await schemaFor(getEpJsonVersion(text));
 const { document } = parseEpJson(text, schema);
 ```
 

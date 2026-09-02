@@ -18,7 +18,7 @@ export type FieldValues = Record<string, StoredValue | null | undefined>;
 /**
  * Something that wants to know when an object changes.
  *
- * Implemented by `IDFDocument`. Declared as an interface so a detached object
+ * Implemented by `IdfDocument`. Declared as an interface so a detached object
  * has no dependency on the document at all.
  */
 export interface ObjectOwner {

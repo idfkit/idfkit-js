@@ -10,6 +10,55 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `IDFDocument` is now `IdfDocument`. It was the last exported type
+  spelling the acronym in full caps, out of step with `IdfObject`,
+  `IdfCollection`, and `IdfParseError`, which have always used the `Idf` prefix.
+
+- **Breaking:** `detectVersion()` is now `getIdfVersion()` and
+  `detectEpJsonVersion()` is now `getEpJsonVersion()`. Python spells the same
+  operation `get_idf_version`, and the shared naming register maps a Python `get_*`
+  accessor to a TypeScript `get*` accessor, as it already does for
+  `get_surface_coords` and `getSurfaceCoords`. The two libraries now name this
+  operation the same way. No alias is kept: a second public name for one concept is
+  what the register exists to prevent.
+
+- **Breaking:** `IdfDocument.collection()` is no longer part of the published
+  surface. Use `all()`, which returns the same collection and is the name the
+  register carries. `collection()` remains inside the package for the parsers, so
+  behaviour is unchanged; it is simply no longer importable.
+
+- **Breaking:** `IdfCollection.insert()`, `delete()`, and `rekey()` are no longer
+  importable. All three were already tagged `@internal`, but no tsconfig set
+  `stripInternal`, so the tag never reached the built declarations and the members
+  shipped as public by accident. `stripInternal` is now set, which is what the tag
+  always meant.
+
+### Fixed
+
+- A blank `Name` is no longer given an invented name. A type with an optional Name
+  field left blank now keeps the blank verbatim as the epJSON key `""`; the
+  synthetic `"<Type> N"` key is reserved for types that have no Name field at all.
+  Previously, finding index 1 already taken by a real name,
+  `IdfDocument.toJSON()` would emit `"<Type> 2"` for the blank-named object, so a
+  document round-tripped through epJSON came back with an object nobody had named.
+  Both parsers already preserved the distinction; only serialization discarded it.
+  ([#7](https://github.com/idfkit/idfkit-js/issues/7))
+
+### Migration
+
+Every rename above is the one rename that name will get. The shared naming register
+records a rename budget per name and its merge gate blocks a second one, so these
+spellings are now fixed.
+
+| Before | After |
+| ------ | ----- |
+| `IDFDocument` | `IdfDocument` |
+| `detectVersion(text)` | `getIdfVersion(text)` |
+| `detectEpJsonVersion(text)` | `getEpJsonVersion(text)` |
+| `doc.collection(type)` | `doc.all(type)` |
+
 ## [0.1.0] - 2026-08-13
 
 ### Added

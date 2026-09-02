@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { IDFDocument, parseIdf, writeIdf } from '@idfkit/core';
+import { IdfDocument, parseIdf, writeIdf } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema } from './helpers.js';
@@ -74,7 +74,7 @@ WeatherProperty:SkyTemperature,
   });
 
   it('allows several blank-named objects of the same type', () => {
-    const doc = new IDFDocument(v26);
+    const doc = new IdfDocument(v26);
     doc.add('WeatherProperty:SkyTemperature', '', { calculation_type: 'ScheduleValue' });
     doc.add('WeatherProperty:SkyTemperature', '', { calculation_type: 'ScheduleValue' });
     expect(doc.all('WeatherProperty:SkyTemperature').size).toBe(2);
@@ -101,7 +101,7 @@ WeatherProperty:SkyTemperature,
   it('coerces extensible group values to numbers', () => {
     // The inner field types live on the array's `items` and were dropped by an
     // early version of the schema bundle, leaving every vertex as a string.
-    const doc = new IDFDocument(v26);
+    const doc = new IdfDocument(v26);
     const { document } = parseIdf(
       'Version, 26.1;\nBuildingSurface:Detailed, S1, Wall, C1, Z1, , Outdoors, , , , 0.5, 1, 1.5, 2.5, 3.5;',
       v26,
@@ -175,7 +175,7 @@ WeatherProperty:SkyTemperature,
     // user from naming an object "WeatherProperty:SkyTemperature 1", so the
     // minted key either overwrote real user data or skipped past it to a name
     // the file never contained. The blank is the object's identity and is kept.
-    const doc = new IDFDocument(v26);
+    const doc = new IdfDocument(v26);
     doc.add('WeatherProperty:SkyTemperature', 'WeatherProperty:SkyTemperature 1', {
       calculation_type: 'ScheduleValue',
       schedule_name: 'S1',
@@ -194,7 +194,7 @@ WeatherProperty:SkyTemperature,
   it('numbers types with no name field from 1 in document order', () => {
     // The other half of the same rule: Output:Variable declares no name, so it
     // has nothing to key on and takes the counted key EnergyPlus itself emits.
-    const doc = new IDFDocument(v26);
+    const doc = new IdfDocument(v26);
     doc.add('Output:Variable', null, { variable_name: 'Site Outdoor Air Drybulb Temperature' });
     doc.add('Output:Variable', null, { variable_name: 'Zone Air Temperature' });
 
@@ -223,7 +223,7 @@ WeatherProperty:SkyTemperature,
     // IDF type names are case-insensitive and files in the wild use ZONE. The
     // object is filed under the schema's spelling, so looking it up by the raw
     // name reported it absent and left it in the saved file.
-    const doc = new IDFDocument(v26);
+    const doc = new IdfDocument(v26);
     const zone = doc.addRaw('ZONE', 'Z1');
 
     expect(doc.size).toBe(1);
@@ -232,7 +232,7 @@ WeatherProperty:SkyTemperature,
   });
 
   it('keeps name and key together when a detached object is renamed', () => {
-    const doc = new IDFDocument(v26);
+    const doc = new IdfDocument(v26);
     const zone = doc.add('Zone', 'Z1');
 
     doc.remove(zone);
@@ -244,8 +244,8 @@ WeatherProperty:SkyTemperature,
   });
 
   it('refuses renames that would corrupt another document or destroy references', () => {
-    const doc = new IDFDocument(v26);
-    const other = new IDFDocument(v26);
+    const doc = new IdfDocument(v26);
+    const other = new IdfDocument(v26);
     const zone = doc.add('Zone', 'Z1');
     doc.add('Lights', 'L1', { zone_or_zonelist_or_space_or_spacelist_name: 'Z1' });
 
@@ -259,7 +259,7 @@ WeatherProperty:SkyTemperature,
   });
 
   it('applies the singleton and version guards to attach(), not just add()', () => {
-    const doc = new IDFDocument(v26);
+    const doc = new IdfDocument(v26);
     const building = doc.add('Building', 'B1');
 
     expect(() => doc.attach(building.clone('B2'))).toThrow(/singleton/);
@@ -272,7 +272,7 @@ WeatherProperty:SkyTemperature,
     // header: every field mis-maps on reload rather than failing. Types whose
     // definition is unchanged between the two versions are the same frozen
     // object and stay attachable, which is the point of content addressing.
-    const older = new IDFDocument(v94);
+    const older = new IdfDocument(v94);
     const layoutChanged = v26
       .changedFrom(v94)
       .changed.find(
@@ -281,10 +281,10 @@ WeatherProperty:SkyTemperature,
     expect(layoutChanged).toBeDefined();
 
     const stale = older.addRaw(layoutChanged!, 'X1').clone('X2');
-    expect(() => new IDFDocument(v26).attach(stale)).toThrow(/different schema/);
+    expect(() => new IdfDocument(v26).attach(stale)).toThrow(/different schema/);
 
     // Same type name, identical definition across versions: allowed.
-    const zone = new IDFDocument(v94).add('Zone', 'Z1');
-    expect(() => new IDFDocument(v26).attach(zone.clone('Z2'))).not.toThrow();
+    const zone = new IdfDocument(v94).add('Zone', 'Z1');
+    expect(() => new IdfDocument(v26).attach(zone.clone('Z2'))).not.toThrow();
   });
 });

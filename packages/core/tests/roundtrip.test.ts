@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { detectVersion, parseIdf, writeIdf } from '@idfkit/core';
+import { getIdfVersion, parseIdf, writeIdf } from '@idfkit/core';
 import { schemaFor } from '@idfkit/core/node';
 
 import { exampleFilesDir, schema } from './helpers.js';
@@ -37,7 +37,7 @@ describe.skipIf(dir === undefined)('round-trip against EnergyPlus example files'
 
   it.each(sample)('parses and re-parses %s without losing data', async (file) => {
     const text = readFileSync(join(dir!, file), 'latin1');
-    const version = detectVersion(text);
+    const version = getIdfVersion(text);
     // Files bundled with the install are all current; a stale one would signal
     // the version-resolution path is wrong rather than the parser.
     expect(version).toBeDefined();

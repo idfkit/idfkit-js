@@ -97,7 +97,7 @@ The full API is generated from the source and published at
 
 The main entry points:
 
-- **`IDFDocument<M>`** — collections by type, a live reference graph, bound to
+- **`IdfDocument<M>`** — collections by type, a live reference graph, bound to
   one EnergyPlus version. `M` is an optional generated type map; omit it and
   everything still works, just untyped.
 - **`IdfObject`** — one EnergyPlus object. Fields are real properties;

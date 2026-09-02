@@ -11,9 +11,9 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { SchemaBundle, type Schema } from '@idfkit/schemas';
 import { localBundle } from '@idfkit/schemas/node';
 
-import type { IDFDocument } from './document.js';
-import { detectEpJsonVersion, parseEpJson } from './parse/epjson.js';
-import { detectVersion, parseIdf, type ParseOptions, type ParseResult } from './parse/idf.js';
+import type { IdfDocument } from './document.js';
+import { getEpJsonVersion, parseEpJson } from './parse/epjson.js';
+import { getIdfVersion, parseIdf, type ParseOptions, type ParseResult } from './parse/idf.js';
 import type { AnyTypeMap, UntypedMap } from './typemap.js';
 import { resolveVersion } from './versions.js';
 import { writeEpJson, type WriteEpJsonOptions } from './write/epjson.js';
@@ -65,7 +65,7 @@ export async function schemaFor(
 export async function loadIdf<M extends AnyTypeMap = UntypedMap>(
   path: string,
   options: LoadOptions = {}
-): Promise<IDFDocument<M>> {
+): Promise<IdfDocument<M>> {
   return (await loadIdfWithDiagnostics<M>(path, options)).document;
 }
 
@@ -78,7 +78,7 @@ export async function loadIdfWithDiagnostics<M extends AnyTypeMap = UntypedMap>(
   // models routinely contain single high bytes (degree signs, accented station
   // names) that are not valid utf-8 and would otherwise decode to U+FFFD.
   const text = await readFile(path, 'latin1');
-  const schema = await schemaFor(detectVersion(text), options);
+  const schema = await schemaFor(getIdfVersion(text), options);
   return parseIdf<M>(text, schema, options);
 }
 
@@ -86,15 +86,15 @@ export async function loadIdfWithDiagnostics<M extends AnyTypeMap = UntypedMap>(
 export async function loadEpJson<M extends AnyTypeMap = UntypedMap>(
   path: string,
   options: LoadOptions = {}
-): Promise<IDFDocument<M>> {
+): Promise<IdfDocument<M>> {
   const text = await readFile(path, 'utf8');
-  const schema = await schemaFor(detectEpJsonVersion(text), options);
+  const schema = await schemaFor(getEpJsonVersion(text), options);
   return parseEpJson<M>(text, schema, options).document;
 }
 
 /** Write a document to an IDF file. */
 export async function saveIdf<M extends AnyTypeMap>(
-  document: IDFDocument<M>,
+  document: IdfDocument<M>,
   path: string,
   options: WriteIdfOptions = {}
 ): Promise<void> {
@@ -103,7 +103,7 @@ export async function saveIdf<M extends AnyTypeMap>(
 
 /** Write a document to an epJSON file. */
 export async function saveEpJson<M extends AnyTypeMap>(
-  document: IDFDocument<M>,
+  document: IdfDocument<M>,
   path: string,
   options: WriteEpJsonOptions = {}
 ): Promise<void> {
