@@ -328,12 +328,7 @@ const PYTHON_TOTALS = {
   units: 4776,
   minimum: 2459,
   maximum: 1339,
-  // Python reports 1113. The extra one is
-  // `AirTerminal:SingleDuct:ConstantVolume:CooledBeam.number_of_beams`, the one
-  // `anyOf: [{integer}, {string}]` field in the version: the bundle hoists the
-  // integer branch's `exclusiveMinimum`, and without an `auto` flag there is
-  // nothing here to recognise it as an anyOf field and drop it again.
-  exclusiveMinimum: 1114,
+  exclusiveMinimum: 1113,
   exclusiveMaximum: 145,
   isReference: 2806,
 };
@@ -402,7 +397,7 @@ describe('agreement with Python', () => {
     });
   }
 
-  it('matches Python field-for-field, except for one known schema shape', () => {
+  it('matches Python field-for-field', () => {
     const mismatches: string[] = [];
     for (const [typeName, expected] of Object.entries(PYTHON_SHAPES)) {
       const actual = describeObjectType(v26, typeName);
@@ -413,12 +408,11 @@ describe('agreement with Python', () => {
         }
       }
     }
-    // `anyOf: [{integer}, {string}]` collapses in the slim bundle to a bare
-    // integer with no `auto` flag, so the union is unrecoverable. Exactly one
-    // field in 26.1.0 has that shape (eight across all 17 versions).
-    expect(mismatches).toEqual([
-      'AirTerminal:SingleDuct:ConstantVolume:CooledBeam.number_of_beams: python=integer|string ts=integer',
-    ]);
+    // Nothing left. `anyOf: [{integer}, {string}]` used to collapse to a bare
+    // integer with no `auto` flag, which lost the union for exactly one field in
+    // 26.1.0 (eight across all 17 versions); the bundle now flags the integer
+    // branch the same way it flags the number branch.
+    expect(mismatches).toEqual([]);
   });
 
   it('matches Python field name and order for every type in the version', () => {
@@ -498,7 +492,7 @@ describe('agreement with Python', () => {
     expect(totals).toEqual(PYTHON_TOTALS);
   });
 
-  it('matches Python on the field-type histogram, less the one known shape', () => {
+  it('matches Python on the field-type histogram', () => {
     const histogram: Record<string, number> = {};
     for (const d of describeAll(v26)) {
       for (const f of d.fields) {
@@ -507,12 +501,7 @@ describe('agreement with Python', () => {
       }
     }
 
-    const { 'integer|string': unions, ...shared } = PYTHON_FIELD_TYPES;
-    expect(histogram).toEqual({
-      ...shared,
-      // The one `integer|string` field lands in `integer` instead.
-      integer: shared.integer + unions,
-    });
+    expect(histogram).toEqual(PYTHON_FIELD_TYPES);
   });
 });
 
@@ -705,8 +694,11 @@ describe('metadata the slim schema does not carry', () => {
   it('has no enum for an autosizable field, where Python reports the branch enum', () => {
     // Python's `enum_values` falls through to the first anyOf branch carrying an
     // enum, which for these fields is ["", "Autocalculate"] or ["", "Autosize"].
-    // The bundle keeps only the numeric branch, so the choice list is gone; the
-    // `auto` flag says the field is autosizable but not which literal it takes.
+    // `enumValues` reports the NUMERIC branch's enum, which these fields do not
+    // have. The string branch's literals are in the bundle — `se`, which is what
+    // validation reads — but surfacing them here would change a difference the
+    // parity ledger records, which is a decision for that ledger and not for
+    // this port.
     expect(field(describeObjectType(v26, 'Zone'), 'ceiling_height').enumValues).toBeUndefined();
   });
 });

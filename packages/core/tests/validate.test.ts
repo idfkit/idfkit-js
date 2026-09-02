@@ -23,6 +23,17 @@ beforeEach(() => {
 /** Codes only. Messages differ between the two languages; codes do not. */
 const codes = (findings: readonly ValidationError[]): string[] => findings.map((f) => f.code);
 
+/**
+ * Fields of the E009 findings a document produces, in order.
+ *
+ * The reference tests build partial objects, so the run also reports missing
+ * required fields; only the dangling-reference findings are of interest.
+ */
+const danglingFields = (document: IdfDocument): (string | undefined)[] =>
+  validateDocument(document)
+    .errors.filter((f) => f.code === 'E009')
+    .map((f) => f.field);
+
 /** A schema-valid Material, so a test can perturb one field at a time. */
 const MATERIAL = {
   roughness: 'Rough',
@@ -94,10 +105,21 @@ describe('field types (E003)', () => {
     expect(validateObject(zone, v26)).toEqual([]);
   });
 
-  it('reports a number in an alpha field, alongside the enum finding', () => {
+  it('reports a number in an alpha field once, not twice', () => {
+    // One finding per field: the value is the wrong type AND outside the choice
+    // list, which is one defect described two ways. Type wins, being the more
+    // fundamental of the two.
     const zone = doc.add('Zone', 'Z1');
     zone.set('part_of_total_floor_area', 3);
-    expect(codes(validateObject(zone, v26))).toEqual(['E003', 'E004']);
+    expect(codes(validateObject(zone, v26))).toEqual(['E003']);
+  });
+
+  it('still reports the range when the type check is switched off', () => {
+    // The two switches gate two independent checks, and dropping to one finding
+    // per field did not merge them: `checkTypes: false` skips type and enum, and
+    // the bounds are still read.
+    const zone = doc.add('Zone', 'Z1', { multiplier: 0 });
+    expect(codes(validateObject(zone, v26, { checkTypes: false }))).toEqual(['E005']);
   });
 
   it('accepts the extensible array in its own field', () => {
@@ -220,10 +242,29 @@ describe('numeric ranges (E005 to E008)', () => {
   });
 });
 
-describe('auto-sizable fields', () => {
-  it('accepts the Autocalculate keyword in a numeric field', () => {
+// The epJSON schema declares 13060 fields across the 17 bundled versions as
+// `anyOf: [{number}, {string}]`, and this is ordinary JSON Schema `anyOf`: the
+// value is valid when it satisfies ONE branch completely, type and enum and
+// bounds together. Both libraries used to check the type against one branch and
+// the constraints against another, which accepted values EnergyPlus rejects.
+// The shared rule is `validation-semantics.md`; these tests are its cases.
+describe('anyOf fields: a number, or a string the branch allows', () => {
+  it('accepts the sentinel this field actually declares', () => {
     const zone = doc.add('Zone', 'Z1', { ceiling_height: 'Autocalculate' });
     expect(validateObject(zone, v26)).toEqual([]);
+  });
+
+  it('rejects the other sentinel, which this field does not take (E004)', () => {
+    // `Zone.ceiling_height` is one of the 1781 fields whose string branch is
+    // `Autocalculate`. Accepting `Autosize` as well, which is what a validator
+    // that assumes one sentinel does, passes a file EnergyPlus refuses.
+    const zone = doc.add('Zone', 'Z1', { ceiling_height: 'Autosize' });
+
+    const findings = validateObject(zone, v26);
+    expect(codes(findings)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe(
+      "Value 'Autosize' not in allowed values: ['', 'Autocalculate']"
+    );
   });
 
   it('accepts a number in the same field', () => {
@@ -231,18 +272,27 @@ describe('auto-sizable fields', () => {
     expect(validateObject(zone, v26)).toEqual([]);
   });
 
-  // The Python original decides the string branch of the epJSON `anyOf` on the
-  // type alone, so any string passes. Reproduced rather than tightened, so the
-  // two libraries agree about the same file.
-  it('accepts any string, matching the Python original', () => {
+  it('reports a string the branch enum does not list as E004, not E002', () => {
+    // The string branch matches on TYPE, so this is not "matches no branch". It
+    // is a value that branch's enum refuses, and saying so is the difference
+    // between a useful diagnostic and telling the user their string is not a
+    // string.
     const zone = doc.add('Zone', 'Z1', { ceiling_height: 'Bogus' });
-    expect(validateObject(zone, v26)).toEqual([]);
+    expect(codes(validateObject(zone, v26))).toEqual(['E004']);
   });
 
-  // The bundle hoists the bounds out of the `anyOf` and the Python original
-  // never reads them, so neither does this port. Documented divergence from
-  // the epJSON schema, shared by both libraries.
-  it('does not range check, because the bounds live inside the anyOf', () => {
+  it('accepts any string where the string branch declares no enum', () => {
+    // 646 fields put no enum on the string branch at all: the slot holds either
+    // a number or the name of a tariff variable, and both are legal.
+    const block = doc.add('UtilityCost:Charge:Block', 'B1', {
+      block_1_cost_per_unit_value_or_variable_name: 'EnergyCharges',
+    });
+    expect(validateObject(block, v26, { checkRequired: false })).toEqual([]);
+  });
+
+  it('range checks the numeric branch above its maximum (E007)', () => {
+    // The bounds live inside the anyOf, which is why neither library used to
+    // read them. `view_factor_to_ground` is declared `maximum: 1`.
     const surface = doc.add('BuildingSurface:Detailed', 'S1', {
       surface_type: 'Wall',
       construction_name: 'C1',
@@ -250,16 +300,85 @@ describe('auto-sizable fields', () => {
       outside_boundary_condition: 'Outdoors',
       view_factor_to_ground: 5,
     });
-    expect(validateObject(surface, v26)).toEqual([]);
+
+    const findings = validateObject(surface, v26);
+    expect(codes(findings)).toEqual(['E007']);
+    expect(findings[0]?.message).toBe('Value 5 is above maximum 1');
   });
 
-  it('reports a value that matches no branch (E002)', () => {
+  it('range checks the numeric branch below its minimum (E005)', () => {
+    const sizing = doc.add('DesignSpecification:ZoneHVAC:Sizing', 'DS1', {
+      cooling_design_capacity: -1,
+    });
+    expect(codes(validateObject(sizing, v26, { checkRequired: false }))).toEqual(['E005']);
+  });
+
+  it('reads the draft-04 exclusive flag on the numeric branch', () => {
+    // 9.4.0 ships draft-04, where `exclusiveMinimum` is the boolean `true`
+    // qualifying `minimum`. Comparing a value against `true` would silently
+    // compare it against 1 and reject every beam shorter than a metre.
+    const old = new IdfDocument(v94);
+    const beam = old.add('AirTerminal:SingleDuct:ConstantVolume:CooledBeam', 'CB1', {
+      beam_length: 0,
+    });
+    const short = old.add('AirTerminal:SingleDuct:ConstantVolume:CooledBeam', 'CB2', {
+      beam_length: 0.5,
+    });
+
+    expect(codes(validateObject(beam, v94, { checkRequired: false }))).toEqual(['E006']);
+    expect(validateObject(short, v94, { checkRequired: false })).toEqual([]);
+  });
+
+  it('enforces a numeric enum declared on the number branch (E004)', () => {
+    // 68 fields state their choices as numbers. `4` is not one of 0, 1, 2, 3, 5.
+    const screen = doc.add('WindowMaterial:Screen', 'SC1', {
+      angle_of_resolution_for_screen_transmittance_output_map: 4,
+    });
+
+    const findings = validateObject(screen, v26, { checkRequired: false });
+    expect(codes(findings)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe("Value '4' not in allowed values: ['0', '1', '2', '3', '5']");
+  });
+
+  it('accepts a member of that numeric enum', () => {
+    const screen = doc.add('WindowMaterial:Screen', 'SC1', {
+      angle_of_resolution_for_screen_transmittance_output_map: 5,
+    });
+    expect(validateObject(screen, v26, { checkRequired: false })).toEqual([]);
+  });
+
+  it('reports a value that matches no branch on type (E002)', () => {
     const zone = doc.add('Zone', 'Z1');
     zone.set('ceiling_height', [{ vertex_x_coordinate: 1 }]);
 
     const findings = validateObject(zone, v26);
     expect(codes(findings)).toEqual(['E002']);
     expect(findings[0]?.message).toContain('does not match any valid type');
+  });
+
+  it('emits one finding for a field, never one per branch', () => {
+    // 'Autosize' fails the string branch's enum and is not a number at all. One
+    // finding, from the first branch the value matched on type.
+    const zone = doc.add('Zone', 'Z1', { ceiling_height: 'Autosize', volume: 'Autosize' });
+    expect(codes(validateObject(zone, v26))).toEqual(['E004', 'E004']);
+  });
+
+  it('reports the enum failure under checkTypes and the bound under checkRanges', () => {
+    // One evaluation answers both questions, so which switch silences a finding
+    // depends on what the finding turned out to be.
+    const zone = doc.add('Zone', 'Z1', { ceiling_height: 'Autosize' });
+    expect(validateObject(zone, v26, { checkTypes: false })).toEqual([]);
+    expect(codes(validateObject(zone, v26, { checkRanges: false }))).toEqual(['E004']);
+
+    const surface = doc.add('BuildingSurface:Detailed', 'S1', {
+      surface_type: 'Wall',
+      construction_name: 'C1',
+      zone_name: 'Z1',
+      outside_boundary_condition: 'Outdoors',
+      view_factor_to_ground: 5,
+    });
+    expect(validateObject(surface, v26, { checkRanges: false })).toEqual([]);
+    expect(codes(validateObject(surface, v26, { checkTypes: false }))).toEqual(['E007']);
   });
 });
 
@@ -343,6 +462,149 @@ describe('validateDocument', () => {
     expect(result.errors[0]?.field).toBe('outside_layer');
     expect(result.errors[0]?.message).toBe("Reference to non-existent object 'M_MISSING'");
     expect(result.isValid).toBe(false);
+  });
+
+  it('does not report a field naming an object TYPE as dangling', () => {
+    // `Branch.component_object_type` points into `validBranchEquipmentTypes`,
+    // one of the four lists in 26.1.0 that nothing contributes to: they hold
+    // object type names, not object names. `Pipe:Adiabatic` is the correct value
+    // and no object will ever declare it. `component_name` beside it is a real
+    // reference and is still reported.
+    const { document } = parseIdf(
+      `
+      Version, 26.1;
+      Branch, B1, , Pipe:Adiabatic, MISSING PIPE, N1, N2;
+      `,
+      v26
+    );
+
+    const result = validateDocument(document);
+    expect(codes(result.errors)).toEqual(['E009']);
+    expect(result.errors[0]?.field).toBe('component_name');
+    expect(result.errors[0]?.message).toBe("Reference to non-existent object 'MISSING PIPE'");
+  });
+
+  it('accepts a ZoneList-expanded name (E009)', () => {
+    // EnergyPlus expands an object assigned to a ZoneList into one instance per
+    // member, named `<member name><space><object name>`, and other objects
+    // reference those. `5ZoneEndUses.idf` does exactly this.
+    doc.add('Zone', 'SPACE3-1');
+    doc.add('ZoneControl:Thermostat', 'AllControlledZones Thermostat');
+    doc.add('ZoneControl:Thermostat:OperativeTemperature', null, {
+      thermostat_name: 'SPACE3-1 AllControlledZones Thermostat',
+    });
+
+    expect(danglingFields(doc)).toEqual([]);
+  });
+
+  it('splits an expanded name at every space, not only the first', () => {
+    // Zone names and object names both routinely contain spaces, so the split
+    // that resolves is the third one here, not the first.
+    doc.add('Zone', 'ZONE 1');
+    doc.add('ZoneControl:Thermostat', 'AllZones Thermostat');
+    doc.add('ZoneControl:Thermostat:OperativeTemperature', null, {
+      thermostat_name: 'ZONE 1 AllZones Thermostat',
+    });
+
+    expect(danglingFields(doc)).toEqual([]);
+  });
+
+  it('accepts a Space name as the expansion prefix', () => {
+    doc.add('Zone', 'Zone 5');
+    doc.add('Space', 'Space 5 Office', { zone_name: 'Zone 5' });
+    doc.add('ZoneControl:Thermostat', 'AllZones Thermostat');
+    doc.add('ZoneControl:Thermostat:OperativeTemperature', null, {
+      thermostat_name: 'Space 5 Office AllZones Thermostat',
+    });
+
+    expect(danglingFields(doc)).toEqual([]);
+  });
+
+  it('matches the two halves of an expanded name case-insensitively', () => {
+    doc.add('Zone', 'SPACE3-1');
+    doc.add('ZoneControl:Thermostat', 'AllControlledZones Thermostat');
+    doc.add('ZoneControl:Thermostat:OperativeTemperature', null, {
+      thermostat_name: 'space3-1 allcontrolledzones THERMOSTAT',
+    });
+
+    expect(danglingFields(doc)).toEqual([]);
+  });
+
+  it('still reports a name with spaces whose prefix is no zone', () => {
+    doc.add('Zone', 'SPACE3-1');
+    doc.add('ZoneControl:Thermostat', 'AllControlledZones Thermostat');
+    doc.add('ZoneControl:Thermostat:OperativeTemperature', null, {
+      thermostat_name: 'SPACE9-9 AllControlledZones Thermostat',
+    });
+
+    expect(danglingFields(doc)).toEqual(['thermostat_name']);
+  });
+
+  it('still reports a name whose prefix is a zone but whose suffix is undeclared', () => {
+    doc.add('Zone', 'SPACE3-1');
+    doc.add('ZoneControl:Thermostat', 'AllControlledZones Thermostat');
+    doc.add('ZoneControl:Thermostat:OperativeTemperature', null, {
+      thermostat_name: 'SPACE3-1 Some Other Thermostat',
+    });
+
+    expect(danglingFields(doc)).toEqual(['thermostat_name']);
+  });
+
+  it('does not treat a zone name alone as an expansion', () => {
+    // No suffix to resolve: `<zone name>` on its own is still dangling.
+    doc.add('Zone', 'SPACE3-1');
+    doc.add('ZoneControl:Thermostat:OperativeTemperature', null, {
+      thermostat_name: 'SPACE3-1 ',
+    });
+
+    expect(danglingFields(doc)).toEqual(['thermostat_name']);
+  });
+
+  it('accepts the implicit remainder space of a declared zone (E009)', () => {
+    // A zone whose Spaces cover only part of it gets one more space from
+    // EnergyPlus named `<Zone Name>-Remainder`, which nothing declares.
+    // `5ZoneAirCooledWithSpacesHVAC.idf` references `Zone 5-Remainder` twelve
+    // times.
+    doc.add('Zone', 'Zone 5');
+    doc.add('Space', 'Space 5 Office', { zone_name: 'Zone 5' });
+    doc.add('Space', 'Space 5 Conference', { zone_name: 'Zone 5' });
+    doc.add('SpaceHVAC:EquipmentConnections', null, { space_name: 'Zone 5-Remainder' });
+
+    expect(danglingFields(doc)).toEqual([]);
+  });
+
+  it('matches a remainder name case-insensitively', () => {
+    doc.add('Zone', 'Zone 5');
+    doc.add('SpaceHVAC:EquipmentConnections', null, { space_name: 'ZONE 5-REMAINDER' });
+
+    expect(danglingFields(doc)).toEqual([]);
+  });
+
+  it('still reports a remainder name whose prefix is no declared zone', () => {
+    // `Space 5 Office` is a Space, not a Zone, and only a Zone gets a
+    // remainder. `Zone 9` is declared nowhere at all.
+    doc.add('Zone', 'Zone 5');
+    doc.add('Space', 'Space 5 Office', { zone_name: 'Zone 5' });
+    doc.add('SpaceHVAC:EquipmentConnections', null, {
+      space_name: 'Space 5 Office-Remainder',
+    });
+    doc.add('SpaceHVAC:EquipmentConnections', null, { space_name: 'Zone 9-Remainder' });
+
+    expect(danglingFields(doc)).toEqual(['space_name', 'space_name']);
+  });
+
+  it('does not treat the bare suffix as a remainder name', () => {
+    doc.add('Zone', 'Zone 5');
+    doc.add('SpaceHVAC:EquipmentConnections', null, { space_name: '-Remainder' });
+
+    expect(danglingFields(doc)).toEqual(['space_name']);
+  });
+
+  it('reports a name a declared zone merely starts, without the suffix', () => {
+    doc.add('Zone', 'Zone 5');
+    doc.add('SpaceHVAC:EquipmentConnections', null, { space_name: 'Zone 5-Remaining' });
+
+    expect(danglingFields(doc)).toEqual(['space_name']);
   });
 
   it('can skip the reference check', () => {

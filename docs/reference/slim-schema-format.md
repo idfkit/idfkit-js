@@ -51,24 +51,50 @@ that says which slot a value belongs to.
 
 ## `SlimField`
 
-| Key    | Meaning                                                                      |
-| ------ | ---------------------------------------------------------------------------- |
-| `t`    | Storage class, see below                                                     |
-| `auto` | `1` when the field accepts `Autosize` or `Autocalculate` as well as a number |
-| `ol`   | Reference lists this field points _into_ — it is a foreign key               |
-| `ref`  | Reference lists this field contributes _to_ — it is a key                    |
-| `e`    | Permitted values, for a choice field                                         |
-| `d`    | Schema default, applied on write when the field is absent                    |
-| `min`  | Inclusive minimum                                                            |
-| `max`  | Inclusive maximum                                                            |
-| `xmin` | Exclusive minimum                                                            |
-| `xmax` | Exclusive maximum                                                            |
-| `u`    | SI units, e.g. `m`                                                           |
-| `rc`   | `1` when the value is case-sensitive and must not be normalized              |
+| Key    | Meaning                                                                                    |
+| ------ | ------------------------------------------------------------------------------------------ |
+| `t`    | Storage class, see below                                                                   |
+| `auto` | `1` when the field is an `anyOf` of a numeric branch and a string branch                   |
+| `se`   | String literals that `anyOf` string branch accepts, see below                              |
+| `ol`   | Reference lists this field points _into_ — it is a foreign key                             |
+| `ref`  | Reference lists this field contributes _to_ — it is a key                                  |
+| `e`    | Permitted values, for a choice field. Numbers on the fields that state choices numerically |
+| `d`    | Schema default, applied on write when the field is absent                                  |
+| `min`  | Inclusive minimum                                                                          |
+| `max`  | Inclusive maximum                                                                          |
+| `xmin` | Exclusive minimum, or `true` on a draft-04 version, see below                              |
+| `xmax` | Exclusive maximum, or `true` on a draft-04 version, see below                              |
+| `u`    | SI units, e.g. `m`                                                                         |
+| `rc`   | `1` when the value is case-sensitive and must not be normalized                            |
 
 `ol` and `ref` together are what the [reference
 graph](../explanation/index.md) is built from: `ref` says a name enters a list,
 `ol` says a field reads from one.
+
+### `auto` and `se`, the two branches of an `anyOf`
+
+13060 fields across the 17 bundled versions are declared `anyOf: [{number},
+{string}]`: a capacity is a number, or the word that asks EnergyPlus to size it.
+The bundle hoists the numeric branch onto the record, so `t`, `e`, `min`, `max`,
+`xmin` and `xmax` all describe that branch, and sets `auto`. What survives of the
+string branch is `se`, its enum, verbatim.
+
+`se` is absent when the string branch declared no enum, and any string is legal
+there. 646 fields have that shape, `Schedule:Compact`'s extensible `field` among
+them. That is why the empty string is kept in `se` rather than filtered out the
+way it is filtered out of `e`: `se: [""]` and no `se` at all are opposite claims.
+
+Nothing about the sentinel can be assumed. 10557 fields take `Autosize` and 1781
+take `Autocalculate`, and a consumer that accepts either everywhere accepts a
+value EnergyPlus rejects.
+
+### `xmin` and `xmax`, in two JSON Schema dialects
+
+From 9.6.0 the schemas are draft-06 or later, where `exclusiveMinimum` carries
+the bound itself, and `xmin` is a number. For 8.9.0 through 9.5.0 they are
+draft-04, where the keyword is a boolean qualifying the sibling `minimum`, and
+`xmin` is `true`. No version mixes the two. Branch on the type of the value, not
+on the version: comparing a value against `true` silently compares it against 1.
 
 ## `FieldKind`
 

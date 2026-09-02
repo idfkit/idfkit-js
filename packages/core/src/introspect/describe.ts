@@ -25,12 +25,26 @@ export interface FieldDescription {
   readonly default: string | number | undefined;
   /** SI units, e.g. `"m"`, `"W/m-K"`. */
   readonly units: string | undefined;
-  /** Permitted values for a choice field. */
-  readonly enumValues: readonly string[] | undefined;
+  /**
+   * Permitted values for a choice field.
+   *
+   * Numbers rather than strings for the handful of fields that express a choice
+   * numerically, matching Python, which also hands back the raw JSON values.
+   */
+  readonly enumValues: readonly (string | number)[] | undefined;
   readonly minimum: number | undefined;
   readonly maximum: number | undefined;
-  readonly exclusiveMinimum: number | undefined;
-  readonly exclusiveMaximum: number | undefined;
+  /**
+   * Exclusive minimum, as the schema for this version declares it.
+   *
+   * `true` rather than a number on 8.9.0 through 9.5.0, whose draft-04 schemas
+   * use the keyword as a flag qualifying `minimum` instead of as a bound. Python
+   * reports the same raw value, so a caller comparing the two sides sees no
+   * difference; a caller comparing a value against it must check the type first.
+   */
+  readonly exclusiveMinimum: number | boolean | undefined;
+  /** Exclusive maximum. Number or boolean, exactly as `exclusiveMinimum`. */
+  readonly exclusiveMaximum: number | boolean | undefined;
   /**
    * Field documentation note.
    *
@@ -196,11 +210,13 @@ function describeField(
   }
 
   // `auto` marks a field the bundle collapsed from `anyOf: [number, string]`.
-  // Python reads `minimum`/`maximum`/`exclusiveMinimum`/`exclusiveMaximum` from
-  // the *top level* of the field schema only, and no `anyOf` field in any of the
-  // 17 bundled versions carries those keys at the top level — they live on the
-  // numeric branch, which Python never looks at. The bundle hoists them; Python
-  // reports null. Suppressing them here is what makes the two sides agree.
+  // Python's `describe_object_type` reads `minimum`/`maximum`/`exclusiveMinimum`/
+  // `exclusiveMaximum` from the *top level* of the field schema only, and no
+  // `anyOf` field in any of the 17 bundled versions carries those keys at the
+  // top level — they live on the numeric branch, which that function never looks
+  // at. The bundle hoists them; Python reports null. Suppressing them here is
+  // what makes the two sides agree. Validation is a separate question and reads
+  // the branch properly on both sides; see `validate/`.
   const collapsedAnyOf = field.auto === 1;
 
   return {
@@ -234,16 +250,13 @@ function describeField(
  *   exactly when the raw field was `anyOf: [{number}, {string}]` — 13052 such
  *   fields across all versions, every one of them in that branch order, so the
  *   union string is reconstructed exactly rather than guessed.
- * - `'i'` is `"integer"`. The bundle also folds `"type": "number"` carrying
- *   `"data_type": "integer"` into `'i'`, which would report `"number"` in
- *   Python — but no schema in any bundled version actually uses that form.
+ * - `'i'` is `"integer"`, and `"integer|string"` when `auto` is set, the
+ *   `anyOf: [{integer}, {string}]` shape carried by one field per version from
+ *   9.3.0 on, `AirTerminal:SingleDuct:ConstantVolume:CooledBeam.number_of_beams`.
+ *   The bundle also folds `"type": "number"` carrying `"data_type": "integer"`
+ *   into `'i'`, which would report `"number"` in Python — but no schema in any
+ *   bundled version actually uses that form.
  * - `'arr'` is `"array"`.
- *
- * The exception: `anyOf: [{integer}, {string}]` collapses to a bare `'i'` with
- * no `auto` flag, so it is indistinguishable from a plain integer field. Python
- * reports `"integer|string"`. Eight fields across all 17 versions are affected,
- * one per version from 9.3.0 on:
- * `AirTerminal:SingleDuct:ConstantVolume:CooledBeam.number_of_beams`.
  *
  * @internal
  */
@@ -252,7 +265,7 @@ function fieldTypeOf(field: SlimField): string {
     case 'arr':
       return 'array';
     case 'i':
-      return 'integer';
+      return field.auto === 1 ? 'integer|string' : 'integer';
     case 'n':
       return field.auto === 1 ? 'number|string' : 'number';
     case 'a':

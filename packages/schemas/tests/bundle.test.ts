@@ -111,6 +111,69 @@ describe('Schema', () => {
     expect(extensible?.p['vertex_x_coordinate']).toMatchObject({ t: 'n' });
   });
 
+  it('keeps both branches of an anyOf field', async () => {
+    const schema = await bundle.load('26.1.0');
+
+    // The numeric branch is hoisted onto the record; `se` is the string branch's
+    // enum, verbatim. Which literal a field takes is a property of the field:
+    // 10557 across the versions take `Autosize` and 1781 take `Autocalculate`,
+    // so a consumer cannot assume one of them.
+    expect(schema.field('Zone', 'ceiling_height')).toMatchObject({
+      t: 'n',
+      auto: 1,
+      se: ['', 'Autocalculate'],
+    });
+    expect(
+      schema.field('DesignSpecification:ZoneHVAC:Sizing', 'cooling_design_capacity')
+    ).toMatchObject({
+      auto: 1,
+      se: ['Autosize'],
+      min: 0,
+    });
+  });
+
+  it('says "any string" by leaving se off, not by leaving it empty', async () => {
+    const schema = await bundle.load('26.1.0');
+
+    // 646 fields put no enum on the string branch at all: the slot holds a
+    // number or the name of a variable. `se: ['']` would be the opposite claim,
+    // and is what the 68 numeric-choice fields carry.
+    const block = schema.field(
+      'UtilityCost:Charge:Block',
+      'block_1_cost_per_unit_value_or_variable_name'
+    );
+    expect(block).toMatchObject({ t: 'n', auto: 1 });
+    expect(block?.se).toBeUndefined();
+
+    const screen = schema.field(
+      'WindowMaterial:Screen',
+      'angle_of_resolution_for_screen_transmittance_output_map'
+    );
+    expect(screen).toMatchObject({ auto: 1, e: [0, 1, 2, 3, 5], se: [''] });
+  });
+
+  it('flags the integer branch of an anyOf, not just the number branch', async () => {
+    const schema = await bundle.load('26.1.0');
+
+    // Eight fields across the versions declare `anyOf: [{integer}, {string}]`.
+    // Matching only `number` left this one with no `auto` flag and a default of
+    // `Autosize` that its own declared type rejects.
+    expect(
+      schema.field('AirTerminal:SingleDuct:ConstantVolume:CooledBeam', 'number_of_beams')
+    ).toMatchObject({ t: 'i', auto: 1, se: ['', 'Autosize'], d: 'Autosize' });
+  });
+
+  it('carries exclusive bounds in whichever dialect the version shipped', async () => {
+    // 8.9.0 through 9.5.0 are draft-04, where the keyword is a flag qualifying
+    // the sibling bound. 9.6.0 on are draft-06+, where it is the bound.
+    const older = await bundle.load('9.4.0');
+    const newer = await bundle.load('26.1.0');
+
+    expect(older.field('Material', 'thickness')).toMatchObject({ min: 0, xmin: true });
+    expect(newer.field('Material', 'thickness')).toMatchObject({ xmin: 0 });
+    expect(newer.field('Material', 'thickness')?.min).toBeUndefined();
+  });
+
   it('flags singletons and anonymous types', async () => {
     const schema = await bundle.load('26.1.0');
     expect(schema.get('Building')?.s).toBe(1);
