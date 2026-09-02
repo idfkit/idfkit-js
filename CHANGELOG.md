@@ -52,12 +52,12 @@ Every rename above is the one rename that name will get. The shared naming regis
 records a rename budget per name and its merge gate blocks a second one, so these
 spellings are now fixed.
 
-| Before | After |
-| ------ | ----- |
-| `IDFDocument` | `IdfDocument` |
-| `detectVersion(text)` | `getIdfVersion(text)` |
+| Before                      | After                    |
+| --------------------------- | ------------------------ |
+| `IDFDocument`               | `IdfDocument`            |
+| `detectVersion(text)`       | `getIdfVersion(text)`    |
 | `detectEpJsonVersion(text)` | `getEpJsonVersion(text)` |
-| `doc.collection(type)` | `doc.all(type)` |
+| `doc.collection(type)`      | `doc.all(type)`          |
 
 ## [0.1.0] - 2026-08-13
 
