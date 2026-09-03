@@ -37,6 +37,13 @@ jobs:
 
       - run: npm run format:check
 
+      - name: Check the exported conformance level against the declared one
+        # FR-024 makes the level a claim the release asserts, and CONFORMANCE_LEVEL is generated
+        # from the pin in packages/core/package.json rather than restated beside it. A pin advanced
+        # without regenerating would export a claim one tag stale, and nothing else here would
+        # notice: the constant compiles, every test passes, and the wrong tag ships.
+        run: npm run check:conformance-level
+
       - name: Typecheck sources and tests
         # tsconfig.test.json, not tsconfig.json: vitest transpiles without
         # typechecking, so the `@ts-expect-error` assertions in typed.test.ts

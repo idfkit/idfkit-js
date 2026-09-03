@@ -70,6 +70,25 @@ jobs:
       # with runtime in it is the one mistake here that cannot be taken back (FR-039).
       - run: npm run check:type-packages
 
+      - name: Check out the conformance corpus at the pinned level
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          path: conformance
+          # Full history and tags: the release check exports the corpus at the declared tag with
+          # `git archive`, so the tag has to resolve inside this checkout.
+          fetch-depth: 0
+
+      - name: Assert this release passes the level it declares
+        # FR-024, SC-025. A release states one thing about agreement, the conformance level it
+        # passes, and this is where that claim is asserted rather than assumed. It runs at the
+        # exported tag, never against the checkout's working tree, and it restates no level: the
+        # tag comes from the same pin CONFORMANCE_LEVEL is generated from.
+        #
+        # Deliberately NOT conditional on env.PUBLISH. A packing-only run that skipped this would
+        # be the run that teaches people the check is optional, and it costs about a second.
+        run: npm run check:release -- --corpus conformance
+
       - name: Resolve the version to publish
         # A release publishes its own tag. A manual run publishes only when
         # given an explicit version, and otherwise just packs.

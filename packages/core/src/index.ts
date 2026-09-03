@@ -32,6 +32,10 @@ export { ObjectShape, shapeFor, shapeOf } from './shape.js';
 export type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
 export { compareVersions, resolveVersion, versionKey } from './versions.js';
 
+// The conformance corpus level this release declares (FR-024), generated from
+// `idfkit.conformance` in package.json so the claim and the pin stay one fact.
+export { CONFORMANCE_LEVEL } from './conformance.js';
+
 export { lex } from './parse/lexer.js';
 export type { LexDiagnostic, LexOptions, RawObject } from './parse/lexer.js';
 export { getIdfVersion, IdfParseError, parseIdf } from './parse/idf.js';
