@@ -10,7 +10,42 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
 
 ## [Unreleased]
 
+### Added
+
+- `idfkit` is now the install name in JavaScript, as it already is on PyPI. It
+  carries no implementation: it re-exports `@idfkit/core` at `idfkit`, its Node
+  edge at `idfkit/node`, `@idfkit/schemas` at `idfkit/schemas`, and
+  `@idfkit/weather` at `idfkit/weather`. The scoped packages keep working and are
+  not deprecated; the facade exists so a reader can install one name.
+
+  `npm install idfkit` places under 1.5 MB on disk. Weather is an optional peer,
+  so it installs no station index and no weather code until you add
+  `@idfkit/weather` by name. `@idfkit/engine` is not reachable through this name
+  at all and never will be: it carries about 51 MB of WebAssembly and pins one
+  EnergyPlus release.
+
+- `@idfkit/types-v26-1` and `@idfkit/types-v9-4`, the per-version object
+  interfaces, as opt-in packages. Install one and parameterise a document with
+  it (`loadIdf<TypeMap>(...)`) to get the 858 typed object interfaces for that
+  EnergyPlus release. Install neither and everything still works, untyped.
+
+- `CONFORMANCE_LEVEL`, exported from `@idfkit/core`, names the cross-language
+  conformance corpus level this release is checked against. It is not a version
+  number and is not comparable to one: two installed libraries agree about the
+  formats when they report the same level, whatever their own versions say.
+
 ### Changed
+
+- **Breaking:** the `@idfkit/core/types` subpath is gone. The generated
+  per-version object interfaces now ship as the opt-in packages described under
+  Added. Replace `import type { TypeMap } from '@idfkit/core/types'` with
+  `import type { TypeMap } from '@idfkit/types-v26-1'`, choosing the package for
+  the EnergyPlus release you target.
+
+  This is why `@idfkit/core` fell from 6.7 MB unpacked to 286 KB. The two type
+  maps were 5.3 MB of it, and every reader paid for both releases whether or not
+  they parameterised a single document. They are types only, erased at build
+  time, so nothing about runtime behaviour changes either way.
 
 - **Breaking:** `IDFDocument` is now `IdfDocument`. It was the last exported type
   spelling the acronym in full caps, out of step with `IdfObject`,
@@ -52,12 +87,34 @@ Every rename above is the one rename that name will get. The shared naming regis
 records a rename budget per name and its merge gate blocks a second one, so these
 spellings are now fixed.
 
-| Before                      | After                    |
-| --------------------------- | ------------------------ |
-| `IDFDocument`               | `IdfDocument`            |
-| `detectVersion(text)`       | `getIdfVersion(text)`    |
-| `detectEpJsonVersion(text)` | `getEpJsonVersion(text)` |
-| `doc.collection(type)`      | `doc.all(type)`          |
+| Before                                              | After                                                |
+| --------------------------------------------------- | ---------------------------------------------------- |
+| `IDFDocument`                                       | `IdfDocument`                                        |
+| `detectVersion(text)`                               | `getIdfVersion(text)`                                |
+| `detectEpJsonVersion(text)`                         | `getEpJsonVersion(text)`                             |
+| `doc.collection(type)`                              | `doc.all(type)`                                      |
+| `import type { TypeMap } from '@idfkit/core/types'` | `import type { TypeMap } from '@idfkit/types-v26-1'` |
+
+**What a missed rename looks like.** All of these are named exports, so a bundler
+resolves them at build time and says which one is missing:
+
+```
+src/model.js (1:9): "IDFDocument" is not exported by
+  "node_modules/@idfkit/core/dist/index.js", imported by "src/model.js".
+```
+
+You do not need TypeScript to get that error; rollup, esbuild and Vite all report
+it. A plain-JavaScript project upgrading this release will be told exactly which
+file and line to change.
+
+The type-package split fails differently, because it is a subpath rather than a
+name: `Cannot find module '@idfkit/core/types'`. Install the package for the
+EnergyPlus release you target and change the specifier.
+
+**Checked against a real consumer.** `idfkit-shoebox`, a browser application
+using `parseIdf`, `writeIdf`, `SchemaBundle`, `httpSource`, `fetchWeatherFiles`
+and `loadStationIndex`, upgraded across this release with **two changed lines**,
+both the `IDFDocument` rename. Every other symbol it imports resolved unchanged.
 
 ## [0.1.0] - 2026-08-13
 

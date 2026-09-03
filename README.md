@@ -22,6 +22,23 @@ handles the model; that one handles the simulation. See
 [How to run a simulation in the browser](https://developers.idfkit.com/how-to/run-a-simulation-in-the-browser/)
 for how the two fit together.
 
+> [!IMPORTANT]
+> **The next release renames four exports and moves the generated types out of
+> `@idfkit/core`.**
+>
+> | Before                                              | After                                                |
+> | --------------------------------------------------- | ---------------------------------------------------- |
+> | `IDFDocument`                                       | `IdfDocument`                                        |
+> | `detectVersion(text)`                               | `getIdfVersion(text)`                                |
+> | `detectEpJsonVersion(text)`                         | `getEpJsonVersion(text)`                             |
+> | `doc.collection(type)`                              | `doc.all(type)`                                      |
+> | `import type { TypeMap } from '@idfkit/core/types'` | `import type { TypeMap } from '@idfkit/types-v26-1'` |
+>
+> Every one is a build-time failure naming the file and line, in plain JavaScript
+> as well as TypeScript, so nothing here reaches runtime. The type move is what
+> takes `@idfkit/core` from 6.7 MB unpacked to 286 KB. Full notes in the
+> [changelog](CHANGELOG.md#migration).
+
 > **Status: beta, and first-tier only.** `@idfkit/core`, `@idfkit/schemas` and
 > `@idfkit/weather` are published at 0.1.0. The API is not yet stable.
 >
