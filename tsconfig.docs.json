@@ -1,0 +1,40 @@
+{
+  // Type-checks every TypeScript example the documentation publishes.
+  //
+  // Constitution VI: renaming a documented operation must break the documentation checks.
+  // A fence typed into a Markdown file is never compiled, so it cannot. These are the same
+  // examples, as real modules, compiled against the workspace sources.
+  //
+  // DOM is in `lib` and is not in the library's own build, deliberately. Several examples are
+  // browser examples, and a browser example that cannot mention `fetch`, `File` or `Worker` is
+  // not the example. The library itself still builds without DOM, so nothing here can smuggle a
+  // browser global into a published package.
+  //
+  // No `paths`. The examples resolve `@idfkit/core` and `idfkit` through node_modules, which is
+  // how a reader resolves them, so what is checked is the published surface rather than the
+  // sources behind it. That means `tsc --build` has to run first, and CI runs it first.
+  //
+  // Pointing `paths` at the sources was tried and is worse in two ways: it type-checks against
+  // members `stripInternal` removes from the published declarations, and it drags the library
+  // sources into this project's `lib`, where DOM turns two correct `Uint8Array` assignments in
+  // packages/weather into errors that have nothing to do with any example.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // OFF here and ON everywhere else, for the reason the Python side turns reportIndexIssue off
+    // over its snippets: a documentation example indexes a collection it has just shown you the
+    // contents of, and `vertices[0]!` teaches the reader nothing except that the example is
+    // fighting a compiler setting. It catches no drift. Every rule that DOES catch drift, which
+    // is the point of compiling these at all, stays on: a renamed export, a changed signature, a
+    // field that no longer exists are all still errors.
+    "noUncheckedIndexedAccess": false,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "baseUrl": "."
+  },
+  "include": ["docs-snippets/**/*.ts"]
+}

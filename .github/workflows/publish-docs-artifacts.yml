@@ -1,0 +1,109 @@
+name: Publish documentation artifacts
+
+# The two things the unified documentation site needs from this repository, published as
+# immutable release assets so the site can pin them (FR-062, FR-064, research R8 and R9).
+#
+#   docs-snippets.tar.gz   every TypeScript example the site publishes, as the real modules
+#                          compiled by `npm run typecheck:docs`. The site includes from these
+#                          with pymdownx.snippets, so a page cannot show text that was never
+#                          compiled (FR-066).
+#   typedoc.json           the TypeDoc JSON the site renders the TypeScript reference from
+#                          (FR-061): generated from source, never written by hand.
+#
+# ONE RELEASE CARRYING BOTH, not two release series. The tasks describe them separately, and
+# separate pins would let the site render a reference from one commit beside examples from
+# another, which is the drift the pinning exists to prevent. Pinned together they describe the
+# same commit by construction, and the site has one thing to advance rather than two.
+#
+# WHY A RELEASE ASSET AND NOT AN ACTIONS ARTIFACT. FR-058 requires the documentation build to
+# need no Node toolchain and no checkout of this repository. An Actions artifact expires and is
+# awkward to fetch across repositories; a release asset is a stable URL that `curl` can take.
+#
+# The tag series is `docs-YYYY.N`, parallel to `conformance-YYYY.N` and `governance-YYYY.N` and
+# independent of both: an example changing does not move the corpus, and neither moves this.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The docs-YYYY.N tag to publish. It is created if it does not exist.
+        required: true
+  push:
+    tags:
+      - 'docs-*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # TypeDoc's source links want real history rather than a single commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Before anything is generated. Both assets describe the built packages, so a workspace
+      # that does not build must not produce either of them.
+      - run: npx tsc --build
+
+      - name: Type-check the documentation examples
+        # An example that does not compile must never reach the site. This is the same check
+        # the CI workflow runs; it is repeated here because this is the step that decides what
+        # gets published, and a publish job that trusts another workflow to have run is a
+        # publish job that will one day publish untested text.
+        run: npm run typecheck:docs
+
+      - name: Generate the TypeDoc JSON
+        run: npm run docs:api
+
+      - name: Resolve the tag
+        run: |
+          if [ "${{ github.event_name }}" = 'push' ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          case "$TAG" in
+            docs-[0-9][0-9][0-9][0-9].[0-9]*) ;;
+            *)
+              echo "::error::$TAG is not a docs-YYYY.N tag. The site pins an immutable tag, never a branch."
+              exit 1
+              ;;
+          esac
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Pack the snippets
+        # The tree as the site includes it, plus the tsconfig that compiled it, so a reader of
+        # the artifact can see what the examples were checked against rather than taking it on
+        # trust. Nothing else: no node_modules, no dist, no sources.
+        run: |
+          tar --create --gzip --file docs-snippets.tar.gz docs-snippets tsconfig.docs.json
+          ls -l docs-snippets.tar.gz .typedoc.json
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. A docs level is immutable: cut a new one."
+            exit 1
+          fi
+          gh release create "$TAG" \
+            --title "Documentation artifacts $TAG" \
+            --notes "TypeScript examples and TypeDoc reference for the unified documentation site, from ${GITHUB_SHA}." \
+            docs-snippets.tar.gz \
+            '.typedoc.json#typedoc.json'

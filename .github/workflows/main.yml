@@ -52,6 +52,17 @@ jobs:
 
       - run: npx tsc --build
 
+      - name: Type-check the documentation examples
+        # Constitution VI, SC-019. Every TypeScript example the documentation publishes is a real
+        # module in docs-snippets/, compiled here against the BUILT packages, resolved through
+        # node_modules exactly as a reader resolves them. A renamed export, a changed signature or
+        # a field that no longer exists fails this step and names the file, which carries the page
+        # in its path. Before this, every fence on 18 pages was hand-typed text nothing compiled.
+        #
+        # After tsc --build, not before: resolution goes through each package's "types" entry,
+        # which points inside dist.
+        run: npm run typecheck:docs
+
   type-packages:
     name: Type packages carry no runtime
     runs-on: ubuntu-latest

@@ -12,6 +12,7 @@
     "build:schemas": "node packages/schemas/scripts/build.mjs",
     "codegen": "node scripts/emit-types.mjs",
     "typecheck": "tsc --build",
+    "typecheck:docs": "tsc -p tsconfig.docs.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write \"{packages,docs}/**/*.{ts,mjs,json,md,css}\" \"*.{json,md}\"",
