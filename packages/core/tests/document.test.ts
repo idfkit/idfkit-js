@@ -172,3 +172,90 @@ describe('collections', () => {
     expect(() => doc.require('Zone', 'Nope')).toThrow('No Zone named "Nope"');
   });
 });
+
+/**
+ * Type-name-keyed lookup: case folding, unknown names, no mutation on read.
+ *
+ * The companion Python suite is `idfkit/tests/test_type_name_lookup.py`, and the
+ * two must stay in step. The one case with no counterpart here is the
+ * schemaless document: every `IdfDocument` is bound to a schema at
+ * construction, so the Python side carries that case alone.
+ */
+describe('type-name lookup', () => {
+  beforeEach(() => {
+    doc.add('Zone', 'Perimeter_ZN_1');
+    doc.add('Zone', 'Core_ZN');
+    doc.add('ScheduleTypeLimits', 'Any Number');
+  });
+
+  it('finds the objects under the canonical name', () => {
+    expect([...doc.all('Zone')].map((z) => z.name)).toEqual(['Perimeter_ZN_1', 'Core_ZN']);
+  });
+
+  it.each(['zone', 'ZONE', 'ZoNe', 'zOnE'])('finds the same objects for %s', (written) => {
+    expect([...doc.all(written)].map((z) => z.name)).toEqual(['Perimeter_ZN_1', 'Core_ZN']);
+  });
+
+  it('recovers internal capitals no casing rule could', () => {
+    // "scheduletypelimits" carries no casing information, so only a schema
+    // lookup gets back to "ScheduleTypeLimits".
+    expect(doc.all('scheduletypelimits').size).toBe(1);
+    expect(doc.all('SCHEDULETYPELIMITS').size).toBe(1);
+  });
+
+  it('does not treat a colon as a word boundary', () => {
+    doc.add('Output:Variable', null, {
+      key_value: '*',
+      variable_name: 'Zone Air Temperature',
+      reporting_frequency: 'Hourly',
+    });
+    expect(doc.all('output:variable').size).toBe(1);
+    expect(doc.all('OuTpUt:VaRiAbLe').size).toBe(1);
+  });
+
+  it('folds case in has, get and require too', () => {
+    expect(doc.has('zone')).toBe(true);
+    expect(doc.get('ZONE', 'Core_ZN')?.name).toBe('Core_ZN');
+    expect(doc.require('zOnE', 'Core_ZN').name).toBe('Core_ZN');
+  });
+
+  it('returns an empty collection for an unknown type name rather than throwing', () => {
+    expect(doc.all('Zoen').size).toBe(0);
+    expect(doc.has('Zoen')).toBe(false);
+  });
+
+  it('keeps the written spelling on a collection nothing resolves', () => {
+    expect(doc.all('Zoen').typeName).toBe('Zoen');
+  });
+
+  it('still rejects the typo on the paths that write', () => {
+    expect(() => doc.add('Zoen', 'X')).toThrow(/not defined in EnergyPlus/);
+    expect(doc.schema.has('Zoen')).toBe(false);
+    expect(doc.schema.resolve('zone')).toBe('Zone');
+  });
+
+  it('adds no collection when an absent or unknown type is read', () => {
+    const before = doc.types();
+    for (const name of ['Lights', 'People', 'Zoen', 'NotAThing', 'zone', 'ZONE']) {
+      doc.all(name);
+      doc.has(name);
+    }
+    expect(doc.types()).toEqual(before);
+  });
+
+  it('hands back a detached collection for an absent type', () => {
+    expect(doc.all('Lights')).not.toBe(doc.all('Lights'));
+    expect(doc.types()).not.toContain('Lights');
+  });
+
+  it('leaves toJSON clean after probing', () => {
+    for (const name of ['Zoen', 'NotAThing', 'Lights']) doc.all(name);
+    expect(Object.keys(doc.toJSON())).toEqual(['Zone', 'ScheduleTypeLimits']);
+  });
+
+  it('files a mis-cased add under the canonical key', () => {
+    const fresh = new IdfDocument(v26);
+    fresh.add('zONE', 'Z1');
+    expect(fresh.types()).toEqual(['Zone']);
+  });
+});
