@@ -5,6 +5,15 @@
  * unchanged in Node, a browser, a worker, or an edge runtime. Reading files and
  * loading schema bundles lives in `@idfkit/core/node`, or is done by the caller
  * via `@idfkit/schemas`.
+ *
+ * This package carries no generated per-version types and does not need to. A
+ * document with no type map is typed through `UntypedMap`, so everything below
+ * works and field names are accepted as strings. Static field checking is
+ * opt-in and installed by its own name, `@idfkit/types-v26-1` or
+ * `@idfkit/types-v9-4`, because the two maps together are 5.3 MB against
+ * roughly 170 KB of everything else and a reader who never parameterises a
+ * document should not pay for them (FR-039, FR-040, SC-014). `./typemap.ts`
+ * says how a map attaches.
  */
 
 export { IdfCollection } from './collection.js';

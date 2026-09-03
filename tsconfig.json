@@ -1,8 +1,23 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/schemas" },
-    { "path": "./packages/core" },
-    { "path": "./packages/weather" }
+    {
+      "path": "./packages/schemas"
+    },
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/weather"
+    },
+    {
+      "path": "./packages/types-v26-1"
+    },
+    {
+      "path": "./packages/types-v9-4"
+    },
+    {
+      "path": "./packages/idfkit"
+    }
   ]
 }

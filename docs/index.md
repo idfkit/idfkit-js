@@ -26,7 +26,7 @@ hide:
 
 ```ts
 import { loadIdf, saveIdf } from '@idfkit/core/node';
-import type { TypeMap } from '@idfkit/core/types/v26-1';
+import type { TypeMap } from '@idfkit/types-v26-1';
 
 const doc = await loadIdf<TypeMap>('model.idf');
 

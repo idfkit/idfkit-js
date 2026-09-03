@@ -184,3 +184,59 @@ jobs:
       # clean checkout.
       - name: Check the exported capabilities against the parity ledger
         run: npm run check:parity -- --corpus conformance
+
+  publication:
+    name: Publication preconditions (FR-044)
+    needs: pins
+    runs-on: ubuntu-latest
+
+    # BLOCKING, but on a narrow question. `scripts/check-publication.mjs` is the gate that stands
+    # between the four FR-044 preconditions and `npm publish idfkit`, and it lives in
+    # publish.yml, where a refusal stops the release. FR-088 is why it exists at all: publication
+    # under the shared name is irreversible, so its preconditions have to be verified by a check
+    # rather than by somebody saying they landed, and a claim later found untrue is corrected by a
+    # further release and never by withdrawing the version.
+    #
+    # This job runs it with --report, which prints the same table and exits 0 unless the check
+    # ITSELF could not run. That distinction is the whole point of having the job:
+    #
+    #   a precondition not yet met   is a fact about how far the work has got. Blocking every
+    #                                merge on it would mean nothing could land until everything
+    #                                had landed.
+    #   the check not running        is a defect. A publication gate that has quietly started
+    #                                exiting 2 -- a missing corpus tag, a renamed gate, a
+    #                                .typedoc.json nobody generates any more -- is worth nothing
+    #                                on the day it is finally consulted, and exit 2 is NOT
+    #                                permission to publish.
+    #
+    # So: this job fails when the gate rots, and reports when the work is unfinished. The
+    # publish workflow is where an unmet precondition actually refuses.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check out the conformance corpus
+        # fetch-depth 0, and no `ref`: this gate reads BOTH pinned tags out of the one checkout,
+        # exports the corpus at the conformance tag with `git archive` to run it, and reads
+        # governance/parity.toml at the governance tag. A shallow single-ref checkout has neither.
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          path: conformance
+          fetch-depth: 0
+
+      - run: npm ci
+
+      # The distribution gates pack the workspace, and the naming gate reads built .d.ts files.
+      - run: npx tsc --build
+
+      # The naming gate reads TypeDoc JSON and exits 2 without it, and the publication check will
+      # not approve or refuse a precondition it could not evaluate.
+      - run: npm run docs:api
+
+      - name: Report on the FR-044 preconditions
+        run: npm run check:publication -- --report --corpus conformance

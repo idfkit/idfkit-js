@@ -1,11 +1,13 @@
 /**
  * Version-specific static typing, with no runtime cost at all.
  *
- * A generated module (`@idfkit/core/types/v26-1`) exports one interface per
- * object type plus a `TypeMap` joining type name to interface. A document
- * parameterized by that map resolves `doc.all('Zone')` to a collection of
- * objects with `Zone`'s fields, and the editor completes among all 858 type
- * names as you type the string.
+ * An opt-in package (`@idfkit/types-v26-1`, one per EnergyPlus version) exports
+ * one interface per object type plus a `TypeMap` joining type name to
+ * interface. A document parameterized by that map resolves `doc.all('Zone')` to
+ * a collection of objects with `Zone`'s fields, and the editor completes among
+ * all 858 type names as you type the string. Install none of them and every
+ * document is an `UntypedMap`: nothing stops working, the field names are
+ * simply not checked.
  *
  * This is where JavaScript beats the Python original rather than imitating it.
  * `__getattr__` resolves names at runtime, so an editor cannot see them and a

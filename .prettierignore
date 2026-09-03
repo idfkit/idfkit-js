@@ -1,0 +1,12 @@
+# Build and vendor output.
+dist/
+node_modules/
+site/
+
+# The generated type maps: one machine-written declaration file per EnergyPlus
+# version, 2.5 MB each. Prettier is not the author here, and letting it be one
+# puts `npm run codegen` and `npm run format` permanently at odds — regenerate,
+# and format:check fails until someone reformats 5 MB of text nobody reads. The
+# generator's output is the canonical form. Everything else in these packages,
+# manifest and README included, is checked normally.
+packages/types-*/index.d.ts

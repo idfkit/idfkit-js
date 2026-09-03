@@ -36,11 +36,12 @@
 packages/*/src/index.ts               @idfkit/javascript-maintainers @idfkit/python-maintainers
 packages/*/src/node.ts                @idfkit/javascript-maintainers @idfkit/python-maintainers
 
-# Generated per-version object interfaces, published as the `./types/*` subpath
-# of `@idfkit/core`, plus the generator that emits them. These declarations name
-# EnergyPlus fields in both libraries, so their shape is a shared decision.
-packages/core/src/types/              @idfkit/javascript-maintainers @idfkit/python-maintainers
-packages/core/scripts/emit-types.mjs  @idfkit/javascript-maintainers @idfkit/python-maintainers
+# Generated per-version object interfaces, published one opt-in package per
+# EnergyPlus version, plus the generator that emits them. These declarations name
+# EnergyPlus fields in both libraries, so their shape is a shared decision. The
+# generator writes the whole package, so a review here covers the manifest too.
+packages/types-*/                     @idfkit/javascript-maintainers @idfkit/python-maintainers
+scripts/emit-types.mjs                @idfkit/javascript-maintainers @idfkit/python-maintainers
 
 # Package manifests. The `exports` map is what makes a module importable at all,
 # and `name`, `version`, and `files` decide what ships to npm.

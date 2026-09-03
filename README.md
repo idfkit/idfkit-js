@@ -32,11 +32,18 @@ the two fit together.
 npm install @idfkit/core @idfkit/schemas
 ```
 
+Static per-version field types are opt-in and installed by name. The quickstart
+below uses them; everything works without them, untyped.
+
+```bash
+npm install --save-dev @idfkit/types-v26-1
+```
+
 ## Quickstart
 
 ```ts
 import { loadIdf, saveIdf } from '@idfkit/core/node';
-import type { TypeMap } from '@idfkit/core/types/v26-1';
+import type { TypeMap } from '@idfkit/types-v26-1';
 
 const doc = await loadIdf<TypeMap>('model.idf');
 

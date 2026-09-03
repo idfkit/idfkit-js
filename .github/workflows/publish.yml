@@ -12,6 +12,20 @@ on:
           failed, without deleting and recreating the release.
         type: string
         required: false
+      publish_facade:
+        description: >
+          Also publish `idfkit`, the shared install name, after the scoped
+          packages. Off by default, and deliberately not automatic on a
+          release. Two reasons. Publication under the shared name is
+          irreversible (FR-088), so it is a decision somebody makes rather than
+          a side effect of tagging. And the name is not registrable on npm
+          today: the registry's similarity filter rejected it and an appeal is
+          pending, so an automatic attempt would fail every release for a
+          reason unrelated to the release. The publish-facade job refuses
+          unless all four FR-044 preconditions verify first.
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -51,6 +65,11 @@ jobs:
 
       - run: npx tsc --build
 
+      # After the build: the gate measures emitted JavaScript, so a stray .ts module in a type
+      # package has to be compiled before there is anything to catch. Publishing a type package
+      # with runtime in it is the one mistake here that cannot be taken back (FR-039).
+      - run: npm run check:type-packages
+
       - name: Resolve the version to publish
         # A release publishes its own tag. A manual run publishes only when
         # given an explicit version, and otherwise just packs.
@@ -83,6 +102,31 @@ jobs:
           npm version "$VERSION" --workspaces --no-git-tag-version --allow-same-version --workspaces-update=false
           npm pkg set "dependencies.@idfkit/schemas=$VERSION" -w @idfkit/core
 
+          # The type packages declare a peer RANGE against core, never a pin (FR-041). In the
+          # repository that range is the ">=0.0.0" placeholder, which says nothing because every
+          # version here is the 0.0.0 placeholder too; the release is the first moment a real
+          # floor exists, so it is stamped here. Lower bound only, and deliberately unbounded
+          # above: a type package borrows exactly one type from core, ExtensibleGroup, and
+          # neither side carries runtime, so skew is a type error at the consumer's build and
+          # never a failure at run time. Give it an upper bound the day ExtensibleGroup changes
+          # shape, and not before.
+          for pkg in @idfkit/types-v26-1 @idfkit/types-v9-4; do
+            npm pkg set "peerDependencies.@idfkit/core=>=$VERSION" -w "$pkg"
+          done
+
+          # The facade's own dependency specs, which `npm version` does NOT touch: it rewrites
+          # the "version" field of each workspace and nothing else. In the repository they read
+          # "0.0.0", which is what makes the workspace link resolve. Published unchanged, they
+          # would ask the registry for @idfkit/core@0.0.0 and @idfkit/schemas@0.0.0, versions
+          # that have never existed, and `npm install idfkit` would fail with ETARGET for
+          # everyone. Caret ranges here rather than exact pins, matching
+          # contracts/distribution.md: the facade re-exports the scoped packages and carries no
+          # implementation, so a patch of core is a patch of idfkit and should reach a consumer
+          # without a facade release.
+          npm pkg set "dependencies.@idfkit/core=^$VERSION" -w idfkit
+          npm pkg set "dependencies.@idfkit/schemas=^$VERSION" -w idfkit
+          npm pkg set "peerDependencies.@idfkit/weather=^$VERSION" -w idfkit
+
       - name: Publish
         if: env.PUBLISH == 'true'
         # No --provenance flag and no NODE_AUTH_TOKEN: with OIDC on a public
@@ -94,8 +138,11 @@ jobs:
           # already-published package, so a release that failed partway can
           # never be completed by re-running it.
           # schemas first: core depends on it by exact version. weather has no
-          # workspace dependencies, so its position does not matter.
-          for pkg in @idfkit/schemas @idfkit/core @idfkit/weather; do
+          # workspace dependencies, so its position does not matter. The type packages go last:
+          # their peer range resolves against a core that is on the registry by then, so a
+          # consumer installing one never sees an unsatisfiable peer.
+          for pkg in @idfkit/schemas @idfkit/core @idfkit/weather \
+                     @idfkit/types-v26-1 @idfkit/types-v9-4; do
             if npm view "$pkg@$VERSION" version >/dev/null 2>&1; then
               echo "$pkg@$VERSION is already published; skipping."
             else
@@ -106,3 +153,65 @@ jobs:
       - name: Pack only
         if: env.PUBLISH != 'true'
         run: npm pack --workspaces --pack-destination /tmp
+
+  publish-facade:
+    name: Publish the shared install name
+    needs: publish
+    # Only on an explicit request. A release publishes the scoped packages and stops there; see
+    # the publish_facade input above for why.
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_facade && inputs.version != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Use an npm that supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - name: Check out the conformance corpus
+        # fetch-depth 0 and no ref: the publication check reads both pinned tags out of this one
+        # checkout. It exports the corpus at the conformance tag to run it, and reads
+        # governance/naming.toml and governance/parity.toml at the governance tag.
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          path: conformance
+          fetch-depth: 0
+
+      - run: npm ci
+
+      - run: npx tsc --build
+
+      # The naming gate reads TypeDoc JSON and exits 2 without it.
+      - run: npm run docs:api
+
+      - name: Verify the four FR-044 preconditions
+        # THE GATE. FR-088: publication under the shared name is irreversible, its preconditions
+        # must be verified by a check rather than by inspection, and a claim later found untrue
+        # is corrected by a further release and never by withdrawing the version. So this runs
+        # WITHOUT --report: exit 1 refuses the publish, and exit 2 -- the check could not decide
+        # -- refuses it too, because a precondition that could not be evaluated has not been met.
+        #
+        # Do not move this after the publish step, do not add continue-on-error, and do not
+        # weaken it to `|| true` to get a release out. There is no taking the version back.
+        run: npm run check:publication -- --corpus conformance
+
+      - name: Publish idfkit
+        run: |
+          VERSION="${{ inputs.version }}"
+          npm version "$VERSION" --workspaces --no-git-tag-version --allow-same-version --workspaces-update=false
+          npm pkg set "dependencies.@idfkit/core=^$VERSION" -w idfkit
+          npm pkg set "dependencies.@idfkit/schemas=^$VERSION" -w idfkit
+          npm pkg set "peerDependencies.@idfkit/weather=^$VERSION" -w idfkit
+          if npm view "idfkit@$VERSION" version >/dev/null 2>&1; then
+            echo "idfkit@$VERSION is already published; nothing to do."
+          else
+            npm publish -w idfkit --access public
+          fi

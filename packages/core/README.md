@@ -16,17 +16,26 @@ npm install @idfkit/core @idfkit/schemas
 
 ## Entry points
 
-| Import                     | Contents                                                 | Environment |
-| -------------------------- | -------------------------------------------------------- | ----------- |
-| `@idfkit/core`             | Parsing, writing, the object model. Synchronous, no I/O. | Anywhere    |
-| `@idfkit/core/node`        | `loadIdf`, `saveIdf`, schema discovery from disk         | Node        |
-| `@idfkit/core/types/v26-1` | Generated interfaces and `TypeMap` for one version       | Types only  |
+| Import              | Contents                                                 | Environment |
+| ------------------- | -------------------------------------------------------- | ----------- |
+| `@idfkit/core`      | Parsing, writing, the object model. Synchronous, no I/O. | Anywhere    |
+| `@idfkit/core/node` | `loadIdf`, `saveIdf`, schema discovery from disk         | Node        |
+
+Generated per-version field types are **not** in this package. They are opt-in,
+one package per EnergyPlus version, installed by name:
+
+```bash
+npm install --save-dev @idfkit/types-v26-1   # or @idfkit/types-v9-4
+```
+
+Install neither and this package is complete: a document with no type map is
+typed permissively, and every operation below works unchanged.
 
 ## Usage
 
 ```ts
 import { loadIdf, saveIdf } from '@idfkit/core/node';
-import type { TypeMap } from '@idfkit/core/types/v26-1';
+import type { TypeMap } from '@idfkit/types-v26-1';
 
 const doc = await loadIdf<TypeMap>('model.idf');
 

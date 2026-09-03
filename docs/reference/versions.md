@@ -21,21 +21,33 @@ the last entry.
 
 ## Generated types
 
-Schemas ship for all 17 versions. Generated TypeScript interfaces are committed
-for two of them:
+Schemas ship for all 17 versions. Generated TypeScript interfaces are published
+for two of them, each as its own opt-in package:
 
-| Import                     | Version |
-| -------------------------- | ------- |
-| `@idfkit/core/types/v26-1` | 26.1.0  |
-| `@idfkit/core/types/v9-4`  | 9.4.0   |
+| Package               | Version | Size            |
+| --------------------- | ------- | --------------- |
+| `@idfkit/types-v26-1` | 26.1.0  | 2.7 MB of types |
+| `@idfkit/types-v9-4`  | 9.4.0   | 2.4 MB of types |
+
+```bash
+npm install --save-dev @idfkit/types-v26-1
+```
+
+Neither is installed by `@idfkit/core`, and installing neither leaves the
+library complete. They are separate because together they are thirty times the
+size of everything else in core.
 
 Every version can be generated. The script needs the raw epJSON schemas from the
 Python repository, which is why the output is committed rather than produced at
 install time:
 
 ```bash
-npm run codegen -w @idfkit/core -- 25.2.0
+npm run codegen -- 25.2.0
 ```
+
+A version with no package yet gets one: the command writes the whole package,
+not only the declarations. Adding it to the solution build and to the publish
+loop is the one manual step, and the script says so when it finishes.
 
 Types are optional everywhere. A document with no map parameter behaves
 identically at runtime; see

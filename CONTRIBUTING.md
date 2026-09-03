@@ -87,12 +87,26 @@ definitions a release actually changed.
 ## Regenerating the TypeScript interfaces
 
 ```bash
-npm run codegen -w @idfkit/core -- 26.1.0
+npm run codegen -- 26.1.0
 ```
 
 This also reads the Python repository's schemas, which is why the output is
 committed rather than generated at install time. Interfaces are committed for
-26.1.0 and 9.4.0.
+26.1.0 and 9.4.0, one opt-in package each: `packages/types-v26-1` and
+`packages/types-v9-4`.
+
+The generator writes the whole package — `index.d.ts`, manifest, tsconfig,
+README — so running it for a version that has none creates one. Add the new
+package to the `references` in `tsconfig.json` and to the publish loop in
+`.github/workflows/publish.yml`; the script prints that reminder when it
+finishes.
+
+The output is a `.d.ts`, not a `.ts`, and that is load-bearing: a type package
+must contain no runtime code (FR-039), and nothing compiles a declaration file
+into any. TypeScript will still accept an exported `const` inside one — it emits
+nothing for it, which makes it a phantom export that crashes whoever imports it
+— so `npm run check:type-packages` fails on a single byte of JavaScript and on
+any exported value declaration.
 
 `TypeMap` must be emitted as a `type` alias, never an `interface`: interfaces
 have no implicit index signature and cannot satisfy `Record<string, object>`.

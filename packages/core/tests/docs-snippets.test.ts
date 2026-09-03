@@ -8,7 +8,7 @@ import { IdfDocument, parseIdf, SchemaBundle, writeIdf, type BundleSource } from
 import { loadIdf, saveIdf, schemas } from '@idfkit/core/node';
 import { readBundleFileSync } from '@idfkit/schemas/node';
 
-import type { TypeMap } from '../src/types/v26-1.js';
+import type { TypeMap } from '@idfkit/types-v26-1';
 
 /**
  * The published documentation snippets, executed.

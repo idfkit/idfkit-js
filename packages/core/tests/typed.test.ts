@@ -3,8 +3,8 @@ import { beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
 import { IdfDocument } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
-import type { TypeMap } from '../src/types/v26-1.js';
-import type { TypeMap as TypeMapV9 } from '../src/types/v9-4.js';
+import type { TypeMap } from '@idfkit/types-v26-1';
+import type { TypeMap as TypeMapV9 } from '@idfkit/types-v9-4';
 import { schema } from './helpers.js';
 
 let v26: Schema;
