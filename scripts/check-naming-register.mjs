@@ -402,6 +402,17 @@ class RegisteredNames {
     this.tokens = new Set();
     /** Items that name a module or package path rather than an identifier. */
     this.modulePaths = [];
+    /** Items spelled `Receiver.member`, as `{ item, receiver, member }`. */
+    this.memberSpellings = [];
+    /**
+     * Tokens from items that are NOT member spellings.
+     *
+     * `tokens` stays the union, because the excluded-surface and governs-list checks want
+     * every identifier the field mentions regardless of shape. Resolution wants less than
+     * that: for `IdfDocument.copy` the union contains `IdfDocument`, and answering with it
+     * is how a registered-but-unwritten member reported itself public.
+     */
+    this.tokensOutsideMemberSpellings = new Set();
 
     for (const raw of String(field ?? '').split(',')) {
       const item = raw.trim();
@@ -414,8 +425,27 @@ class RegisteredNames {
       head = head.trim();
 
       if (head.includes('/') || head.startsWith('@')) this.modulePaths.push(head);
-      for (const segment of head.split(/[./@]/)) {
+      const segments = head.split(/[./@]/);
+      for (const segment of segments) {
         if (IDENTIFIER.test(segment)) this.tokens.add(segment);
+      }
+
+      // `Receiver.member`, the one shape whose resolution the bare tokens get wrong in both
+      // directions. `IdfDocument.copy` passed because `IdfDocument` is exported, though no
+      // `copy` exists; `obj.extensible` failed because neither `obj` nor `extensible` is a
+      // top-level export, though the member is public. Recording the pair lets the surface
+      // answer for the member rather than for whatever the receiver happens to be.
+      const isMemberSpelling =
+        !head.includes('/') &&
+        !head.startsWith('@') &&
+        segments.length === 2 &&
+        segments.every((segment) => IDENTIFIER.test(segment));
+      if (isMemberSpelling) {
+        this.memberSpellings.push({ item, receiver: segments[0], member: segments[1] });
+      } else {
+        for (const segment of segments) {
+          if (IDENTIFIER.test(segment)) this.tokensOutsideMemberSpellings.add(segment);
+        }
       }
     }
   }
@@ -497,7 +527,7 @@ class Register {
 
 /** One name an entry point exports. */
 class PublicName {
-  constructor({ name, packageName, specifier, file, kind, sources }) {
+  constructor({ name, packageName, specifier, file, kind, sources, members }) {
     this.name = name;
     this.packageName = packageName;
     this.specifier = specifier;
@@ -505,6 +535,8 @@ class PublicName {
     this.kind = kind;
     /** Which inputs saw this name: 'd.ts', 'typedoc', or both. */
     this.sources = new Set(sources);
+    /** The names this class or interface declares, empty for anything else. */
+    this.members = new Set(members ?? []);
   }
 
   get where() {
@@ -630,6 +662,13 @@ function readTypedoc(file) {
         name: child.name,
         kind: TYPEDOC_KINDS[child.kind] ?? String(child.kind),
         file: child.sources?.[0]?.fileName ?? null,
+        // The members of a class or interface, which is the only input that carries them:
+        // a flattened .d.ts states them too, but not in a shape a regex can attribute to an
+        // owner. Symbol-keyed members ([iterator], [DATA]) are skipped: they are protocol
+        // slots, not names the register governs.
+        members: (child.children ?? [])
+          .map((member) => member.name)
+          .filter((name) => IDENTIFIER.test(name)),
       }));
       modules.set(module.name, declarations);
     }
@@ -665,6 +704,7 @@ function readSurface(entryPoints, typedoc) {
           file: entry?.file ?? relative(REPO, entryPoint.declarationFile),
           kind: entry?.kind ?? 'unknown',
           sources: seenIn,
+          members: entry?.members ?? [],
         })
       );
     }
@@ -947,6 +987,47 @@ function checkRenameCounts(register, previous) {
 }
 
 /**
+ * Public classes and interfaces that declare *member*, as owner names.
+ *
+ * Used to tell two different unresolved entries apart. A registered token that appears
+ * nowhere at all is a name not yet written, which is the FR-007 case and is reported
+ * quietly. A token that is not exported but IS a member of something public is a spelling
+ * problem in the register, and the gate cannot settle it: `values` is a member of
+ * `RawObject`, and the entry that spells it bare means a schedule's values for a year, so
+ * matching them would be a false pass invented to clear a false failure.
+ */
+function ownersDeclaring(surfaceByName, member) {
+  const owners = [];
+  for (const candidate of surfaceByName.values()) {
+    if (candidate.members.has(member)) owners.push(candidate.name);
+  }
+  return owners;
+}
+
+/**
+ * Whether the surface actually carries a `Receiver.member` spelling.
+ *
+ * Two receiver shapes, because the register uses two. An exported class or interface names
+ * itself (`SchemaBundle.load`, `IdfDocument.schema`), and the member must be on THAT owner:
+ * accepting it anywhere would let a rename move a method between classes unnoticed. A
+ * lowercase receiver is a placeholder standing for an instance (`obj.extensible`,
+ * `doc.all('Zone')`, `col.require(name)`), and names no exported type at all, so the member is
+ * looked for on every public class and interface.
+ *
+ * The distinction is the receiver's own presence on the surface, not its capitalisation:
+ * a placeholder that happened to collide with an exported name would be checked against that
+ * type, which is the stricter and more useful reading.
+ */
+function memberIsPublic(surfaceByName, { receiver, member }) {
+  const owner = surfaceByName.get(receiver);
+  if (owner !== undefined) return owner.members.has(member);
+  for (const candidate of surfaceByName.values()) {
+    if (candidate.members.has(member)) return true;
+  }
+  return false;
+}
+
+/**
  * Which side is behind the pinned register (FR-003, FR-082).
  *
  * A landed rename is the case that matters. `rename_count.typescript` above 0
@@ -983,8 +1064,17 @@ function checkWhichSideIsBehind(register, surfaceByName, landedModulePaths) {
       continue;
     }
 
+    // A member spelling answers for its member, never for its receiver. Any other item
+    // answers for a token it mentions, as before. Keeping the two apart is the whole point:
+    // a receiver that is itself an exported class would otherwise resolve the item and
+    // report a pass about a member nobody ever looked for.
     const landed =
-      [...entry.typescript.tokens].some((token) => surfaceByName.has(token)) ||
+      entry.typescript.memberSpellings.some((spelling) =>
+        memberIsPublic(surfaceByName, spelling)
+      ) ||
+      [...entry.typescript.tokensOutsideMemberSpellings].some((token) =>
+        surfaceByName.has(token)
+      ) ||
       entry.typescript.modulePaths.some((path) => landedModulePaths.has(path));
     if (landed) continue;
     if (renamed) {
@@ -1003,6 +1093,41 @@ function checkWhichSideIsBehind(register, surfaceByName, landedModulePaths) {
     } else {
       pending.push(entry);
     }
+  }
+
+  // Entries that are unresolved only because the register spells a member without a
+  // receiver. Reported separately from the FR-007 backlog because the two need opposite
+  // work: one needs the name written in TypeScript, the other needs the register to say
+  // which type the name is on, so the gate can check the right one.
+  const ambiguous = [];
+  for (const entry of pending) {
+    if (entry.typescript.memberSpellings.length > 0) continue;
+    for (const token of entry.typescript.tokensOutsideMemberSpellings) {
+      if (surfaceByName.has(token)) continue;
+      const owners = ownersDeclaring(surfaceByName, token);
+      if (owners.length > 0) ambiguous.push({ entry, token, owners });
+    }
+  }
+  if (ambiguous.length > 0) {
+    findings.push(
+      new Finding({
+        check: 'behind',
+        requirement: 'SC-001, FR-067',
+        fail: false,
+        side: 'idfkit-js',
+        message:
+          `${ambiguous.length} registered TypeScript names are spelled without a receiver and ` +
+          'are members of a public type, so this gate cannot establish either verdict',
+        detail:
+          ambiguous
+            .map(
+              ({ entry, token, owners }) => `${token} (${entry.concept}) on ${owners.join(', ')}`
+            )
+            .join(', ') +
+          '. Spell each as Receiver.member in the register, reviewed by both languages, and the ' +
+          'gate checks the named type rather than guessing an owner.',
+      })
+    );
   }
 
   if (pending.length > 0) {
