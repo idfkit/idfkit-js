@@ -1,0 +1,134 @@
+name: deploy-js-redirects
+
+# Publish the redirect-only build to js.idfkit.com (T117, FR-056).
+#
+# js.idfkit.com is retired. Every address it published redirects permanently to
+# developers.idfkit.com, and every address it did not publish lands on a section landing page
+# rather than on an error.
+#
+# WHERE THE MAP AND THE GENERATOR COME FROM
+#
+# Both live in the public idfkit repository: redirects/path-map.json and
+# scripts/build_redirect_site.py. There is one map and one generator for both retired hosts, so
+# js.idfkit.com and py.idfkit.com cannot drift apart, and check_redirects.py in that repository
+# checks the same file this build was made from. The generator is standard-library Python, so
+# nothing is installed to run it.
+#
+# WHERE IT PUBLISHES
+#
+# This repository's own gh-pages branch, which is what js.idfkit.com is served from. docs.yml
+# no longer publishes there (see its JS_IDFKIT_COM_MODE lever), so there is no contention.
+# Neither docs/ nor mkdocs.yml is touched: the sources of the retired site stay in the
+# repository and still build.
+#
+# Nothing here deletes anything. The full procedure and the revert are in the idfkit repository
+# at redirects/README.md.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-js-redirects.yml
+
+permissions:
+  contents: write
+  actions: read
+
+# Shares the gh-pages group with docs.yml so the two can never race for the branch. Never
+# cancel a run in flight: a half-published redirect site is worse than a stale one.
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+
+env:
+  # ------------------------------------------------------------------------------------------
+  # THE CUTOVER LEVER for js.idfkit.com. This is the whole configuration change (FR-090).
+  #
+  #   redirect-only  the cutover state: this workflow publishes the redirect build.
+  #   off            pre-cutover, or reverted: this workflow publishes nothing.
+  #
+  # docs.yml carries a lever of the same name with the same two values, and the two must be
+  # flipped together: exactly one of them publishes to gh-pages. Reverting is setting this to
+  # "off" and docs.yml's to "full-site", per redirects/README.md.
+  # ------------------------------------------------------------------------------------------
+  JS_IDFKIT_COM_MODE: redirect-only
+
+  RETIRED_HOST: js.idfkit.com
+  ARCHIVE_ARTIFACT_NAME: js.idfkit.com-last-full-build
+  # The idfkit checkout the map and the generator are read from. A branch rather than a tag,
+  # because the map is corrected as pages land on the unified site; pin it to a tag if you
+  # want a cutover that cannot move under you.
+  MAP_REPOSITORY: idfkit/idfkit
+  MAP_REF: main
+
+jobs:
+  # The lever is workflow-level env, which a job-level `if` cannot read, so one job reads it
+  # into an output and the publishing job is gated on that. A skipped publish job is the
+  # visible sign that this host is not in the redirect-only state.
+  cutover-lever:
+    name: Read the cutover lever
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.read.outputs.mode }}
+    steps:
+      - id: read
+        run: |
+          echo "mode=${JS_IDFKIT_COM_MODE}" >> "$GITHUB_OUTPUT"
+          echo "::notice::js.idfkit.com mode is '${JS_IDFKIT_COM_MODE}'."
+
+  publish-redirects:
+    name: Publish the redirect-only build
+    needs: cutover-lever
+    if: needs.cutover-lever.outputs.mode == 'redirect-only'
+    runs-on: ubuntu-latest
+    steps:
+      # The map, the generator, and the captured sitemap that the generator verifies against.
+      - name: Check out the path map and the generator
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.MAP_REPOSITORY }}
+          ref: ${{ env.MAP_REF }}
+          path: idfkit
+          sparse-checkout: |
+            redirects
+            scripts/build_redirect_site.py
+            old-sitemaps
+          sparse-checkout-cone-mode: false
+
+      # The interlock for FR-090: the cutover may not proceed until the last full build of this
+      # host is retained and still within its window. archive-retired-site.yml uploads it.
+      - name: Require the retained last full build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          live=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${ARCHIVE_ARTIFACT_NAME}&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | length')
+          if [ "${live}" = "0" ]; then
+            echo "::error::No unexpired '${ARCHIVE_ARTIFACT_NAME}' artefact exists, so the last full"
+            echo "::error::build of ${RETIRED_HOST} is not retained and this cutover would not be"
+            echo "::error::revertible. Run the archive-retired-site workflow first."
+            exit 1
+          fi
+          echo "${live} unexpired copy or copies of ${ARCHIVE_ARTIFACT_NAME} are retained."
+
+      - name: Build the redirect-only site
+        run: |
+          python3 idfkit/scripts/build_redirect_site.py \
+            --host "${RETIRED_HOST}" \
+            --map idfkit/redirects/path-map.json \
+            --sitemap "idfkit/old-sitemaps/${RETIRED_HOST}.sitemap.xml" \
+            --out site
+
+      - name: Deploy to js.idfkit.com
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          # The branch is build output; its history is worth nothing and grows without bound.
+          force_orphan: true
+          # The build writes site/CNAME too, and docs/CNAME still sets it for a local build, so
+          # the custom domain survives a deploy by any route.
+          cname: js.idfkit.com

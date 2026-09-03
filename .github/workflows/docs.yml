@@ -17,6 +17,23 @@ concurrency:
   group: gh-pages
   cancel-in-progress: false
 
+env:
+  # ------------------------------------------------------------------------------------------
+  # THE CUTOVER LEVER for js.idfkit.com (T117, FR-090). This is the whole configuration change
+  # that stopped this site publishing. Nothing was deleted: docs/, mkdocs.yml and docs/CNAME are
+  # untouched, and every step below still runs, so the site is still built and still proved to
+  # build on every push. Only the deploy is withheld.
+  #
+  #   redirect-only  the cutover state: deploy-js-redirects.yml owns gh-pages and publishes the
+  #                  redirect build to js.idfkit.com. This workflow builds but does not deploy.
+  #   full-site      pre-cutover, or reverted: this workflow publishes the site again.
+  #
+  # deploy-js-redirects.yml carries a lever of the same name with values redirect-only and off.
+  # Flip both together: exactly one of the two workflows may publish to gh-pages. The procedure
+  # is in the idfkit repository at redirects/README.md.
+  # ------------------------------------------------------------------------------------------
+  JS_IDFKIT_COM_MODE: redirect-only
+
 jobs:
   deploy:
     name: Build and deploy
@@ -45,7 +62,14 @@ jobs:
 
       - run: npm run docs:build
 
+      - name: Say why nothing is being published
+        if: env.JS_IDFKIT_COM_MODE != 'full-site'
+        run: |
+          echo "::notice::JS_IDFKIT_COM_MODE is '${JS_IDFKIT_COM_MODE}'. The site built, and was"
+          echo "::notice::not published: js.idfkit.com serves redirects to developers.idfkit.com."
+
       - name: Deploy to GitHub Pages
+        if: env.JS_IDFKIT_COM_MODE == 'full-site'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
