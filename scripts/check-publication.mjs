@@ -100,8 +100,16 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 class CannotRun extends Error {}
 
-/** The conformance level FR-044 and T101 name. Both pins must be at it. */
-const REQUIRED_CONFORMANCE = 'conformance-2026.6';
+/**
+ * The conformance level this release publishes against. Both pins must be at it.
+ *
+ * T101 names conformance-2026.6, the level that proved the Tier 1 port. This is 2026.7, which
+ * contains all of it plus the type-lookup assertion and its case, so FR-044's "proven agreement"
+ * precondition is met more strongly rather than less. Advance this whenever both pins advance:
+ * the check asserts the two pins agree with each other AND with the level named here, so a pin
+ * that moves without this constant is caught, and so is this constant moving on its own.
+ */
+const REQUIRED_CONFORMANCE = 'conformance-2026.7';
 
 /** The distribution gates, precondition 4. Order is cheapest first. */
 const DISTRIBUTION_GATES = [
