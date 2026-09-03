@@ -28,6 +28,12 @@
     // is the point of compiling these at all, stays on: a renamed export, a changed signature, a
     // field that no longer exists are all still errors.
     "noUncheckedIndexedAccess": false,
+    // One file in this tree is JavaScript rather than TypeScript: the live runner's example,
+    // which the documentation page fetches and evaluates verbatim, so it cannot carry syntax a
+    // browser would reject. checkJs is what keeps it checked anyway, through JSDoc types, so a
+    // renamed engine method fails here exactly as it would in a .ts example.
+    "allowJs": true,
+    "checkJs": true,
     "composite": false,
     "declaration": false,
     "declarationMap": false,
@@ -36,5 +42,5 @@
     "types": ["node"],
     "baseUrl": "."
   },
-  "include": ["docs-snippets/**/*.ts"]
+  "include": ["docs-snippets/**/*.ts", "docs-snippets/**/*.js"]
 }
