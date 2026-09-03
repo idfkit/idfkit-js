@@ -65,5 +65,5 @@ EnergyPlus itself. The Python
 ## Why this is cheap
 
 Loading the second version only pays for definitions the two versions do not
-share, and 87% of them are identical. `changed` falls out of comparing hashes,
+share, and 82% of them are identical. `changed` falls out of comparing hashes,
 with no structural walk at all.

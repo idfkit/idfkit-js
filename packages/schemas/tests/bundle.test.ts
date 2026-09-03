@@ -116,7 +116,7 @@ describe('Schema', () => {
 
     // The numeric branch is hoisted onto the record; `se` is the string branch's
     // enum, verbatim. Which literal a field takes is a property of the field:
-    // 10557 across the versions take `Autosize` and 1781 take `Autocalculate`,
+    // 10565 across the versions take `Autosize` and 1781 take `Autocalculate`,
     // so a consumer cannot assume one of them.
     expect(schema.field('Zone', 'ceiling_height')).toMatchObject({
       t: 'n',

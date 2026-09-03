@@ -4,8 +4,9 @@
  * This is deliberately NOT the raw epJSON schema. Keys are single letters and
  * documentation metadata (`note`, `ip-units`, `field_info`) is dropped, because
  * this bundle is on the critical path of every parse and, in a browser, every
- * page load. Human-facing metadata lives in `@idfkit/schemas/docs`, which only
- * tooling that renders documentation needs to pull in.
+ * page load. This package republishes that metadata nowhere; tooling that
+ * renders documentation reads the raw epJSON schemas directly, or uses
+ * idfkit-docs (https://docs.idfkit.com).
  */
 
 /** Field storage class, mirroring how the IDF writer must format the value. */
@@ -41,7 +42,7 @@ export interface SlimField {
    * number branch carries a numeric enum) and no `se` at all mean the opposite
    * of one another.
    *
-   * The sentinel is not a constant: 10557 fields take `Autosize` and 1781 take
+   * The sentinel is not a constant: 10565 fields take `Autosize` and 1781 take
    * `Autocalculate`, so a validator that accepts either everywhere accepts a
    * value EnergyPlus rejects.
    */
@@ -67,9 +68,10 @@ export interface SlimField {
    *
    * A number is the bound itself (draft-06+, 9.6.0 onwards). The boolean `true`
    * qualifies the sibling `min`, making it exclusive (draft-04, 8.9.0 through
-   * 9.5.0). Measured: 9816 boolean occurrences in the older seven versions,
-   * 12070 numeric ones in the newer ten, and no version mixing the two. Branch
-   * on the value's type, never on the version.
+   * 9.5.0). Measured across the bundled schemas: `xmin` is boolean 9013 times
+   * in the older seven versions and numeric 13840 times in the newer ten;
+   * `xmax` behaves identically, and no version mixes the two. Branch on the
+   * value's type, never on the version.
    */
   xmin?: number | boolean;
   /** Exclusive maximum. Number or boolean, exactly as `xmin`. */

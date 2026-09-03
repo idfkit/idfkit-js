@@ -84,7 +84,7 @@ there. 646 fields have that shape, `Schedule:Compact`'s extensible `field` among
 them. That is why the empty string is kept in `se` rather than filtered out the
 way it is filtered out of `e`: `se: [""]` and no `se` at all are opposite claims.
 
-Nothing about the sentinel can be assumed. 10557 fields take `Autosize` and 1781
+Nothing about the sentinel can be assumed. 10565 fields take `Autosize` and 1781
 take `Autocalculate`, and a consumer that accepts either everywhere accepts a
 value EnergyPlus rejects.
 

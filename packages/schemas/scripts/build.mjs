@@ -2,10 +2,13 @@
 /**
  * Build the content-addressed schema bundle from idfkit's bundled epJSON schemas.
  *
- * 87% of object-type definitions are byte-identical across EnergyPlus versions
- * (Zone has not changed since 8.9), so the bundle stores each unique definition
- * once and gives every version a manifest of `typeName -> hash`. Supporting all
- * 17 versions therefore costs barely more than supporting one.
+ * 82% of the object-type definitions across the EnergyPlus versions are a
+ * byte-identical repeat of a definition another version already carries
+ * (Construction has changed once in 17 releases), so the bundle stores each
+ * unique definition once and gives every version a manifest of
+ * `typeName -> hash`. Supporting all 17 versions therefore costs barely more
+ * than supporting one. The `unique defs` line this script prints is the
+ * complement, so the figure is re-measured on every rebuild.
  *
  * Usage: node scripts/build.mjs [--source <dir>]
  */
@@ -95,7 +98,7 @@ function slimField(def) {
   //
   // `se` is what makes the collapse lossless enough to validate from. Without it
   // the bundle says only "some string is legal here", which is three different
-  // things: `Autosize` on 10557 fields, `Autocalculate` on 1781, ANY string on
+  // things: `Autosize` on 10565 fields, `Autocalculate` on 1781, ANY string on
   // 646, and only the empty string on the 68 that carry a numeric enum on the
   // number branch. Absent `se` with `auto` set is the "any string" case, which
   // is why the empty string is kept verbatim here rather than filtered out the
