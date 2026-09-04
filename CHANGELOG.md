@@ -43,11 +43,17 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
   rather than one finding flattened into two fields. `.line` and `.typeName`
   still resolve to the first finding's values, so no existing caller breaks.
 
-- `ParseDiagnostic` gains a `code`, a `column`, a `filepath`, and an
-  `objectName`, so both libraries carry the same kinds of location. `code` is
+- `ParseDiagnostic` gains a `code` and an `objectName`, and declares a `column`
+  and a `filepath` so both libraries carry the same kinds of location. `code` is
   one of eight values shared with the Python library. Match on it rather than
   on `message`: the corpus compares findings on `(code, line, typeName)` and
   never on wording.
+
+  `column` and `filepath` are declared but not yet filled: the lexer counts
+  lines and not columns, and `parseIdf` takes text rather than a path, so
+  neither value exists at the point a finding is built. They are optional, so a
+  reader must treat them as absent until the lexer tracks a column and the
+  file-reading edge attaches the path it read from.
 
 ### Fixed
 

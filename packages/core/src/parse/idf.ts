@@ -65,6 +65,12 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
         message: `Unknown object type "${object.typeName}" in EnergyPlus ${schema.version}`,
         line: object.line,
         typeName: object.typeName,
+        // Best effort, and the same rule Python's `_extract_object_name` uses: the first positional
+        // value is the name for every named type, and is a real field for the anonymous ones. An
+        // unknown type has no definition to tell the two apart, so the raw first value is what there
+        // is. Declaring `objectName` and never filling it would make the field a claim rather than a
+        // value.
+        objectName: object.values[0],
         code: 'UnknownObjectType',
       });
       continue;
@@ -79,6 +85,7 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
         message: error instanceof Error ? error.message : String(error),
         line: object.line,
         typeName: canonical,
+        objectName: definition.anon === 1 ? undefined : object.values[0],
         code: 'ParseError',
       });
     }
