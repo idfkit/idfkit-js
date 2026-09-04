@@ -59,7 +59,7 @@ export { Severity, validateDocument, validateObject } from './validate/index.js'
 export type { ValidationError, ValidationResult } from './validate/index.js';
 
 export { describeObjectType } from './introspect/describe.js';
-export type { FieldDescription, ObjectDescription, ProsePool } from './introspect/describe.js';
+export type { FieldDescription, ObjectDescription } from './introspect/describe.js';
 
 export {
   docsUrlForObject,
@@ -70,4 +70,4 @@ export {
 export type { DocsUrl } from './docs-url/index.js';
 
 export { Schema, SchemaBundle, httpSource } from '@idfkit/schemas';
-export type { BundleSource, SchemaDelta, SlimField, SlimType } from '@idfkit/schemas';
+export type { BundleSource, ProsePool, SchemaDelta, SlimField, SlimType } from '@idfkit/schemas';
