@@ -5,17 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
-`@idfkit/weather`, are versioned and released together.
+The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
+`@idfkit/weather` and `@idfkit/language`, are versioned and released together.
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-09-04
 
 This release stays on `conformance-2026.8`, the corpus level `CONFORMANCE_LEVEL`
 reports, and adds no cases to it. A capability that exists in one language
 asserts no cross-language agreement, so there is nothing for the corpus to
-compare; the parity ledger carries the absence instead. The governance level
-moves to `governance-2026.11`, which is where the names below are registered and
-where that ledger entry lives.
+compare; the parity ledger carries the absence instead.
+
+The governance level moves to `governance-2026.12`. `governance-2026.11`
+registers the language service's names and carries that ledger entry;
+`governance-2026.12` adds the two that reach the schema prose.
 
 ### Added
 
@@ -95,6 +99,33 @@ where that ledger entry lives.
   amendment rather than an edit. What it costs a reader is stated rather than
   implied. These answers need a JavaScript runtime, and `pip install idfkit`
   alone does not provide them.
+
+- `SchemaBundle.loadProse()` and `SchemaBundle.prose()`, the pair that lets a
+  consumer of the shared name reach the schema's own explanatory prose. The
+  strings have shipped since 0.2.0-rc.2 and `describeObjectType` has always
+  resolved them, but there was no way to obtain the pool without depending on
+  `@idfkit/schemas/node`, a package a consumer of `idfkit` did not install, and
+  hardcoding a file name the bundle layout does not promise.
+
+  `loadProse()` reads it once, `prose()` returns it synchronously or
+  `undefined`, exactly as `load(version)` and `loaded(version)` already work for
+  schemas. The synchronous half is the point: everything that reads prose is
+  synchronous, so an editor server loads once when a document arrives and reads
+  on the request path without holding a thread.
+
+  **On the bundle rather than beside it**, because the indices are only
+  meaningful against manifests built in the same run. A pool paired with another
+  build's manifests resolves every sentence to a real sentence belonging to a
+  different field, and nothing fails. Keeping the loader on the object that
+  carries the indices is what makes that pairing hard to reach by accident.
+
+  It works in a browser through `httpSource` on the same terms, and the parse
+  path is unchanged: the pool is still its own file behind its own call, and a
+  read-and-write bundle still carries none of it.
+
+  `ProsePool` now comes from `@idfkit/schemas`, which is the package that builds
+  the pool. `@idfkit/core` re-exports it, so the name a consumer imports is
+  unchanged.
 
 ### Changed
 
@@ -464,7 +495,8 @@ First published release. The API is not yet stable.
   no schema matches, because loading the wrong schema mis-maps every positional
   field instead of failing.
 
-[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.2...HEAD
+[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.2...v0.2.0
 [0.2.0-rc.2]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.1...v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/idfkit/idfkit-js/compare/v0.0.1...v0.1.0
