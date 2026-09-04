@@ -284,16 +284,16 @@ jobs:
         # is caught. `errors` is zero: unlike the Python library, this one detects a Version object
         # wherever it sits, so no example file fails to read at all.
         #
-        # 8.9.0 through 9.2.0 are four where Python is three, and the extra one is real:
-        # `_1a-Long0.0.idf` carries an un-migrated `report variable dictionary;`, which this lexer
-        # reports as an unknown type and Python's pattern discards in silence because it has no
-        # comma. The file exists at those four tags and not after, which is why the divergence
-        # stops at 9.3.0. Tracked as idfkit#193; the numbers agree again once it is decided.
+        # These numbers are IDENTICAL to the Python library's, version for version, and that is
+        # the point: the two sweep the same files and any number that moves on one side alone is a
+        # divergence. Three everywhere is the two parametric-preprocessor files; 22.2.0 adds nine
+        # objects absent from the schema its files declare, 25.2.0 and 24.1.0 one stale-stamp file
+        # each.
         include:
-          - { version: "8.9.0", findings: 4, errors: 0 }
-          - { version: "9.0.1", findings: 4, errors: 0 }
-          - { version: "9.1.0", findings: 4, errors: 0 }
-          - { version: "9.2.0", findings: 4, errors: 0 }
+          - { version: "8.9.0", findings: 3, errors: 0 }
+          - { version: "9.0.1", findings: 3, errors: 0 }
+          - { version: "9.1.0", findings: 3, errors: 0 }
+          - { version: "9.2.0", findings: 3, errors: 0 }
           - { version: "9.3.0", findings: 3, errors: 0 }
           - { version: "9.4.0", findings: 3, errors: 0 }
           - { version: "9.5.0", findings: 3, errors: 0 }
@@ -341,7 +341,13 @@ jobs:
           git clone --filter=blob:none --no-checkout --depth 1 \
             --branch "v${{ matrix.version }}" "$REPO" ep
           cd ep
-          git sparse-checkout set --no-cone 'testfiles/*.idf'
+          # `_1a-Long0.0.idf` is excluded. It carries an un-migrated `report variable dictionary;`
+          # at the four tags it exists in, which is a defect in that file rather than in either
+          # library, and the two libraries disagree about it: one reports an unknown type, the
+          # other's pattern discards it for having no comma. That disagreement is idfkit#193 and is
+          # tracked there. Carrying it here would mean holding four versions at a count that says
+          # nothing about this repository's own regressions, which is what this sweep is for.
+          git sparse-checkout set --no-cone 'testfiles/*.idf' '!testfiles/_1a-Long0.0.idf'
           git checkout
 
       - name: Fail if the example files were not found
