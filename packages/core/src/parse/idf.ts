@@ -4,6 +4,7 @@ import { IdfDocument } from '../document.js';
 import type { ExtensibleGroup, FieldValues, StoredValue } from '../object.js';
 import type { AnyTypeMap, UntypedMap } from '../typemap.js';
 import { lex, type LexDiagnostic, type RawObject } from './lexer.js';
+import { scan } from './scan.js';
 
 export interface ParseDiagnostic extends LexDiagnostic {
   /**
@@ -249,56 +250,44 @@ function stringIsLegal(definition: SlimType, field: string, value: string): bool
 }
 
 /**
- * The 1-based line a field sits on, found by rescanning from the object's own offset.
+ * The 1-based line a field sits on, found by rescanning the statement from its own offset.
  *
  * The lexer records one offset per object rather than a line per field, because a finding about a
- * field is rare and an array per object is not. This walks forward counting separators, stepping
- * over `!` comments so a comma inside one is not mistaken for one, which is the same rule the
- * lexer itself follows.
+ * field is rare and an array per object is not. This is the rescan that offset exists for, and it
+ * runs only while a finding is being built.
  *
- * `index` counts into `RawObject.values`, which the lexer has already shifted the type name off.
- * The scan starts at the type name, so it steps over one more separator than the index: the comma
- * that ends `Building,` is what puts values[0] on the line after it.
+ * The rescan goes through the shared scanner, so "step over the comment between a separator and
+ * its value" is the rule the lexer itself followed rather than a second copy of it. A field's
+ * comma is routinely followed by `!- Field Name` on the same line, and a helper that stopped at
+ * the `!` would report the line the PREVIOUS value sits on, one too early.
+ *
+ * `index` counts into `RawObject.values`, which has already had the type name shifted off, so the
+ * field wanted is the scanner's `index + 1`: the comma that ends `Building,` is what puts
+ * `values[0]` on the line after it. The scan stops at that field, or at the end of the statement
+ * when the statement has fewer fields than the finding names, in which case the object's own line
+ * is the best answer available.
  *
  * @internal
  */
 function fieldLine(text: string, object: RawObject, index: number): number {
   if (object.offset === undefined) return object.line;
 
-  const separators = index + 1;
-  let seen = 0;
-  let position = object.offset;
-  while (position < text.length && seen < separators) {
-    const char = text[position];
-    if (char === '!') {
-      const newline = text.indexOf('\n', position);
-      if (newline < 0) break;
-      position = newline + 1;
-      continue;
-    }
-    if (char === ';') break;
-    if (char === ',') seen += 1;
-    position += 1;
-  }
-  if (seen < separators) return object.line;
-
-  // Step over whitespace AND any comment between the separator and the value. A field's comma is
-  // routinely followed by `!- Field Name` on the same line, and stopping at the `!` would report
-  // the line the PREVIOUS value sits on, one too early.
-  while (position < text.length) {
-    const char = text[position] ?? '';
-    if (char === '!') {
-      const newline = text.indexOf('\n', position);
-      if (newline < 0) break;
-      position = newline + 1;
-      continue;
-    }
-    if (!/\s/.test(char)) break;
-    position += 1;
-  }
-
+  const wanted = index + 1;
   let line = object.line;
-  for (let i = object.offset; i < position; i += 1) if (text[i] === '\n') line += 1;
+  scan(
+    text,
+    {
+      fieldEnd(field, _start, _end, valueLine) {
+        if (field < wanted) return;
+        line = valueLine;
+        return false;
+      },
+      statementEnd() {
+        return false;
+      },
+    },
+    { from: object.offset, line: object.line, column: object.column }
+  );
   return line;
 }
 

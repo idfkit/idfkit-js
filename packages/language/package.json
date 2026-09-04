@@ -1,0 +1,48 @@
+{
+  "name": "@idfkit/language",
+  "version": "0.0.0",
+  "description": "The opt-in IDF language service: cursor answers, positioned findings, synchronous and free of I/O, with no editor protocol",
+  "type": "module",
+  "license": "MIT",
+  "author": "Samuel Letellier-Duchesne <developers@idfkit.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idfkit/idfkit-js.git",
+    "directory": "packages/language"
+  },
+  "homepage": "https://js.idfkit.com/",
+  "bugs": {
+    "url": "https://github.com/idfkit/idfkit-js/issues"
+  },
+  "keywords": [
+    "energyplus",
+    "idf",
+    "editor",
+    "completion",
+    "diagnostics",
+    "building-energy",
+    "simulation"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@idfkit/core": "0.0.0"
+  },
+  "scripts": {
+    "build": "tsc --build"
+  }
+}

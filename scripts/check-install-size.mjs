@@ -11,8 +11,7 @@
  * WHICH 1.75 MB, AND WHICH "ON DISK"
  *
  * Both halves of that sentence need pinning down, because the two readings of
- * "on disk" differ by enough to have flipped the verdict under the previous
- * budget, and will again once the package grows.
+ * "on disk" now disagree about the verdict rather than merely about the number.
  *
  *   1.75 MB     is 1.75 MiB, 1,835,008 bytes. Every other size in the contract
  *               is quoted the way npm quotes them, and npm's are binary.
@@ -22,13 +21,13 @@
  *               tool built on the registry means.
  *
  * The alternative reading, allocated blocks, is the one `du` gives. Measured on
- * 2026-09-03, across 141 files:
+ * 2026-09-04, across 164 files:
  *
- *       1.33 MB apparent          76 percent of the budget
- *       1.66 MB by du -sk         95 percent of the budget
+ *       1.71 MB apparent          97.9 percent of the budget
+ *       2.08 MB by du -sk         119 percent of the budget
  *
- * The 346 KB between them is not weight in the package. It is the filesystem
- * rounding 141 mostly-small files up to its allocation unit, 4 KB on the ext4
+ * The 378 KB between them is not weight in the package. It is the filesystem
+ * rounding 164 mostly-small files up to its allocation unit, 4 KB on the ext4
  * of a GitHub runner and on the APFS of a laptop. That number would move on a
  * tmpfs, on ZFS with compression, on a filesystem with tail packing, and on any
  * runner image that changes its storage driver. A criterion whose verdict
@@ -36,15 +35,17 @@
  * one the package can be engineered against either: the only way to improve an
  * allocation figure is to ship fewer, larger files, which is a worse package.
  *
- * So the gate FAILS ON THE APPARENT FIGURE ONLY, and PRINTS BOTH. The
- * pessimistic number is not hidden, because a gate that quietly picks the
- * flattering measure is the thing this whole contract is written against.
+ * So the gate FAILS ON THE APPARENT FIGURE ONLY, and PRINTS BOTH. What `du`
+ * reports is printed for honesty and is never measured against. The pessimistic
+ * number is not hidden, because a gate that quietly picks the flattering
+ * measure is the thing this whole contract is written against.
  *
- * Both readings sit under the budget today. They did not under the previous one,
- * where the same install measured 88 percent apparent against 110 percent
- * allocated, and they will not again once the schema prose lands. The choice of
- * measure is therefore settled on the principle above rather than on which side
- * of the line the two figures happen to fall this month.
+ * That distinction used to cost nothing here and now decides the outcome. At
+ * the previous measurement both readings sat inside the budget; the schema
+ * prose has since landed, and the allocated figure is now over it while the
+ * apparent one passes with 38 KB to spare. Which is why the choice of measure
+ * was settled on the principle above, at a moment when it changed no verdict,
+ * rather than now, when it decides one.
  *
  * WHY 1.75 MB, AND WHAT IT WAS BEFORE
  *
@@ -69,20 +70,27 @@
  * originally set with, and it keeps what SC-012 is for: a 4.3x reduction from
  * 7.9 MB, against 5.0x under the old figure.
  *
- * HEADROOM, AND WHAT THE INCREASE IS FOR
+ * HEADROOM, AND WHAT THE INCREASE WAS FOR
  *
- * 1.33 of 1.75 MB is 76 percent, about 434 KB of slack. That is not permission
- * to spend it: roughly 190 KB is already promised to the schema prose, which
- * will take the install to 86 percent and the slack to about 248 KB. The gate
- * therefore does not just print PASS: it prints the percentage, the remaining
- * headroom, and the per-package breakdown, so the number that matters is
- * visible in the log of every run rather than only in the run that finally
- * fails.
+ * The increase has been spent, on the thing it was raised for. 1.71 of 1.75 MB
+ * is 97.9 percent, about 38 KB of slack, with the prose in `@idfkit/schemas`
+ * and the syntax layer in `@idfkit/core`. The language service is not in this
+ * measurement at all: it is an optional peer, so it puts nothing on disk here,
+ * and the per-package breakdown is what would say otherwise, since a package
+ * the contract does not list is a finding whether or not the total passes.
+ *
+ * 38 KB is thin, and it is meant to be read that way. The gate therefore does
+ * not just print PASS: it prints the percentage, the remaining headroom, and
+ * the per-package breakdown, so the number that matters is visible in the log
+ * of every run rather than only in the run that finally fails. The next feature
+ * that wants to add weight to either installed package should expect to argue
+ * for it, and either amend SC-012 deliberately or move the weight to an opt-in
+ * component, which is the choice this budget exists to force.
  *
  * WHAT IS COUNTED
  *
  * Everything under the fixture's `node_modules`, including npm's own
- * `.package-lock.json`. That file is roughly 1 KB and is genuinely on the
+ * `.package-lock.json`. That file is roughly 2 KB and is genuinely on the
  * reader's disk after the install, so excluding it would be a small lie in the
  * gate's favour.
  *

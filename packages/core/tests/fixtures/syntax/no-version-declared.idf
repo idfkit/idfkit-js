@@ -1,0 +1,5 @@
+! No Version statement, so no schema can be resolved for this text.
+
+Zone,
+  Zone One,                !- Name
+  0.0;                     !- Direction of Relative North

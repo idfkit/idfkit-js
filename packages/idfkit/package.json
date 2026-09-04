@@ -1,7 +1,7 @@
 {
   "name": "idfkit",
   "version": "0.0.0",
-  "description": "The shared install name for idfkit in JavaScript: subpath re-exports of @idfkit/core, @idfkit/schemas and the optional @idfkit/weather",
+  "description": "The shared install name for idfkit in JavaScript: subpath re-exports of @idfkit/core, @idfkit/schemas and the optional @idfkit/weather and @idfkit/language",
   "type": "module",
   "license": "MIT",
   "author": "Samuel Letellier-Duchesne <developers@idfkit.com>",
@@ -26,6 +26,10 @@
       "types": "./index.d.ts",
       "default": "./index.js"
     },
+    "./language": {
+      "types": "./language.d.ts",
+      "default": "./language.js"
+    },
     "./node": {
       "types": "./node.d.ts",
       "default": "./node.js"
@@ -42,6 +46,8 @@
   "files": [
     "index.js",
     "index.d.ts",
+    "language.js",
+    "language.d.ts",
     "node.js",
     "node.d.ts",
     "schemas.js",
@@ -61,9 +67,13 @@
     "@idfkit/schemas": "0.0.0"
   },
   "peerDependencies": {
+    "@idfkit/language": "0.0.0",
     "@idfkit/weather": "0.0.0"
   },
   "peerDependenciesMeta": {
+    "@idfkit/language": {
+      "optional": true
+    },
     "@idfkit/weather": {
       "optional": true
     }

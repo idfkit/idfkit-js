@@ -1,0 +1,45 @@
+Version, 26.1;
+
+Material:NoMass,
+  R13,                     !- Name
+  Rough,                   !- Roughness
+  2.29,                    !- Thermal Resistance {m2-K/W}
+  0.9,                     !- Thermal Absorptance
+  0.75,                    !- Solar Absorptance
+  0.75;                    !- Visible Absorptance
+
+Construction,
+  ExtWall,                 !- Name
+  R13;                     !- Outside Layer
+
+Zone,
+  Zone One,                !- Name
+  0.0,                     !- Direction of Relative North
+  0.0,                     !- X Origin
+  0.0,                     !- Y Origin
+  0.0;                     !- Z Origin
+
+BuildingSurface:Detailed,
+  South Wall,              !- Name
+  Wall,                    !- Surface Type
+  ExtWall,                 !- Construction Name
+  Zone One,                !- Zone Name
+  ,                        !- Space Name
+  Outdoors,                !- Outside Boundary Condition
+  ,                        !- Outside Boundary Condition Object
+  SunExposed,              !- Sun Exposure
+  WindExposed,             !- Wind Exposure
+  0.5,                     !- View Factor to Ground
+  12,                      !- Number of Vertices
+  0.0, 0.0, 3.0,           !- Vertex 1
+  4.0, 0.0, 3.0,           !- Vertex 2
+  8.0, 0.0, 3.0,           !- Vertex 3
+  12.0, 0.0, 3.0,          !- Vertex 4
+  12.0, 4.0, 3.0,          !- Vertex 5
+  12.0, 8.0, 3.0,          !- Vertex 6
+  8.0, 8.0, 3.0,           !- Vertex 7
+  4.0, 8.0, 3.0,           !- Vertex 8
+  not-a-number, 8.0, 3.0,  !- Vertex 9
+  0.0, 4.0, 3.0,           !- Vertex 10
+  0.0, 2.0, 3.0,           !- Vertex 11
+  0.0, 0.0, 3.0;           !- Vertex 12

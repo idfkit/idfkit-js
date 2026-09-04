@@ -1,0 +1,7 @@
+Version, 26.1;
+
+NotAnObject:AtAll,
+  Whatever,                !- Name
+  1.0;                     !- Some Field
+
+Timestep, 6;

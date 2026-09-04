@@ -1,0 +1,172 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`validating is unchanged by positioning > produces the same findings for every syntax fixture 1`] = `
+"--- comma-inside-trailing-comment
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- comment-between-separator-and-value
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- comments-only
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- duplicate-object-name
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- empty
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- line-endings-crlf
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- line-endings-lf
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- line-endings-mixed
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- missing-terminator-swallows-next
+{
+  "errors": [
+    {
+      "severity": "error",
+      "objType": "Zone",
+      "objName": "Zone One",
+      "field": "x_origin",
+      "message": "Expected number, got string",
+      "code": "E003"
+    },
+    {
+      "severity": "error",
+      "objType": "Zone",
+      "objName": "Zone One",
+      "field": "y_origin",
+      "message": "Expected number, got string",
+      "code": "E003"
+    },
+    {
+      "severity": "error",
+      "objType": "Zone",
+      "objName": "Zone One",
+      "field": "type",
+      "message": "Value 0 is below minimum 1",
+      "code": "E005"
+    }
+  ],
+  "warnings": [],
+  "info": [],
+  "isValid": false,
+  "totalIssues": 3
+}
+
+--- no-version-declared
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- single-unterminated-word
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- surface-bad-ninth-vertex
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- unknown-object-type
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- unsupported-version
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- unterminated-final-statement
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
+--- value-across-two-lines
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}"
+`;

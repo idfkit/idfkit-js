@@ -1,0 +1,5 @@
+Version, 7.0;
+
+Zone,
+  Zone One,                !- Name
+  0.0;                     !- Direction of Relative North

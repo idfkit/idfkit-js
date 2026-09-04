@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { IdfDocument, shapeOf } from '@idfkit/core';
+import { IdfDocument, parseIdf, shapeOf } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema } from './helpers.js';
@@ -257,5 +257,73 @@ describe('type-name lookup', () => {
     const fresh = new IdfDocument(v26);
     fresh.add('zONE', 'Z1');
     expect(fresh.types()).toEqual(['Zone']);
+  });
+});
+
+/**
+ * The two facts the language service's correlation rests on (research R6).
+ *
+ * `@idfkit/language` positions a validation finding by matching the object it names against the
+ * statements in the text: by folded type name and folded object name for a named object, and by
+ * folded type name and ordinal for an anonymous one. Neither key is sound on its own; each is sound
+ * only because of behaviour these two tests pin down. Both are asserted rather than trusted because
+ * a change to either breaks correlation *silently*: findings keep arriving, they just start
+ * underlining the wrong object, and no other test in either repository would notice.
+ */
+describe('what positioning a finding depends on', () => {
+  it('never lets a document parsed from text hold two objects of one type under one name', () => {
+    // Without this the name key would be ambiguous, and duplicate names are common in real files.
+    // `addRaw` throws on the second one, `parseIdf` catches that, records a `ParseError` and skips
+    // the object, so the duplicate reaches a reader as a reading finding positioned by the scanner
+    // that saw it, and never reaches correlation at all.
+    doc.addRaw('Zone', 'Zone One');
+    expect(() => doc.addRaw('Zone', 'Zone One')).toThrow(/already exists/);
+    // Folded, because that is the key correlation uses and the key a collection stores under.
+    expect(() => doc.addRaw('Zone', 'ZONE ONE')).toThrow(/already exists/);
+
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Zone,',
+      '  Zone One,',
+      '  0.0;',
+      '',
+      'Zone,',
+      '  Zone One,',
+      '  90.0;',
+      '',
+    ].join('\n');
+    const parsed = parseIdf(text, v26, { strict: false });
+
+    expect(parsed.diagnostics.map((d) => d.code)).toEqual(['ParseError']);
+    expect(parsed.diagnostics[0]?.line).toBe(7);
+    // The first statement is the one the document kept, so a finding about this type and this name
+    // is a finding about the first statement in the text.
+    expect(parsed.document.all('Zone').size).toBe(1);
+    expect(parsed.document.require('Zone', 'Zone One').get('direction_of_relative_north')).toBe(0);
+  });
+
+  it('preserves insertion order, so the Nth object of a type is the Nth statement', () => {
+    // The ordinal key serves anonymous objects, whose findings carry an empty `objName` and so
+    // cannot be correlated by name at all. It is sound only while `parseIdf` adds in source order
+    // and `IdfCollection` hands the objects back in the order they were inserted.
+    for (const name of ['C', 'A', 'B']) doc.add('Zone', name);
+    expect([...doc.all('Zone')].map((zone) => zone.name)).toEqual(['C', 'A', 'B']);
+
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Output:Variable, *, Zone Air Temperature, Hourly;',
+      'Output:Variable, *, Site Outdoor Air Drybulb Temperature, Hourly;',
+      'Output:Variable, *, Zone Mean Air Temperature, Daily;',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false });
+
+    expect([...document.all('Output:Variable')].map((obj) => obj.get('variable_name'))).toEqual([
+      'Zone Air Temperature',
+      'Site Outdoor Air Drybulb Temperature',
+      'Zone Mean Air Temperature',
+    ]);
   });
 });
