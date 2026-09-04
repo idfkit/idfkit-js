@@ -57,7 +57,7 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
   // [{ code: 'E005', field: 'ceiling_height', message: 'Value -1 is below minimum 0', ... }]
   ```
 
-  `describeObjectType(typeName, schema)` reports what a type declares, as an
+  `describeObjectType(schema, typeName)` reports what a type declares, as an
   `ObjectDescription`: every field with its type, whether it is required, its
   default, its units, its permitted values and its bounds, plus whether the type
   carries a name and whether it has an extensible group. It is the schema read as
