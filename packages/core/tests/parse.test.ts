@@ -222,3 +222,60 @@ describe('feature 002, a fatal parse carries its findings', () => {
     expect(result.document.has('Version')).toBe(true);
   });
 });
+
+/**
+ * idfkit-js#36: a value of the wrong kind is reported rather than stored in silence.
+ *
+ * The shape this catches is a missing semicolon swallowing the object below, which slides that
+ * object's type name into a numeric field. The field count still fits, so nothing overflows and no
+ * parser notices by counting.
+ */
+describe('InvalidField diagnostics', () => {
+  const SWALLOWED =
+    'Version,\n  26.1;\n\nBuilding,\n  Conformance,\n  0,\n  ,\n  ,\n  ,\n  ,\nTimestep,\n  4;\n';
+
+  it('reports the wrong kind of value, at the field rather than the object', async () => {
+    const s = await schema('26.1.0');
+
+    const result = parseIdf(SWALLOWED, s, { strict: false });
+    const invalid = result.diagnostics.filter((d) => d.code === 'InvalidField');
+
+    // Line 11 is the swallowed `Timestep,`. Line 4 is where Building starts, which would be true
+    // and useless: the damage is seven lines further down.
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]?.line).toBe(11);
+    expect(invalid[0]?.typeName).toBe('Building');
+  });
+
+  it('does not stop a strict parse', async () => {
+    // FR-014. A value of the wrong KIND still leaves a complete document, unlike an unknown type,
+    // so this finding is recorded rather than thrown even under `strict`.
+    const s = await schema('26.1.0');
+
+    expect(() => parseIdf(SWALLOWED, s)).not.toThrow();
+    expect(parseIdf(SWALLOWED, s).diagnostics.some((d) => d.code === 'InvalidField')).toBe(true);
+  });
+
+  it('accepts a sizing sentinel in any numeric field', async () => {
+    // The check that keeps this diagnostic worth reading. Reading each field's own string branch
+    // literally produced 3,775 findings across the 760 EnergyPlus example files of one release,
+    // every one against a model EnergyPlus accepts: the schema is narrower than the engine.
+    const s = await schema('26.1.0');
+    const text =
+      'Version,\n  26.1;\n\nPlantLoop,\n  Loop,\n  Water,\n  ,\n  ,\n  ,\n  ,\n  ,\n  ,\n  Autosize;\n';
+
+    const result = parseIdf(text, s, { strict: false });
+
+    expect(result.diagnostics.filter((d) => d.code === 'InvalidField')).toEqual([]);
+  });
+
+  it('accepts a sentinel whatever its case', async () => {
+    const s = await schema('26.1.0');
+    const text =
+      'Version,\n  26.1;\n\nPeople,\n  P,\n  Z,\n  Sched,\n  People,\n  1,\n  ,\n  ,\n  AUTOCALCULATE;\n';
+
+    const result = parseIdf(text, s, { strict: false });
+
+    expect(result.diagnostics.filter((d) => d.code === 'InvalidField')).toEqual([]);
+  });
+});

@@ -8,6 +8,14 @@ export interface RawObject {
   line: number;
   /** 1-based column where the object starts, for diagnostics. */
   column?: number;
+  /**
+   * Absolute offset of the object's first character in the source text.
+   *
+   * One number per object, so that a finding about a FIELD can be positioned without the lexer
+   * recording a line for every field of every object. The rescan that uses it runs only when a
+   * finding is being built.
+   */
+  offset?: number;
 }
 
 export interface LexDiagnostic {
@@ -98,6 +106,8 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
    * column 4 here too, or the corpus compares two different notions of position.
    */
   let objectColumn = 0;
+  /** Absolute offset of the current object's first non-blank character. */
+  let objectOffset = -1;
 
   /** 1-based column of an offset on the line it falls in. Matches Python's `_line_and_column`. */
   const columnAt = (offset: number): number => offset - lineStart + 1;
@@ -118,6 +128,7 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
     if (objectColumn === 0 && char !== undefined && !/\s/.test(char)) {
       objectLine = line;
       objectColumn = columnAt(index);
+      objectOffset = index;
     }
 
     if (char === '!') {
@@ -139,6 +150,7 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
         chunks = [];
         objectLine = line;
         objectColumn = 0;
+        objectOffset = -1;
       }
       continue;
     }
@@ -165,12 +177,19 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
           code: 'ParseError',
         });
       } else {
-        objects.push({ typeName, values, line: objectLine, column: objectColumn || undefined });
+        objects.push({
+          typeName,
+          values,
+          line: objectLine,
+          column: objectColumn || undefined,
+          offset: objectOffset >= 0 ? objectOffset : undefined,
+        });
       }
       values = [];
       objectStarted = false;
       objectLine = line;
       objectColumn = 0;
+      objectOffset = -1;
       continue;
     }
 
@@ -187,6 +206,7 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
         fieldStart = index + 1;
         objectLine = line;
         objectColumn = 0;
+        objectOffset = -1;
       }
     }
 

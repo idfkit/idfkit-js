@@ -5,7 +5,7 @@ import { lex, type LexDiagnostic } from '@idfkit/core';
 describe('lex', () => {
   it('reads a single-line object', () => {
     expect(lex('Version, 26.1;')).toEqual([
-      { typeName: 'Version', values: ['26.1'], line: 1, column: 1 },
+      { typeName: 'Version', values: ['26.1'], line: 1, column: 1, offset: 0 },
     ]);
   });
 
@@ -18,7 +18,7 @@ describe('lex', () => {
     ].join('\n');
 
     expect(lex(text)).toEqual([
-      { typeName: 'Zone', values: ['Zone One', '0', '1.5'], line: 1, column: 1 },
+      { typeName: 'Zone', values: ['Zone One', '0', '1.5'], line: 1, column: 1, offset: 0 },
     ]);
   });
 
@@ -68,7 +68,9 @@ describe('lex', () => {
     const first = lex('Zone,\n  Z1,\n  4.0');
     const second = lex('Version, 26.1;');
     expect(first).toEqual([]);
-    expect(second).toEqual([{ typeName: 'Version', values: ['26.1'], line: 1, column: 1 }]);
+    expect(second).toEqual([
+      { typeName: 'Version', values: ['26.1'], line: 1, column: 1, offset: 0 },
+    ]);
   });
 });
 

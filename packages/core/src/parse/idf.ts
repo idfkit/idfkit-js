@@ -55,6 +55,20 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
     options.onDiagnostic?.(diagnostic);
   };
 
+  /**
+   * Record a finding that does NOT stop the parse, whatever `strict` says.
+   *
+   * `report` throws under `strict`, which is right for a finding that leaves nothing to return: an
+   * object whose type is unknown cannot be built. A value of the wrong KIND is different. The
+   * object is built, the document is complete, and a caller reading strictly gets exactly what they
+   * got before this finding existed (FR-014). Routing it through `report` made a strict parse fail
+   * on files that used to load, which is the opposite of additive.
+   */
+  const note = (diagnostic: ParseDiagnostic): void => {
+    diagnostics.push(diagnostic);
+    options.onDiagnostic?.(diagnostic);
+  };
+
   const raw = lex(text, { onDiagnostic: report });
   const document = new IdfDocument<M>(schema);
 
@@ -79,8 +93,27 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
 
     const definition = schema.require(canonical);
     try {
-      const { name, values } = interpret(definition, object);
+      const invalid: { field: string; index: number; value: string }[] = [];
+      const { name, values } = interpret(definition, object, invalid);
       document.addRaw(canonical, definition.anon === 1 ? null : name, values);
+
+      // Reported after the object is built, never instead of building it: a value of the wrong
+      // kind does not stop the parse, so a caller reading strictly gets the document they always
+      // got. This adds a finding where there was silence, and nothing else.
+      //
+      // Positioned at the offending FIELD rather than at the object, because that is what makes it
+      // useful. The shape this catches is a missing semicolon swallowing the object below, and the
+      // object's own first line is nowhere near the damage.
+      for (const { field, index, value } of invalid) {
+        if (stringIsLegal(definition, field, value)) continue;
+        note({
+          message: `Field "${field}" expects a number, got "${value}"`,
+          line: fieldLine(text, object, index),
+          typeName: canonical,
+          objectName: definition.anon === 1 ? undefined : object.values[0],
+          code: 'InvalidField',
+        });
+      }
     } catch (error) {
       report({
         message: error instanceof Error ? error.message : String(error),
@@ -97,7 +130,11 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
 }
 
 /** Map positional IDF values onto named schema fields. */
-function interpret(definition: SlimType, object: RawObject): { name: string; values: FieldValues } {
+function interpret(
+  definition: SlimType,
+  object: RawObject,
+  invalid?: { field: string; index: number; value: string }[]
+): { name: string; values: FieldValues } {
   const order = definition.f;
   const named = definition.anon !== 1 && order[0] === 'name';
   const values: FieldValues = {};
@@ -115,11 +152,17 @@ function interpret(definition: SlimType, object: RawObject): { name: string; val
 
   const fixed = named ? order.slice(1) : order;
   for (const field of fixed) {
+    const index = cursor;
     const raw = object.values[cursor++];
     if (raw === undefined) break;
     if (raw === '') continue;
     const coerced = coerce(definition, field, raw);
     if (coerced !== undefined) values[field] = coerced;
+    // A numeric field that kept its string is a coercion that fell through. Whether that is
+    // actually wrong needs the schema and is asked on the reporting path, which runs almost never.
+    if (invalid !== undefined && coerced === raw && isNumericField(definition, field)) {
+      invalid.push({ field, index, value: raw });
+    }
   }
 
   // Everything past the fixed fields belongs to the extensible section, read in
@@ -156,6 +199,94 @@ function interpret(definition: SlimType, object: RawObject): { name: string; val
   }
 
   return { name, values };
+}
+
+/**
+ * The two sizing sentinels, accepted in ANY numeric field.
+ *
+ * Not read from the field's own `se` branch, deliberately. The schema EnergyPlus ships is NARROWER
+ * than the engine it ships with, and its own example files prove it. Both of these declare a string
+ * branch naming exactly one sentinel, and the shipped files use the other one:
+ *
+ *   `PlantLoop.plant_loop_volume` allows `Autocalculate`; 28 files write `Autosize`.
+ *   `AirTerminal:SingleDuct:VAV:Reheat.maximum_flow_fraction_during_reheat` allows `Autosize`;
+ *   673 files write `Autocalculate`.
+ *
+ * The schema is well formed: across all 17 bundled versions no field declares a non-numeric string
+ * default on a numeric type with no string branch. It is simply stricter about WHICH sentinel
+ * belongs where than EnergyPlus is. Reading each field's branch literally produced 3,775 findings
+ * across the 760 example files of one release, every one against a model EnergyPlus reads happily.
+ *
+ * A parse finding says the value is not of the kind the field takes. Whether the exact sentinel is
+ * the one THIS field documents is a schema question, and `validateObject` already answers it.
+ */
+const SIZING_SENTINELS = new Set(['autosize', 'autocalculate']);
+
+/** @internal */
+function isNumericField(definition: SlimType, field: string): boolean {
+  const kind = definition.p[field]?.t;
+  return kind === 'n' || kind === 'i';
+}
+
+/**
+ * Whether a string the numeric coercion rejected is legal for this field anyway.
+ *
+ * Consulted only when coercion has already failed, so the parse path pays nothing for it.
+ *
+ * @internal
+ */
+function stringIsLegal(definition: SlimType, field: string, value: string): boolean {
+  if (SIZING_SENTINELS.has(value.toLowerCase())) return true;
+
+  const slim = definition.p[field];
+  if (slim === undefined) return true;
+  // `auto` marks a collapsed `anyOf`. Without an `se` the string branch declared no enum, so any
+  // string satisfies it; with one, only its members do.
+  if (slim.se === undefined) return slim.auto === 1;
+
+  const folded = value.toLowerCase();
+  return slim.se.some((allowed) => allowed.toLowerCase() === folded);
+}
+
+/**
+ * The 1-based line a field sits on, found by rescanning from the object's own offset.
+ *
+ * The lexer records one offset per object rather than a line per field, because a finding about a
+ * field is rare and an array per object is not. This walks forward counting separators, stepping
+ * over `!` comments so a comma inside one is not mistaken for one, which is the same rule the
+ * lexer itself follows.
+ *
+ * `index` counts into `RawObject.values`, which the lexer has already shifted the type name off.
+ * The scan starts at the type name, so it steps over one more separator than the index: the comma
+ * that ends `Building,` is what puts values[0] on the line after it.
+ *
+ * @internal
+ */
+function fieldLine(text: string, object: RawObject, index: number): number {
+  if (object.offset === undefined) return object.line;
+
+  const separators = index + 1;
+  let seen = 0;
+  let position = object.offset;
+  while (position < text.length && seen < separators) {
+    const char = text[position];
+    if (char === '!') {
+      const newline = text.indexOf('\n', position);
+      if (newline < 0) break;
+      position = newline + 1;
+      continue;
+    }
+    if (char === ';') break;
+    if (char === ',') seen += 1;
+    position += 1;
+  }
+  if (seen < separators) return object.line;
+
+  while (position < text.length && /\s/.test(text[position] ?? '')) position += 1;
+
+  let line = object.line;
+  for (let i = object.offset; i < position; i += 1) if (text[i] === '\n') line += 1;
+  return line;
 }
 
 function coerce(definition: SlimType, field: string, raw: string): StoredValue | undefined {
