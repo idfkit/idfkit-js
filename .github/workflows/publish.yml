@@ -138,21 +138,22 @@ jobs:
           # the registry for @idfkit/core@0.0.0, a version that has never existed, and every
           # install of the language service would fail to resolve its peer.
           #
-          # A CARET, WHERE THE CONTRACT SAYS EXACT, and the difference is deliberate. Feature 005's
-          # contracts/language-service.md asks for an exact peer, reasoning that a service paired
-          # with a layer it disagrees with puts findings on the wrong characters silently. The
-          # reasoning is right and the range does not deliver it: the facade three lines below
-          # depends on "@idfkit/core=^$VERSION", so the first patch release of core makes npm
-          # resolve core to 0.x.(n+1) for anyone installing the facade, and an exact peer on
-          # 0.x.n is then unsatisfiable. Exact here buys no safety and breaks every install one
-          # patch release later.
+          # EXACT, not a caret, and contracts/language-service.md is explicit about why: the
+          # service reads the syntax layer core builds, so a pair that disagrees about the layer's
+          # shape puts findings on the wrong characters SILENTLY. Nothing fails; the underline is
+          # simply in the wrong place. A caret would permit exactly that pairing across a core
+          # patch release, and the whole argument for splitting the two packages rests on there
+          # being no supported install in which they differ.
           #
-          # What actually holds the two together is the lockstep publish below and SyntaxLayer
-          # being a published type: a pair that disagreed about its shape is a type error rather
-          # than a wrong underline. Tightening this to exact means pinning the facade's own core
-          # dependency exactly in the same change, which is a decision about the whole repository
-          # rather than about this package.
-          npm pkg set "peerDependencies.@idfkit/core=^$VERSION" -w @idfkit/language
+          # This sits beside, and does not contradict, the facade's caret on core a few lines
+          # below, which contracts/distribution.md requires so that a patch of core reaches a
+          # consumer without a facade release. npm resolves peers as part of building the tree,
+          # so `idfkit`'s "^X.Y.Z" and this "X.Y.Z" are satisfied together by X.Y.Z, and the
+          # narrow case where they cannot be is one where some other dependency has already
+          # forced core above the version this service was built against. Refusing to resolve is
+          # the right answer there: it is the pairing the exact range exists to reject, and a
+          # failed install is better than an underline in the wrong place.
+          npm pkg set "peerDependencies.@idfkit/core=$VERSION" -w @idfkit/language
 
           # The facade's own dependency specs, which `npm version` does NOT touch: it rewrites
           # the "version" field of each workspace and nothing else. In the repository they read
