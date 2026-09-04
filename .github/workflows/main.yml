@@ -229,6 +229,50 @@ jobs:
 
       - run: npm test
 
+  budget:
+    name: The performance budget
+    runs-on: ubuntu-latest
+
+    # ITS OWN JOB, and deliberately not a step inside `test`. The language service exists so that
+    # an answer about the cursor costs the statement rather than the file, and a requirement with
+    # no measurement behind it is a hope: bench/budget.mjs is the measurement, and it fails.
+    #
+    # Why it is not in the test suite. A timing threshold wired into the same run as the
+    # correctness tests means a noisy neighbour on the runner blocks a documentation typo, and a
+    # gate that fails work it has nothing to do with is a gate somebody switches off within the
+    # month. Here a breach reports against itself and names the ratio that moved.
+    #
+    # Why it can fail on a shared runner at all. Every enforced number is a RATIO between two
+    # figures measured in the same process on the same machine in the same run: a cursor answer
+    # against parseIdf over the same text, scanIdf against parseIdf, parseIdf against lex, the
+    # same cursor answer on the reference model against a file one hundredth its size, and the
+    # same answer at the two ends of one comment-free file. A slower runner moves both halves
+    # together and the ratio does not move. Absolute milliseconds are printed for a human to read
+    # and nothing is held against them.
+    #
+    # The last two are the ones that pin the design, and they pin different axes. A ratio against
+    # parseIdf could be met by a merely fast reparse; independence from file SIZE could not, and a
+    # reparse shows a hundredfold difference on any machine. But size independence compares two
+    # files and cannot see a cost that grows with the OFFSET, because both of its readings sit at
+    # the same place in their own file. That is a real defect rather than a hypothetical one: a
+    # backward search for an exclamation mark reads the whole prefix in a file that holds none,
+    # and it measured 925x here while every other gate on this list stayed green.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # After the build: the benchmark reads dist, which is what an npm consumer receives, rather
+      # than the sources a bundler would transform.
+      - run: npx tsc --build
+
+      - run: npm run check:bench
+
   docs:
     name: Docs
     runs-on: ubuntu-latest

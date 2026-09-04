@@ -10,6 +10,113 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
 
 ## [Unreleased]
 
+This release stays on `conformance-2026.8`, the corpus level `CONFORMANCE_LEVEL`
+reports, and adds no cases to it. A capability that exists in one language
+asserts no cross-language agreement, so there is nothing for the corpus to
+compare; the parity ledger carries the absence instead. The governance level
+moves to `governance-2026.11`, which is where the names below are registered and
+where that ledger entry lives.
+
+### Added
+
+- A syntax layer in `@idfkit/core`. `scanIdf(text)` returns a `SyntaxLayer`:
+  every statement, with the region of its type name and of each field it was
+  written with, plus every meaningful token in source order, packed. It takes
+  text and nothing else, because the layer records what the text says and never
+  what it means, and it never throws for any input. Text that breaks the grammar
+  is represented rather than stopped at: an unterminated final statement runs to
+  the end of the input and says so, a statement written with no type name still
+  gets a region, and empty text produces an empty layer.
+
+  Nothing builds it implicitly. `parseIdf` and `lex` read the same characters
+  through the same scan and construct none of it, so **a caller who never names
+  `scanIdf` pays neither its time nor its memory**, and reading a file costs what
+  it did before.
+
+  `classify(layer)` is that layer read for drawing: the stored tokens with the
+  gaps between them filled as `trivia`, so the sequence tiles the whole text with
+  no hole and no overlap, and no token crosses a line boundary, because no token
+  encoding in use can express one that does. It is a generator, so a consumer
+  colouring a viewport stops where it stops rather than materialising every token
+  in the file. `lineColumnAt` and `offsetAt` convert between an offset and a
+  1-based line and column.
+
+- `@idfkit/language`, the opt-in language service for IDF text, reachable under
+  the shared name at `idfkit/language`. It answers a cursor and positions
+  findings, and does nothing else:
+
+  - `contextAt(text, offset, schema?)` reports what the cursor is on: the
+    statement it is in, whether the offset falls on the type name, in a field,
+    inside a comment, or between statements, and which field it is.
+  - `completionsAt`, `explainAt`, and `declarationAt` answer what may be written
+    here, what this means in the schema's own words, and where the name under the
+    cursor is declared. Each returns a discriminated union rather than a list
+    that is sometimes empty, because "the schema permits anything here" and "I
+    could not consult a schema" are different states, and an editor that rendered
+    them alike would look broken in the first case and be silently wrong in the
+    second.
+  - `findingsIn(text, schema)` reads, validates, and gives every finding a region
+    plus the precision of that region, `field` or `statement`.
+    `position(findings, layer, schema)` does the same for findings a caller
+    already holds, so a consumer with its own parse pays for one scan rather than
+    a second read. No validator changed and no finding is filtered or reworded:
+    correlation is a separate step over the layer, and a caller that never asks
+    for a position receives exactly what it received before.
+
+  Everything here is synchronous, free of input and output, and holds no state.
+  There is no service object to construct, because a service object is where
+  state would accumulate, and every answer takes the text itself rather than a
+  path, since an editor's buffer differs from the file on disk whenever there are
+  unsaved changes. The same code therefore runs unchanged in Node, in a browser,
+  in a browser worker, and behind an editor server. Nothing here imports or names
+  a type from any editor protocol, and nothing here ever will; a consumer
+  translates.
+
+  An answer costs the statement rather than the file. The statement containing an
+  offset is found by scanning backwards to the nearest semicolon that is not
+  inside a comment, so there is no reparse, no incremental parser, and no cache.
+  A committed measurement under `bench/` holds that to ratios rather than to
+  milliseconds, which is the form that survives being run on someone else's
+  machine: a cursor answer at most 2 percent of `parseIdf` over the same text,
+  and `scanIdf` at most 1.25 times it.
+
+  **It is not installed by default.** `npm install idfkit` places zero bytes of
+  the service on disk, exactly as it places no weather code. Add
+  `@idfkit/language` by name to get it, and importing `idfkit/language` without
+  it names the package to install rather than failing with
+  `ERR_MODULE_NOT_FOUND`.
+
+  There is no Python counterpart, and there is not going to be one. The answers
+  are computed from byte offsets into the source text, and a second
+  implementation of that arithmetic is the drift the corpus is least able to
+  police, since it compares findings on `(code, line, typeName)` and never on a
+  column. The decision is on the parity ledger as `idf-language-service`, at
+  `never`, which is terminal: adding a counterpart takes a constitutional
+  amendment rather than an edit. What it costs a reader is stated rather than
+  implied. These answers need a JavaScript runtime, and `pip install idfkit`
+  alone does not provide them.
+
+### Changed
+
+- `ParseDiagnostic.column` is filled. It was declared in 0.2.0-rc.2 and left
+  undefined because the lexer counted lines and not columns; the shared scan
+  counts both, and a reading finding now reports the column its statement begins
+  at, taken at the first non-blank character and counted from 1. The field is
+  still optional, so nothing that treated it as absent breaks.
+
+  A column is the one location the two libraries measure in different units, and
+  that is registered rather than left to be found: Python counts code points and
+  JavaScript counts UTF-16 code units, so the two agree everywhere except in text
+  containing an astral character, which in practice means an emoji in a comment.
+  Each unit is the one its own ecosystem's editors want, so neither is converted.
+  Nothing compares columns across the two libraries today; the corpus matches
+  findings on `(code, line, typeName)`.
+
+- `lex` and `parseIdf` read through the same scan the syntax layer is built from.
+  Both keep their surface and their behaviour; there is now one scanner rather
+  than two, which is what keeps a position the layer reports and a position a
+  finding reports from drifting apart.
+
 ## [0.2.0-rc.2] - 2026-09-04
 
 ### Added
@@ -51,11 +158,14 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
   on `message`: the corpus compares findings on `(code, line, typeName)` and
   never on wording.
 
-  `column` and `filepath` are declared but not yet filled: the lexer counts
-  lines and not columns, and `parseIdf` takes text rather than a path, so
-  neither value exists at the point a finding is built. They are optional, so a
-  reader must treat them as absent until the lexer tracks a column and the
-  file-reading edge attaches the path it read from.
+  Both are optional, and each is filled at the one place that knows the value.
+  `parseIdf` takes text and cannot know where the text came from, so `filepath`
+  is stamped by the Node file-reading edge: `loadIdf` and
+  `loadIdfWithDiagnostics` attach the path they read to every finding, on the
+  result and on the error alike. A caller parsing a string still gets none,
+  because a string names no file. `column` is filled by the reader itself, from
+  the statement's first non-blank character, once the shared scan arrived to
+  count it (see Unreleased).
 
 ### Fixed
 

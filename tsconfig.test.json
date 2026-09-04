@@ -16,6 +16,7 @@
       "@idfkit/core/node": ["./packages/core/src/node.ts"],
       "@idfkit/weather": ["./packages/weather/src/index.ts"],
       "@idfkit/weather/node": ["./packages/weather/src/node.ts"],
+      "@idfkit/language": ["./packages/language/src/index.ts"],
       "@idfkit/types-v26-1": ["./packages/types-v26-1/index.d.ts"],
       "@idfkit/types-v9-4": ["./packages/types-v9-4/index.d.ts"]
     },

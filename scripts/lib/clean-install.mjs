@@ -44,7 +44,7 @@
  *
  * NO CACHING, DELIBERATELY
  *
- * Packing all six workspace packages costs a couple of seconds and every gate
+ * Packing every workspace package costs a couple of seconds and every gate
  * pays it. A cache keyed on mtimes would be faster and would occasionally
  * measure a tree that no longer exists; a verification tool that reports on
  * stale evidence is worse than a slow one.
@@ -456,6 +456,7 @@ export const FACADE = 'idfkit';
 export const CORE = '@idfkit/core';
 export const SCHEMAS = '@idfkit/schemas';
 export const WEATHER = '@idfkit/weather';
+export const LANGUAGE = '@idfkit/language';
 export const TYPE_PACKAGES = ['@idfkit/types-v26-1', '@idfkit/types-v9-4'];
 export const ENGINE = ['@idfkit/engine', '@idfkit/engine-assets'];
 
@@ -479,7 +480,7 @@ export function installSharedName(scratch, tarballs, { label, also = [], flags =
   // Every scoped name the facade could ask for is redirected to a local
   // tarball, including the ones that must not appear. See fixtureManifest().
   const overrides = {};
-  for (const name of [CORE, SCHEMAS, WEATHER, ...TYPE_PACKAGES]) {
+  for (const name of [CORE, SCHEMAS, WEATHER, LANGUAGE, ...TYPE_PACKAGES]) {
     if (tarballs.has(name)) overrides[name] = file(name);
   }
 

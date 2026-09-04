@@ -4,7 +4,7 @@
  *
  * WHAT THE FACADE IS
  *
- * `packages/idfkit/` contains no implementation. It is a manifest and eight
+ * `packages/idfkit/` contains no implementation. It is a manifest and ten
  * one-line-ish re-export files, so that `npm install idfkit` gives a working
  * library without the reader ever learning the scoped names, while the scoped
  * packages stay published and stay the real implementations (FR-036, FR-037).
@@ -21,15 +21,17 @@
  *      install idfkit` succeeds, `import 'idfkit/results'` fails at run time,
  *      and the failure lands on the reader rather than on CI. The export map is
  *      therefore pinned to exactly the four entries in
- *      `contracts/distribution.md`, and every one of them must resolve to a
- *      package that is really there.
+ *      `contracts/distribution.md` plus the `./language` entry added by
+ *      `005-idf-language-service/contracts/language-service.md`, and every one
+ *      of them must resolve to a package that is really there.
  *
- *   2. WEATHER STOPS BEING OPT-IN (FR-043, SC-016). Moving `@idfkit/weather`
- *      from `peerDependencies` into `dependencies` is a one-word edit that no
- *      test would notice, and it puts a 1.6 MB station index on disk for every
- *      reader who never asked for weather. `optionalDependencies` is not the
- *      mechanism either despite the name: npm installs those by default and
- *      merely tolerates failure.
+ *   2. AN OPT-IN COMPONENT STOPS BEING OPT-IN (FR-043, SC-016, SC-015). Moving
+ *      `@idfkit/weather` or `@idfkit/language` from `peerDependencies` into
+ *      `dependencies` is a one-word edit that no test would notice, and it puts
+ *      a 1.6 MB station index, or a language service nobody without an editor
+ *      can use, on disk for every reader who never asked for either.
+ *      `optionalDependencies` is not the mechanism either despite the name: npm
+ *      installs those by default and merely tolerates failure.
  *
  *   3. THE ENGINE ARRIVES (FR-070). `@idfkit/engine-assets` is 51 MB of
  *      WebAssembly and datasets, and it versions on the EnergyPlus release it
@@ -37,20 +39,20 @@
  *      helpful `./engine` subpath, breaks the install-size and bundle-purity
  *      criteria at a stroke and pins every facade user to one engine version.
  *
- *   4. THE WEATHER SHIM DRIFTS (FR-074). `weather.js` cannot use `export *`,
- *      because the whole point of it is to catch the missing-peer failure and
- *      name the install, and a static re-export is linked before any code in it
- *      runs. So it writes the names out. A name added to `@idfkit/weather` then
- *      exists under `@idfkit/weather` and not under `idfkit/weather`, with the
- *      types insisting otherwise, and nothing says so. This gate reads both
- *      surfaces and fails on any difference.
+ *   4. AN OPT-IN SHIM DRIFTS (FR-074, FR-046). `weather.js` and `language.js`
+ *      cannot use `export *`, because the whole point of them is to catch the
+ *      missing-peer failure and name the install, and a static re-export is
+ *      linked before any code in them runs. So they write the names out. A name
+ *      added to `@idfkit/weather` then exists under `@idfkit/weather` and not
+ *      under `idfkit/weather`, with the types insisting otherwise, and nothing
+ *      says so. This gate reads both surfaces and fails on any difference.
  *
  * WHAT IT READS
  *
  *   packages/idfkit/package.json     the export map, the dependency shape
  *   packages/idfkit/*.js, *.d.ts     the specifier each subpath re-exports
  *   node_modules, walking up         whether each specifier resolves
- *   @idfkit/weather                  its real runtime exports, for the drift check
+ *   each optional peer               its real runtime exports, for the drift check
  *
  * Resolution is done by hand rather than through `import.meta.resolve` so a
  * failure can say which package was missing and where it looked, and so the
@@ -73,14 +75,16 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FACADE = join(REPO, 'packages', 'idfkit');
 
 /**
- * The export map, verbatim from `contracts/distribution.md`.
+ * The export map: `contracts/distribution.md` verbatim, plus `./language` from
+ * `005-idf-language-service/contracts/language-service.md`.
  *
- * Subpath -> the specifier it must re-export. Both halves are pinned: a fifth
- * entry is a dead subpath waiting to happen, and a fourth entry pointing
+ * Subpath -> the specifier it must re-export. Both halves are pinned: a sixth
+ * entry is a dead subpath waiting to happen, and one of these five pointing
  * somewhere else is a silent rename of the public surface.
  */
 const CONTRACTED = new Map([
   ['.', '@idfkit/core'],
+  ['./language', '@idfkit/language'],
   ['./node', '@idfkit/core/node'],
   ['./schemas', '@idfkit/schemas'],
   ['./weather', '@idfkit/weather'],
@@ -89,14 +93,36 @@ const CONTRACTED = new Map([
 /** Plain `dependencies`, always installed, never optional (FR-042, T094). */
 const REQUIRED_DEPENDENCIES = ['@idfkit/core', '@idfkit/schemas'];
 
-/** The one opt-in component, and the only legal `peerDependencies` entry. */
-const OPTIONAL_PEER = '@idfkit/weather';
+/**
+ * The opt-in components, and the only legal `peerDependencies` entries.
+ *
+ * Each is a package the shared name reaches through a guarded shim rather than
+ * a static re-export, so each carries the two things this gate checks about a
+ * shim: the install it must name, and the file whose written-out names are held
+ * against the package's real surface.
+ */
+const OPTIONAL_PEERS = [
+  {
+    name: '@idfkit/weather',
+    file: 'weather.js',
+    install: 'npm install @idfkit/weather',
+    why:
+      'This is what keeps the 1.6 MB station index off disk under the shared name ' +
+      '(FR-043, SC-016).',
+  },
+  {
+    name: '@idfkit/language',
+    file: 'language.js',
+    install: 'npm install @idfkit/language',
+    why:
+      'This is what keeps the language service off disk for the readers who never open an ' +
+      'editor, which is what leaves the install-size budget satisfied with no amendment ' +
+      '(FR-046, SC-015).',
+  },
+];
 
 /** Not a subpath, not a dependency, not an optional peer (FR-070). */
 const BANNED = ['@idfkit/engine', '@idfkit/engine-assets'];
-
-/** The install `idfkit/weather` must name when the peer is absent (FR-074). */
-const INSTALL_COMMAND = 'npm install @idfkit/weather';
 
 /** Install-time scripting, rejected outright (FR-042, SC-015). */
 const INSTALL_SCRIPTS = ['preinstall', 'install', 'postinstall', 'prepare'];
@@ -209,8 +235,8 @@ function checkExportMap(manifest, findings) {
     findings.push(
       new Finding(
         `the export map has ${extra.length} entry beyond the contract: ${extra.join(', ')}`,
-        'contracts/distribution.md pins the facade to exactly ' +
-          `${contracted.join(', ')}. A fifth subpath is how a name reserved in the register ` +
+        'contracts/distribution.md, plus the ./language entry, pins the facade to exactly ' +
+          `${contracted.join(', ')}. A sixth subpath is how a name reserved in the register ` +
           'leaks into the published surface as a subpath that resolves to nothing (FR-077).'
       )
     );
@@ -219,7 +245,7 @@ function checkExportMap(manifest, findings) {
     findings.push(
       new Finding(
         `the export map is missing ${missing.join(', ')}`,
-        'All four subpaths are mandatory. A flat facade with one eager entry point drags the ' +
+        'All five subpaths are mandatory. A flat facade with one eager entry point drags the ' +
           'schema data and the station index into every browser bundle (FR-038).'
       )
     );
@@ -261,8 +287,9 @@ function checkSubpathTargets(manifest, findings) {
         );
       }
 
-      const specifiers = new Set(reexportedSpecifiers(read(path)));
-      for (const match of read(path).matchAll(DYNAMIC_IMPORT)) specifiers.add(match[1]);
+      const source = read(path);
+      const specifiers = new Set(reexportedSpecifiers(source));
+      for (const match of source.matchAll(DYNAMIC_IMPORT)) specifiers.add(match[1]);
       if (specifiers.size === 0) {
         findings.push(
           new Finding(
@@ -363,38 +390,35 @@ function checkDependencyShape(manifest, findings) {
   }
 
   const peerNames = Object.keys(peers);
-  if (!peerNames.includes(OPTIONAL_PEER)) {
-    findings.push(
-      new Finding(
-        `${OPTIONAL_PEER} is not a "peerDependencies" entry`,
-        'This is what keeps the 1.6 MB station index off disk under the shared name ' +
-          '(FR-043, SC-016).'
-      )
-    );
-  } else if (meta[OPTIONAL_PEER]?.optional !== true) {
-    findings.push(
-      new Finding(
-        `${OPTIONAL_PEER} is a peer dependency but is not marked optional`,
-        'Without `"peerDependenciesMeta": { "@idfkit/weather": { "optional": true } }` npm 7+ ' +
-          'auto-installs the peer, and the index is back on disk for everyone (FR-043).'
-      )
-    );
+  for (const peer of OPTIONAL_PEERS) {
+    if (!peerNames.includes(peer.name)) {
+      findings.push(new Finding(`${peer.name} is not a "peerDependencies" entry`, peer.why));
+    } else if (meta[peer.name]?.optional !== true) {
+      findings.push(
+        new Finding(
+          `${peer.name} is a peer dependency but is not marked optional`,
+          `Without \`"peerDependenciesMeta": { "${peer.name}": { "optional": true } }\` npm 7+ ` +
+            'auto-installs the peer, and it is back on disk for everyone (FR-043, FR-046).'
+        )
+      );
+    }
+    if (dependencies[peer.name] !== undefined || optional[peer.name] !== undefined) {
+      findings.push(
+        new Finding(
+          `${peer.name} is also declared as a dependency`,
+          'Then it installs, and the optional peer declaration means nothing.'
+        )
+      );
+    }
   }
-  if (dependencies[OPTIONAL_PEER] !== undefined || optional[OPTIONAL_PEER] !== undefined) {
-    findings.push(
-      new Finding(
-        `${OPTIONAL_PEER} is also declared as a dependency`,
-        'Then it installs, and the optional peer declaration means nothing.'
-      )
-    );
-  }
-  for (const extra of peerNames.filter((name) => name !== OPTIONAL_PEER)) {
+  const expectedPeers = OPTIONAL_PEERS.map((peer) => peer.name);
+  for (const extra of peerNames.filter((name) => !expectedPeers.includes(name))) {
     findings.push(
       new Finding(
         `${extra} is an unexpected peer dependency`,
-        'Weather is the one opt-in component of the shared name. Anything else here is either ' +
-          'a dependency the reader should not have to know about, or a component that needs ' +
-          'its own decision.'
+        `Weather and the language service are the opt-in components of the shared name. ` +
+          'Anything else here is either a dependency the reader should not have to know about, ' +
+          'or a component that needs its own decision.'
       )
     );
   }
@@ -471,34 +495,44 @@ function checkNoEngine(manifest, findings) {
 }
 
 /**
- * The weather shim: it names the install, and its written-out names are the
+ * One opt-in shim: it names its install, and its written-out names are the
  * peer's real ones.
+ *
+ * The same three failures apply to every shim, which is why this is a loop over
+ * OPTIONAL_PEERS rather than one function per component. A second copy of this
+ * check written for the language subpath would be the place the two drift apart.
+ *
+ * Only runtime values are compared. Both `.d.ts` twins are the plain
+ * `export * from`, so the type-only names of a peer are re-exported whole and
+ * have nothing to write out here.
  */
-async function checkWeatherShim(findings) {
-  const path = join(FACADE, 'weather.js');
+async function checkShim(peer, findings) {
+  const path = join(FACADE, peer.file);
   if (!existsSync(path)) {
-    findings.push(new Finding('weather.js is missing', 'The ./weather subpath has no target.'));
+    findings.push(
+      new Finding(`${peer.file} is missing`, `The subpath re-exporting ${peer.name} has no target.`)
+    );
     return;
   }
   const text = read(path);
 
-  if (!text.includes(INSTALL_COMMAND)) {
+  if (!text.includes(peer.install)) {
     findings.push(
       new Finding(
-        `weather.js does not name "${INSTALL_COMMAND}"`,
-        'FR-074: importing an absent opt-in component must fail with a message naming the ' +
-          'component to install, rather than a bare unresolved-module error.'
+        `${peer.file} does not name "${peer.install}"`,
+        'FR-074 and FR-046: importing an absent opt-in component must fail with a message ' +
+          'naming the component to install, rather than a bare unresolved-module error.'
       )
     );
   }
+  REEXPORT.lastIndex = 0;
   if (REEXPORT.test(text)) {
-    REEXPORT.lastIndex = 0;
     findings.push(
       new Finding(
-        'weather.js uses a static re-export',
-        'A static `export * from "@idfkit/weather"` is linked before any code in this file ' +
+        `${peer.file} uses a static re-export`,
+        `A static \`export * from "${peer.name}"\` is linked before any code in this file ` +
           'runs, so the guard never executes and the reader gets ERR_MODULE_NOT_FOUND ' +
-          'instead of the install command (FR-074).'
+          'instead of the install command (FR-074, FR-046).'
       )
     );
   }
@@ -506,14 +540,14 @@ async function checkWeatherShim(findings) {
 
   const written = new Set([...text.matchAll(NAMED_CONST)].map((match) => match[1]));
   if (written.size === 0) {
-    findings.push(new Finding('weather.js re-exports no names', 'The subpath would be empty.'));
+    findings.push(new Finding(`${peer.file} re-exports no names`, 'The subpath would be empty.'));
     return;
   }
 
-  const pkg = findPackage(OPTIONAL_PEER, FACADE);
+  const pkg = findPackage(peer.name, FACADE);
   if (pkg.manifest === null) {
     throw new CannotRun(
-      `${OPTIONAL_PEER} is not installed, so the shim's names cannot be checked against it. ` +
+      `${peer.name} is not installed, so the shim's names cannot be checked against it. ` +
         'It is an optional peer for consumers and a workspace package here; run `npm install`.'
     );
   }
@@ -522,30 +556,31 @@ async function checkWeatherShim(findings) {
     real = new Set(Object.keys(await import(pathToFileURL(join(pkg.dir, 'dist/index.js')).href)));
   } catch (error) {
     throw new CannotRun(
-      `cannot load ${OPTIONAL_PEER} to read its exports: ${error.message}. Run \`npx tsc --build\`.`
+      `cannot load ${peer.name} to read its exports: ${error.message}. Run \`npx tsc --build\`.`
     );
   }
 
   const dropped = [...real].filter((name) => !written.has(name)).sort();
   const invented = [...written].filter((name) => !real.has(name)).sort();
+  const types = peer.file.replace(/\.js$/, '.d.ts');
   if (dropped.length > 0) {
     findings.push(
       new Finding(
-        `weather.js is missing ${dropped.length} of ${OPTIONAL_PEER}'s exports: ${dropped.join(', ')}`,
-        'weather.d.ts re-exports the peer whole, so these type-check under idfkit/weather and ' +
-          'are undefined at run time. Add them to weather.js.'
+        `${peer.file} is missing ${dropped.length} of ${peer.name}'s exports: ${dropped.join(', ')}`,
+        `${types} re-exports the peer whole, so these type-check under the subpath and are ` +
+          `undefined at run time. Add them to ${peer.file}.`
       )
     );
   }
   if (invented.length > 0) {
     findings.push(
       new Finding(
-        `weather.js exports ${invented.join(', ')}, which ${OPTIONAL_PEER} does not`,
+        `${peer.file} exports ${invented.join(', ')}, which ${peer.name} does not`,
         'Each is undefined at run time.'
       )
     );
   }
-  return { written: written.size, real: real.size };
+  return { peer, written: written.size, real: real.size };
 }
 
 async function main() {
@@ -559,7 +594,11 @@ async function main() {
   const resolved = checkSubpathTargets(manifest, findings);
   checkDependencyShape(manifest, findings);
   const tree = checkNoEngine(manifest, findings);
-  const shim = await checkWeatherShim(findings);
+  const shims = [];
+  for (const peer of OPTIONAL_PEERS) {
+    const shim = await checkShim(peer, findings);
+    if (shim !== undefined) shims.push(shim);
+  }
 
   console.log('idfkit-js facade gate');
   console.log(`  package      ${manifest.name}@${manifest.version}`);
@@ -575,13 +614,18 @@ async function main() {
     );
   }
   console.log(`  dependencies ${Object.keys(manifest.dependencies ?? {}).join(', ') || 'none'}`);
-  console.log(
-    `  optional peer ${Object.keys(manifest.peerDependencies ?? {}).join(', ') || 'none'}` +
-      ` (optional: ${manifest.peerDependenciesMeta?.[OPTIONAL_PEER]?.optional === true})`
-  );
+  const peerNames = Object.keys(manifest.peerDependencies ?? {});
+  console.log(peerNames.length === 0 ? '  optional peers none' : '  optional peers');
+  for (const name of peerNames) {
+    console.log(
+      `    ${name.padEnd(20)} optional: ${manifest.peerDependenciesMeta?.[name]?.optional === true}`
+    );
+  }
   console.log(`  dep tree     ${tree.size} packages, none of ${BANNED.join(', ')}`);
-  if (shim !== undefined) {
-    console.log(`  weather shim ${shim.written} names re-exported, ${shim.real} in the peer`);
+  for (const shim of shims) {
+    console.log(
+      `  ${shim.peer.file.padEnd(12)} ${shim.written} names re-exported, ${shim.real} in the peer`
+    );
   }
   console.log('');
 

@@ -43,6 +43,13 @@ export type { ParseDiagnostic, ParseOptions, ParseResult } from './parse/idf.js'
 export { getEpJsonVersion, parseEpJson } from './parse/epjson.js';
 export type { EpJson } from './parse/epjson.js';
 
+export { scanIdf } from './syntax/layer.js';
+export type { Statement, SyntaxLayer } from './syntax/layer.js';
+export { classify } from './syntax/classify.js';
+export type { Token, TokenKind } from './syntax/tokens.js';
+export { lineColumnAt, offsetAt } from './syntax/region.js';
+export type { LineColumn, Region } from './syntax/region.js';
+
 export { writeIdf, writeObject } from './write/idf.js';
 export type { ObjectWriteOptions, WriteIdfOptions } from './write/idf.js';
 export { toEpJson, writeEpJson } from './write/epjson.js';
@@ -52,7 +59,7 @@ export { Severity, validateDocument, validateObject } from './validate/index.js'
 export type { ValidationError, ValidationResult } from './validate/index.js';
 
 export { describeObjectType } from './introspect/describe.js';
-export type { FieldDescription, ObjectDescription } from './introspect/describe.js';
+export type { FieldDescription, ObjectDescription, ProsePool } from './introspect/describe.js';
 
 export {
   docsUrlForObject,

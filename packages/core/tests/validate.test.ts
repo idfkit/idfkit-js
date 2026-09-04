@@ -7,7 +7,7 @@ import { DATA } from '../src/internal.js';
 import { Severity, validateDocument, validateObject } from '../src/validate/index.js';
 import type { ValidationError } from '../src/validate/index.js';
 
-import { schema } from './helpers.js';
+import { schema, syntaxFixtures } from './helpers.js';
 
 let v26: Schema;
 let v94: Schema;
@@ -673,5 +673,45 @@ describe('validateDocument', () => {
 
     const result = validateDocument(doc, { schema: v94, checkReferences: false });
     expect(codes(result.warnings)).toEqual(['W002']);
+  });
+});
+
+/**
+ * FR-014 and FR-015: validating returns what it returned before the language service existed.
+ *
+ * The companion of the same assertion in `parse.test.ts`, and it is here for the same reason: the
+ * conformance corpus compares findings produced by this exact code path, so a finding that gained a
+ * field, changed a message, or moved between severities would be a cross-language difference before
+ * it was anything else. Positioning happens afterwards and elsewhere; this is what keeps that true.
+ */
+describe('validating is unchanged by positioning', () => {
+  /** Every fixture read then validated, in name order, as text a snapshot can diff line by line. */
+  function validateCorpus(): string {
+    return syntaxFixtures()
+      .map(({ name, text }) => {
+        const { document } = parseIdf(text, v26, { strict: false });
+        return `--- ${name}\n${JSON.stringify(validateDocument(document), null, 2)}`;
+      })
+      .join('\n\n');
+  }
+
+  it('produces the same findings for every syntax fixture', () => {
+    expect(validateCorpus()).toMatchSnapshot();
+  });
+
+  it('attaches nothing to a finding, so an existing caller receives exactly what it did', () => {
+    // `region` and `precision` belong to a `PositionedFinding`, which `@idfkit/language` builds from
+    // this value rather than inside it. Finding either here would mean a validator had been edited.
+    const declared = new Set(['severity', 'objType', 'objName', 'field', 'message', 'code']);
+
+    for (const { name, text } of syntaxFixtures()) {
+      const { document } = parseIdf(text, v26, { strict: false });
+      const result = validateDocument(document);
+      for (const finding of [...result.errors, ...result.warnings, ...result.info]) {
+        for (const key of Object.keys(finding)) {
+          expect(declared.has(key), `${name}.idf carries "${key}" on a ValidationError`).toBe(true);
+        }
+      }
+    }
   });
 });

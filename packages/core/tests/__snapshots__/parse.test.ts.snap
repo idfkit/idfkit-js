@@ -1,0 +1,363 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`reading is unchanged by positioning > produces the same document and the same diagnostics for every syntax fixture 1`] = `
+"--- comma-inside-trailing-comment
+diagnostics: []
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0,
+      "x_origin": 0
+    }
+  }
+}
+
+--- comment-between-separator-and-value
+diagnostics: []
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0,
+      "x_origin": 0
+    }
+  }
+}
+
+--- comments-only
+diagnostics: []
+document: {}
+
+--- duplicate-object-name
+diagnostics: [
+  {
+    "message": "A Zone named \\"Zone One\\" already exists",
+    "line": 7,
+    "column": 1,
+    "typeName": "Zone",
+    "objectName": "Zone One",
+    "code": "ParseError"
+  }
+]
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0
+    }
+  }
+}
+
+--- empty
+diagnostics: []
+document: {}
+
+--- line-endings-crlf
+diagnostics: []
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0,
+      "x_origin": 0
+    }
+  },
+  "Timestep": {
+    "Timestep 1": {
+      "number_of_timesteps_per_hour": 6
+    }
+  }
+}
+
+--- line-endings-lf
+diagnostics: []
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0,
+      "x_origin": 0
+    }
+  },
+  "Timestep": {
+    "Timestep 1": {
+      "number_of_timesteps_per_hour": 6
+    }
+  }
+}
+
+--- line-endings-mixed
+diagnostics: []
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0,
+      "x_origin": 0
+    }
+  },
+  "Timestep": {
+    "Timestep 1": {
+      "number_of_timesteps_per_hour": 6
+    }
+  }
+}
+
+--- missing-terminator-swallows-next
+diagnostics: [
+  {
+    "message": "Field \\"x_origin\\" expects a number, got \\"0.0\\n\\nZone\\"",
+    "line": 6,
+    "typeName": "Zone",
+    "objectName": "Zone One",
+    "code": "InvalidField"
+  },
+  {
+    "message": "Field \\"y_origin\\" expects a number, got \\"Zone Two\\"",
+    "line": 9,
+    "typeName": "Zone",
+    "objectName": "Zone One",
+    "code": "InvalidField"
+  }
+]
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0,
+      "x_origin": "0.0\\n\\nZone",
+      "y_origin": "Zone Two",
+      "z_origin": 0,
+      "type": 0
+    }
+  },
+  "Timestep": {
+    "Timestep 1": {
+      "number_of_timesteps_per_hour": 6
+    }
+  }
+}
+
+--- no-version-declared
+diagnostics: []
+document: {
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0
+    }
+  }
+}
+
+--- single-unterminated-word
+diagnostics: [
+  {
+    "message": "Unterminated object near \\"Zone\\" (missing \\";\\")",
+    "line": 1,
+    "code": "ParseError",
+    "column": 1
+  }
+]
+document: {}
+
+--- surface-bad-ninth-vertex
+diagnostics: []
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Material:NoMass": {
+    "R13": {
+      "roughness": "Rough",
+      "thermal_resistance": 2.29,
+      "thermal_absorptance": 0.9,
+      "solar_absorptance": 0.75,
+      "visible_absorptance": 0.75
+    }
+  },
+  "Construction": {
+    "ExtWall": {
+      "outside_layer": "R13"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0,
+      "x_origin": 0,
+      "y_origin": 0,
+      "z_origin": 0
+    }
+  },
+  "BuildingSurface:Detailed": {
+    "South Wall": {
+      "surface_type": "Wall",
+      "construction_name": "ExtWall",
+      "zone_name": "Zone One",
+      "outside_boundary_condition": "Outdoors",
+      "sun_exposure": "SunExposed",
+      "wind_exposure": "WindExposed",
+      "view_factor_to_ground": 0.5,
+      "number_of_vertices": 12,
+      "vertices": [
+        {
+          "vertex_x_coordinate": 0,
+          "vertex_y_coordinate": 0,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 4,
+          "vertex_y_coordinate": 0,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 8,
+          "vertex_y_coordinate": 0,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 12,
+          "vertex_y_coordinate": 0,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 12,
+          "vertex_y_coordinate": 4,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 12,
+          "vertex_y_coordinate": 8,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 8,
+          "vertex_y_coordinate": 8,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 4,
+          "vertex_y_coordinate": 8,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": "not-a-number",
+          "vertex_y_coordinate": 8,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 0,
+          "vertex_y_coordinate": 4,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 0,
+          "vertex_y_coordinate": 2,
+          "vertex_z_coordinate": 3
+        },
+        {
+          "vertex_x_coordinate": 0,
+          "vertex_y_coordinate": 0,
+          "vertex_z_coordinate": 3
+        }
+      ]
+    }
+  }
+}
+
+--- unknown-object-type
+diagnostics: [
+  {
+    "message": "Unknown object type \\"NotAnObject:AtAll\\" in EnergyPlus 26.1.0",
+    "line": 3,
+    "column": 1,
+    "typeName": "NotAnObject:AtAll",
+    "objectName": "Whatever",
+    "code": "UnknownObjectType"
+  }
+]
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Timestep": {
+    "Timestep 1": {
+      "number_of_timesteps_per_hour": 6
+    }
+  }
+}
+
+--- unsupported-version
+diagnostics: []
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "7.0"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0
+    }
+  }
+}
+
+--- unterminated-final-statement
+diagnostics: [
+  {
+    "message": "Unterminated object near \\"0.0\\" (missing \\";\\")",
+    "line": 3,
+    "code": "ParseError",
+    "column": 1,
+    "typeName": "Zone"
+  }
+]
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  }
+}
+
+--- value-across-two-lines
+diagnostics: []
+document: {
+  "Zone": {
+    "My\\n  Zone": {
+      "direction_of_relative_north": 0
+    }
+  }
+}"
+`;

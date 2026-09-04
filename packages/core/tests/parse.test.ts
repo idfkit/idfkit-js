@@ -10,7 +10,7 @@ import {
 } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
-import { schema } from './helpers.js';
+import { schema, syntaxFixtures } from './helpers.js';
 
 let v26: Schema;
 beforeAll(async () => {
@@ -310,5 +310,60 @@ describe('field position with comments between the fields', () => {
     // `NotANumber` is on line 7. Line 6 is the comment-bearing line above it.
     expect(invalid).toHaveLength(1);
     expect(invalid[0]?.line).toBe(7);
+  });
+});
+
+/**
+ * FR-014 and FR-015: reading returns what it returned before the language service existed.
+ *
+ * Positions are attached afterwards, by correlating findings against a syntax layer in a separate
+ * package, so `parseIdf` was never edited and "additive" ought to hold by construction. This is the
+ * check that makes it hold rather than intend to. The snapshot is every syntax fixture read in full,
+ * document and diagnostics both, serialised deterministically, so a change to either shows up as a
+ * diff a reviewer can read instead of as a number nobody was watching.
+ *
+ * It cannot testify about a past it did not observe; what it can do is fail the moment reading
+ * starts producing something different, which is the property FR-015 actually needs.
+ */
+describe('reading is unchanged by positioning', () => {
+  /** Every fixture read, in name order, as text a snapshot can diff line by line. */
+  function readCorpus(): string {
+    return syntaxFixtures()
+      .map(({ name, text }) => {
+        const { document, diagnostics } = parseIdf(text, v26, { strict: false });
+        return [
+          `--- ${name}`,
+          `diagnostics: ${JSON.stringify(diagnostics, null, 2)}`,
+          `document: ${JSON.stringify(document.toJSON(), null, 2)}`,
+        ].join('\n');
+      })
+      .join('\n\n');
+  }
+
+  it('produces the same document and the same diagnostics for every syntax fixture', () => {
+    expect(readCorpus()).toMatchSnapshot();
+  });
+
+  it('attaches nothing to a diagnostic, so an existing caller receives exactly what it did', () => {
+    // `region` and `precision` belong to a `PositionedFinding`, which is a separate value built by
+    // `@idfkit/language` from this one. Finding either here would mean the position had been merged
+    // into the source after all, which is the shape of the change this design exists to avoid.
+    const declared = new Set([
+      'message',
+      'line',
+      'column',
+      'code',
+      'filepath',
+      'typeName',
+      'objectName',
+    ]);
+
+    for (const { name, text } of syntaxFixtures()) {
+      for (const diagnostic of parseIdf(text, v26, { strict: false }).diagnostics) {
+        for (const key of Object.keys(diagnostic)) {
+          expect(declared.has(key), `${name}.idf carries "${key}" on a ParseDiagnostic`).toBe(true);
+        }
+      }
+    }
   });
 });
