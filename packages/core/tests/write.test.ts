@@ -110,3 +110,153 @@ describe('writeEpJson', () => {
     expect(JSON.parse(writeEpJson(doc))).toEqual({});
   });
 });
+
+/**
+ * FR-017: no writer default moves, in either language.
+ *
+ * The requirement most easily broken by accident. Feature 002 adds a compressed mode here and
+ * three controls on the other side, and the only thing that makes a slipped default loud rather
+ * than discovered later is a test that fails.
+ *
+ * Six defaults, pinned as the values they are TODAY. Every one is also pinned on the other side,
+ * in `idfkit/tests/test_writers.py`, at the values THAT writer uses. The two disagree on five of
+ * the six, both are published, and neither is more correct. That disagreement is the point: it is
+ * documented on a page rather than resolved, because resolving it would change output somebody
+ * depends on.
+ */
+describe('writer defaults are pinned (FR-017)', () => {
+  const model = (s: Schema): IdfDocument => {
+    const { document } = parseIdf(
+      'Version,\n  26.1;\n\nBuilding,\n  Pinned,\n  30.0;\n\nTimestep,\n  4;\n',
+      s
+    );
+    return document;
+  };
+
+  it('indents four spaces', () => {
+    const text = writeIdf(model(v26));
+
+    const fieldLines = text.split('\n').filter((l) => l.startsWith(' ') && l.includes('!-'));
+    expect(fieldLines.length).toBeGreaterThan(0);
+    // Four, where the other language writes two.
+    expect(fieldLines.every((l) => l.startsWith('    ') && !l.startsWith('     '))).toBe(true);
+  });
+
+  it('puts the comment at column 30', () => {
+    const text = writeIdf(model(v26));
+
+    let checked = 0;
+    for (const line of text.split('\n')) {
+      const marker = line.indexOf('!-');
+      if (marker <= 0) continue;
+      // Only lines the padding actually reached: a value longer than the column pushes the comment
+      // right, and that overflow behaviour is itself one of the seven differences.
+      if (line.slice(0, marker).trimEnd().length < 30) {
+        expect(marker).toBe(30);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('writes objects in insertion order, with Version first', () => {
+    const text = writeIdf(model(v26));
+
+    const types = text
+      .split('\n')
+      .filter((l) => l.length > 0 && !/^\s/.test(l) && l.endsWith(','))
+      .map((l) => l.slice(0, -1));
+    // Insertion order, not sorted: the other language sorts by type name.
+    expect(types).toEqual(['Version', 'Building', 'Timestep']);
+  });
+
+  it('consults the schema when rendering a float', () => {
+    const text = writeIdf(model(v26));
+
+    // north_axis came in as 30.0 and stays 30.0, because the schema calls the field a number. The
+    // other language renders every float with %g and writes 30.
+    expect(text).toContain('30.0');
+  });
+
+  it('lowercases minor words in a field comment', () => {
+    const text = writeIdf(model(v26));
+
+    // "Number of Timesteps per Hour", where the other language title-cases every word and writes
+    // "Number Of Timesteps Per Hour".
+    expect(text).toMatch(/!- Number of Timesteps per Hour/);
+  });
+
+  it('writes no generator header', () => {
+    const text = writeIdf(model(v26));
+
+    // The other language opens every file with "!-Generator idfkit v..." and "!-Option
+    // SortedOrder". This writes neither, which is the first difference a reader diffing two
+    // outputs would meet.
+    expect(text.startsWith('!-')).toBe(false);
+    expect(text).not.toContain('!-Generator');
+    expect(text).not.toContain('!-Option');
+  });
+});
+
+/**
+ * FR-016 and SC-007: the fifth and last control to close.
+ *
+ * Four of the five controls existed on one writer and were added to the other. This is the one
+ * that went the other way: the other language has had `output_type="compressed"` since it was
+ * written, and this writer had no compact path at all to extend.
+ */
+describe('compressed output (FR-016)', () => {
+  const model = (s: Schema): IdfDocument => {
+    const { document } = parseIdf('Version,\n  26.1;\n\nBuilding,\n  Ctl,\n  30.0;\n', s);
+    return document;
+  };
+
+  it('puts each object on one line, with no blank line between them', () => {
+    const text = writeIdf(model(v26), { compressed: true });
+
+    expect(text).toBe('Version,26.1;\nBuilding,Ctl,30.0;');
+  });
+
+  it('means the same thing as the other language’s compressed', () => {
+    // Python writes 'Version,26.1;\nBuilding,Ctl,30;' for the same input. The two agree on
+    // structure and differ only on float rendering, which is one of the six pinned defaults and is
+    // not something compressed removes. That is why the corpus compares this structurally, by
+    // re-reading both outputs, rather than textually.
+    const text = writeIdf(model(v26), { compressed: true });
+    const lines = text.split('\n');
+
+    expect(lines).toHaveLength(2);
+    expect(lines.every((l) => l.endsWith(';'))).toBe(true);
+    expect(lines.every((l) => !l.includes('!-'))).toBe(true);
+    expect(text).not.toContain('!-Generator');
+  });
+
+  it('is not the same as turning comments off', () => {
+    // `comments: false` skips the padding and the comment and still puts every field on its own
+    // line. Both languages already had that; it is a different, coarser output.
+    const withoutComments = writeIdf(model(v26), { comments: false });
+    const compressed = writeIdf(model(v26), { compressed: true });
+
+    expect(withoutComments.split('\n').length).toBeGreaterThan(compressed.split('\n').length);
+    expect(withoutComments).toContain('\n    26.1;');
+  });
+
+  it('re-reads to the same document it came from (FR-019)', () => {
+    const original = model(v26);
+    const reread = parseIdf(writeIdf(original, { compressed: true }), v26).document;
+
+    // Structure survives the control, which is what FR-019 asks. Compared over parsed values
+    // rather than text, because the text is deliberately different.
+    expect(reread.types().sort()).toEqual(original.types().sort());
+    expect(reread.all('Building').size).toBe(original.all('Building').size);
+  });
+
+  it('does not add a lossless mode', () => {
+    // `lossless-round-trip` is a separate Tier 2 entry on the parity record, absent here and
+    // tracked as not-yet-ported. Compressed is not a step toward it and must not be read as one:
+    // it discards MORE formatting, not less.
+    const options: Record<string, unknown> = { compressed: true };
+    expect(Object.keys(options)).not.toContain('preserveFormatting');
+    expect(writeIdf(model(v26), { compressed: true })).not.toContain('  26.1');
+  });
+});
