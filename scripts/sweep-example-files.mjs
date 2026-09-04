@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { getIdfVersion, parseIdf } from '../packages/core/dist/index.js';
+import { schemaFor } from '../packages/core/dist/node.js';
 import { localBundle } from '../packages/schemas/dist/node.js';
 
 const { values, positionals } = parseArgs({
@@ -74,7 +75,11 @@ for (const name of files) {
       errors.push(`${name}: no Version object found`);
       continue;
     }
-    if (!schemas.has(version)) schemas.set(version, await bundle.load(version));
+    // `schemaFor`, not `bundle.load`, because that is the path `loadIdf` takes and it is the one
+    // that resolves a declared version onto a bundled one. Loading directly demands an exact
+    // match, so every file declaring `9.0` was reported unreadable against a bundle carrying
+    // 9.0.1: a defect in this script that looked exactly like one in the library.
+    if (!schemas.has(version)) schemas.set(version, await schemaFor(version, { bundle }));
 
     // strict off, because the point is to collect what a file reports rather than to stop at the
     // first thing wrong with it.

@@ -283,11 +283,16 @@ jobs:
         # `findings` is that version's MEASURED count, not a round number, so a regression of one
         # is caught. `errors` is zero: unlike the Python library, this one detects a Version object
         # wherever it sits, so no example file fails to read at all.
+        #
+        # 9.2.0 is four where Python is three, and the extra one is real: `_1a-Long0.0.idf` carries
+        # an un-migrated `report variable dictionary;`, which this lexer reports as an unknown type
+        # and Python's pattern discards in silence because it has no comma. Tracked as idfkit#193,
+        # and the two numbers agree again once that is decided.
         include:
           - { version: "8.9.0", findings: 3, errors: 0 }
           - { version: "9.0.1", findings: 3, errors: 0 }
           - { version: "9.1.0", findings: 3, errors: 0 }
-          - { version: "9.2.0", findings: 3, errors: 0 }
+          - { version: "9.2.0", findings: 4, errors: 0 }
           - { version: "9.3.0", findings: 3, errors: 0 }
           - { version: "9.4.0", findings: 3, errors: 0 }
           - { version: "9.5.0", findings: 3, errors: 0 }
