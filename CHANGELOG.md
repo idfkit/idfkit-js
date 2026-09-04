@@ -10,6 +10,8 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
 
 ## [Unreleased]
 
+## [0.2.0-rc.2] - 2026-09-04
+
 ### Added
 
 - `describeObjectType` reports the schema's explanatory prose. It takes an
@@ -352,7 +354,8 @@ First published release. The API is not yet stable.
   no schema matches, because loading the wrong schema mis-maps every positional
   field instead of failing.
 
-[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.1...HEAD
+[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.2...HEAD
+[0.2.0-rc.2]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.1...v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/idfkit/idfkit-js/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/idfkit/idfkit-js/releases/tag/v0.0.1
