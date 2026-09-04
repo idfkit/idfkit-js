@@ -311,7 +311,9 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      # The sweep reads `dist/`, which is what an npm consumer receives, rather than the sources a
+      # bundler would transform. `typecheck` is `tsc --build`, so this is the build.
+      - run: npm run typecheck
 
       - name: Cache the example files
         id: cache-examples
