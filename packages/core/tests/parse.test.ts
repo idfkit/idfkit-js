@@ -279,3 +279,36 @@ describe('InvalidField diagnostics', () => {
     expect(result.diagnostics.filter((d) => d.code === 'InvalidField')).toEqual([]);
   });
 });
+
+/**
+ * Found by sweeping the EnergyPlus example files in both languages and comparing the output: the
+ * two agreed on the file and the field and disagreed on the line by one.
+ *
+ * A field's comma is routinely followed by `!- Field Name` on the same line. Stopping the scan at
+ * the `!` reports the line the PREVIOUS value sits on. The conformance case for this diagnostic did
+ * not catch it, because its input has no comments.
+ */
+describe('field position with comments between the fields', () => {
+  it('reports the line the value is on, not the line the comment is on', async () => {
+    const s = await schema('26.1.0');
+    const text = [
+      'Version,',
+      '  26.1;',
+      '',
+      'Material,',
+      '  IN46,                    !- Name',
+      '  VeryRough,               !- Roughness',
+      '  NotANumber,              !- Thickness {m}',
+      '  2.3;                     !- Conductivity {W/m-K}',
+      '',
+    ].join('\n');
+
+    const invalid = parseIdf(text, s, { strict: false }).diagnostics.filter(
+      (d) => d.code === 'InvalidField'
+    );
+
+    // `NotANumber` is on line 7. Line 6 is the comment-bearing line above it.
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]?.line).toBe(7);
+  });
+});

@@ -282,7 +282,20 @@ function fieldLine(text: string, object: RawObject, index: number): number {
   }
   if (seen < separators) return object.line;
 
-  while (position < text.length && /\s/.test(text[position] ?? '')) position += 1;
+  // Step over whitespace AND any comment between the separator and the value. A field's comma is
+  // routinely followed by `!- Field Name` on the same line, and stopping at the `!` would report
+  // the line the PREVIOUS value sits on, one too early.
+  while (position < text.length) {
+    const char = text[position] ?? '';
+    if (char === '!') {
+      const newline = text.indexOf('\n', position);
+      if (newline < 0) break;
+      position = newline + 1;
+      continue;
+    }
+    if (!/\s/.test(char)) break;
+    position += 1;
+  }
 
   let line = object.line;
   for (let i = object.offset; i < position; i += 1) if (text[i] === '\n') line += 1;

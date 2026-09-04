@@ -257,8 +257,50 @@ jobs:
         run: npm run docs:build
 
   conformance:
-    name: Round-trip EnergyPlus example files
+    # Read every EnergyPlus example file, for every version @idfkit/schemas bundles.
+    #
+    # This used to install EnergyPlus 26.1, roughly a gigabyte, to get at one release's example
+    # files, and read them with one schema. It needed neither: the library parses against its own
+    # bundled schemas, so the only thing wanted from a release is the files, and a blobless,
+    # shallow, sparse clone of `testfiles/*.idf` is about 210 MB. Cached on the release tag, which
+    # is immutable, so a hit is permanent and seventeen downloads happen once rather than per pull
+    # request.
+    #
+    # Sweeping every version is what catches the two defects a single release cannot show. A parser
+    # change safe on the newest schema and wrong on an older one, because field lists and
+    # extensible groups moved between releases. And a file whose content belongs to one version
+    # while its Version object declares another, which EnergyPlus ships several of.
+    #
+    # The counts are held per version and are compared against the Python library's, which sweeps
+    # the same files. A number that moves on one side and not the other is a divergence.
+    name: "E+ ${{ matrix.version }}"
     runs-on: ubuntu-latest
+    strategy:
+      # Every version reports for itself. One release failing must not cancel the sixteen that
+      # would have told you whether the fault is that release or the change under test.
+      fail-fast: false
+      matrix:
+        # `findings` is that version's MEASURED count, not a round number, so a regression of one
+        # is caught. `errors` is zero: unlike the Python library, this one detects a Version object
+        # wherever it sits, so no example file fails to read at all.
+        include:
+          - { version: "8.9.0", findings: 3, errors: 0 }
+          - { version: "9.0.1", findings: 3, errors: 0 }
+          - { version: "9.1.0", findings: 3, errors: 0 }
+          - { version: "9.2.0", findings: 3, errors: 0 }
+          - { version: "9.3.0", findings: 3, errors: 0 }
+          - { version: "9.4.0", findings: 3, errors: 0 }
+          - { version: "9.5.0", findings: 3, errors: 0 }
+          - { version: "9.6.0", findings: 3, errors: 0 }
+          - { version: "22.1.0", findings: 3, errors: 0 }
+          - { version: "22.2.0", findings: 13, errors: 0 }
+          - { version: "23.1.0", findings: 3, errors: 0 }
+          - { version: "23.2.0", findings: 3, errors: 0 }
+          - { version: "24.1.0", findings: 4, errors: 0 }
+          - { version: "24.2.0", findings: 3, errors: 0 }
+          - { version: "25.1.0", findings: 3, errors: 0 }
+          - { version: "25.2.0", findings: 8, errors: 0 }
+          - { version: "26.1.0", findings: 3, errors: 0 }
     steps:
       - uses: actions/checkout@v4
 
@@ -269,47 +311,40 @@ jobs:
 
       - run: npm ci
 
-      - name: Install EnergyPlus
-        # The example set is the real conformance suite: 760 files covering
-        # extensible shapes, blank names, and autosized fields that hand-written
-        # fixtures never reach. Unit tests skip these when absent, so this job
-        # exists to make sure they actually run somewhere.
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - run: npm run build
+
+      - name: Cache the example files
+        id: cache-examples
+        uses: actions/cache@v4
+        with:
+          path: ep/testfiles
+          key: ep-testfiles-v${{ matrix.version }}
+
+      - name: Fetch the example files for this release
+        if: steps.cache-examples.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          TAG=v26.1.0
+          # NREL/EnergyPlus redirects here since the rename. The canonical name is used so that the
+          # redirect being dropped some day is a loud failure rather than a silent one.
+          REPO=https://github.com/NatLabRockies/EnergyPlus
 
-          # The asset name cannot be built from the version: it embeds a build
-          # hash (EnergyPlus-26.1.0-6f2e40d102-...) and names whichever Ubuntu
-          # that release targeted, which moves between releases. Ask the API.
-          ASSETS="$(gh api "repos/NREL/EnergyPlus/releases/tags/${TAG}" --jq '.assets[].name')"
-
-          # Prefer the build for the runner's own Ubuntu; a mismatched glibc
-          # fails at exec time, well after this step has reported success.
-          UBUNTU="$(. /etc/os-release && echo "$VERSION_ID")"
-          NAME="$(printf '%s\n' "$ASSETS" | grep -E "Linux-Ubuntu${UBUNTU}-x86_64\.tar\.gz$" || true)"
-          if [ -z "$NAME" ]; then
-            NAME="$(printf '%s\n' "$ASSETS" \
-              | grep -E 'Linux-Ubuntu[0-9.]+-x86_64\.tar\.gz$' | sort -V | tail -1 || true)"
-            echo "::warning::No ${TAG} build for Ubuntu ${UBUNTU}; falling back to ${NAME:-none}"
-          fi
-          if [ -z "$NAME" ]; then
-            echo "::error::No Linux x86_64 tarball on the ${TAG} release. Assets were:"
-            printf '%s\n' "$ASSETS"
-            exit 1
-          fi
-
-          echo "Installing $NAME"
-          curl -fsSL -o ep.tar.gz \
-            "https://github.com/NREL/EnergyPlus/releases/download/${TAG}/${NAME}"
-          mkdir -p "$HOME/EnergyPlus"
-          tar -xzf ep.tar.gz -C "$HOME/EnergyPlus" --strip-components=1
-          echo "ENERGYPLUS_DIR=$HOME/EnergyPlus" >> "$GITHUB_ENV"
-
-      - run: npm test
+          # --filter=blob:none fetches no file contents until checkout and --depth 1 no history;
+          # the sparse pattern then pulls only the IDF files.
+          git clone --filter=blob:none --no-checkout --depth 1 \
+            --branch "v${{ matrix.version }}" "$REPO" ep
+          cd ep
+          git sparse-checkout set --no-cone 'testfiles/*.idf'
+          git checkout
 
       - name: Fail if the example files were not found
         run: |
-          test -d "$ENERGYPLUS_DIR/ExampleFiles" \
-            || (echo "::error::ExampleFiles missing; conformance job proved nothing" && exit 1)
+          # An empty sweep passes every threshold while proving nothing.
+          count=$(find ep/testfiles -maxdepth 1 -name '*.idf' | wc -l)
+          echo "found $count example files for ${{ matrix.version }}"
+          test "$count" -gt 0 \
+            || (echo "::error::no example files at v${{ matrix.version }}; the sweep proved nothing" && exit 1)
+
+      - name: Read every file
+        run: |
+          node scripts/sweep-example-files.mjs ep/testfiles \
+            --max-findings ${{ matrix.findings }} --max-errors ${{ matrix.errors }}
