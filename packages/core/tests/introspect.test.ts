@@ -880,7 +880,9 @@ describe('feature 002, describing a type agrees across both languages', () => {
    */
   it('puts the name first for ZoneProperty:UserViewFactors:BySurfaceName', () => {
     expect(
-      describeObjectType(v26, 'ZoneProperty:UserViewFactors:BySurfaceName').fields.map((f) => f.name)
+      describeObjectType(v26, 'ZoneProperty:UserViewFactors:BySurfaceName').fields.map(
+        (f) => f.name
+      )
     ).toEqual([
       'zone_or_zonelist_or_space_or_spacelist_name',
       'view_factors',

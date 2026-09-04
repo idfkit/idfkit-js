@@ -155,3 +155,70 @@ describe('parseEpJson', () => {
     expect(() => parseEpJson('{not json', v26)).toThrow(/Invalid JSON/);
   });
 });
+
+/**
+ * Feature 002, US3: what a fatal parse carries, and what it must keep carrying.
+ *
+ * The record described this gap as one-sided, "Python raises and TypeScript returns". Neither
+ * library ever did that: `parseIdf` defaults to `strict: true` and throws, `parse_idf` defaults to
+ * `strict_parsing=True` and raises. What actually differed is that this error carried one finding
+ * flattened into two fields while Python's carried the whole collection.
+ */
+describe('feature 002, a fatal parse carries its findings', () => {
+  it('throws by default, which it always did', async () => {
+    const s = await schema('26.1.0');
+
+    expect(() => parseIdf('Version, 26.1;\nNotARealType, x;\n', s)).toThrow(IdfParseError);
+  });
+
+  it('carries the findings as a collection', async () => {
+    const s = await schema('26.1.0');
+
+    let error: IdfParseError | undefined;
+    try {
+      parseIdf('Version, 26.1;\nNotARealType, x;\n', s);
+    } catch (caught) {
+      error = caught as IdfParseError;
+    }
+
+    expect(error).toBeInstanceOf(IdfParseError);
+    expect(error?.diagnostics).toHaveLength(1);
+    expect(error?.diagnostics[0]?.code).toBe('UnknownObjectType');
+    expect(error?.diagnostics[0]?.typeName).toBe('NotARealType');
+  });
+
+  it('keeps the flattened accessors resolving to the first finding', async () => {
+    const s = await schema('26.1.0');
+
+    let error: IdfParseError | undefined;
+    try {
+      parseIdf('Version, 26.1;\nNotARealType, x;\n', s);
+    } catch (caught) {
+      error = caught as IdfParseError;
+    }
+
+    // FR-014: `.line` and `.typeName` are what existing callers read, and they still return what
+    // they returned before. They are a convenience over `diagnostics[0]`, not a second truth.
+    expect(error?.line).toBe(error?.diagnostics[0]?.line);
+    expect(error?.typeName).toBe(error?.diagnostics[0]?.typeName);
+    expect(error?.message).toContain('NotARealType');
+  });
+
+  it('gives every returned finding a code from the shared vocabulary', async () => {
+    const s = await schema('26.1.0');
+
+    const result = parseIdf('Version, 26.1;\nNotARealType, x;\nAlsoNotReal, y;\n', s, {
+      strict: false,
+    });
+
+    // One finding per skip, not one per distinct type name, and each carries a code the corpus
+    // can compare. Message text is deliberately not asserted: it is a presentation choice.
+    expect(result.diagnostics).toHaveLength(2);
+    expect(result.diagnostics.map((d) => d.code)).toEqual([
+      'UnknownObjectType',
+      'UnknownObjectType',
+    ]);
+    expect(result.diagnostics.map((d) => d.typeName)).toEqual(['NotARealType', 'AlsoNotReal']);
+    expect(result.document.has('Version')).toBe(true);
+  });
+});

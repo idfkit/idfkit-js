@@ -299,7 +299,7 @@ describe('field order and accepted values in the bundle', () => {
 
     for (const version of index.versions) {
       const manifest = (await nodeSource().read(
-        `manifest-${version.replace(/\./g, "-")}.json`
+        `manifest-${version.replace(/\./g, '-')}.json`
       )) as Record<string, string>;
 
       const withOrder = Object.entries(manifest)

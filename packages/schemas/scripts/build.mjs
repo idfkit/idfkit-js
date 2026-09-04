@@ -293,7 +293,9 @@ function main() {
   dirs.sort();
 
   const readSchema = (dir) =>
-    JSON.parse(gunzipSync(readFileSync(join(SOURCE, dir, 'Energy+.schema.epJSON.gz'))).toString('utf8'));
+    JSON.parse(
+      gunzipSync(readFileSync(join(SOURCE, dir, 'Energy+.schema.epJSON.gz'))).toString('utf8')
+    );
 
   // Pass one: every distinct memo and note across every version, numbered.
   const prose = createProsePool();
@@ -357,7 +359,9 @@ function main() {
   console.log(`type defs       ${totalDefs}`);
   console.log(`unique defs     ${blobs.size} (${((100 * blobs.size) / totalDefs).toFixed(1)}%)`);
   const docsBytes = readFileSync(join(OUT, 'docs.json.gz')).length;
-  console.log(`prose strings   ${proseStrings.length} distinct (${(docsBytes / 1024).toFixed(1)} KB gzipped)`);
+  console.log(
+    `prose strings   ${proseStrings.length} distinct (${(docsBytes / 1024).toFixed(1)} KB gzipped)`
+  );
   console.log(`bundle on disk  ${(gzTotal / 1024).toFixed(1)} KB gzipped`);
 }
 

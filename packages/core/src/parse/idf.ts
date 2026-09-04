@@ -6,8 +6,14 @@ import type { AnyTypeMap, UntypedMap } from '../typemap.js';
 import { lex, type LexDiagnostic, type RawObject } from './lexer.js';
 
 export interface ParseDiagnostic extends LexDiagnostic {
-  /** Object type the problem occurred in, when known. */
-  typeName?: string;
+  /**
+   * Object name the problem occurred in, when known.
+   *
+   * Python spells this `obj_name`, and `typeName` against its `obj_type` is the same idiomatic
+   * casing difference the naming register already records. Not a gap, and not renamed: spending a
+   * rename to make the register harder to read is the wrong trade.
+   */
+  objectName?: string;
 }
 
 export interface ParseOptions {
@@ -59,6 +65,7 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
         message: `Unknown object type "${object.typeName}" in EnergyPlus ${schema.version}`,
         line: object.line,
         typeName: object.typeName,
+        code: 'UnknownObjectType',
       });
       continue;
     }
@@ -72,6 +79,7 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
         message: error instanceof Error ? error.message : String(error),
         line: object.line,
         typeName: canonical,
+        code: 'ParseError',
       });
     }
   }
@@ -178,12 +186,32 @@ function coerceValue(kind: string | undefined, raw: string): StoredValue | undef
 export class IdfParseError extends Error {
   readonly line: number;
   readonly typeName: string | undefined;
+  /**
+   * Every finding that stopped the parse.
+   *
+   * This error carried `line` and `typeName` from a single diagnostic, flattened into fields, and
+   * a caller who wanted the rest had nowhere to look. Python's `IDFParseError` has always carried
+   * the collection; this is the half of the difference that was real.
+   *
+   * `line` and `typeName` still resolve to the first finding's values, so no existing caller
+   * breaks (FR-013, FR-014). They are a convenience over `diagnostics[0]` rather than a second
+   * source of truth.
+   */
+  readonly diagnostics: readonly ParseDiagnostic[];
 
-  constructor(diagnostic: ParseDiagnostic) {
-    super(`${diagnostic.message} (line ${diagnostic.line})`);
+  constructor(diagnostic: ParseDiagnostic | readonly ParseDiagnostic[]) {
+    const diagnostics = Array.isArray(diagnostic)
+      ? (diagnostic as readonly ParseDiagnostic[])
+      : [diagnostic as ParseDiagnostic];
+    const first = diagnostics[0];
+    if (first === undefined) {
+      throw new TypeError('IdfParseError needs at least one diagnostic');
+    }
+    super(`${first.message} (line ${first.line})`);
     this.name = 'IdfParseError';
-    this.line = diagnostic.line;
-    this.typeName = diagnostic.typeName;
+    this.line = first.line;
+    this.typeName = first.typeName;
+    this.diagnostics = Object.freeze([...diagnostics]);
   }
 }
 

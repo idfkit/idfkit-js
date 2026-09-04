@@ -11,7 +11,42 @@ export interface RawObject {
 export interface LexDiagnostic {
   message: string;
   line: number;
+  /**
+   * Machine-readable kind, from the vocabulary both libraries share.
+   *
+   * Derived from Python's exception hierarchy by dropping the `Error` suffix, so neither language
+   * invented it and the mapping stays mechanical. The conformance corpus compares a finding on
+   * `(code, line, typeName)` and never on `message`: wording is a presentation choice each library
+   * should stay free to improve, and pinning it would turn every improvement into a failure.
+   */
+  code?: ParseDiagnosticCode;
+  /** 1-based column, when the lexer knew one. */
+  column?: number;
+  /** Path the text came from, when it came from a file rather than a string. */
+  filepath?: string;
+  /**
+   * Object type the problem occurred in, when known.
+   *
+   * Declared here rather than only on `ParseDiagnostic` because the lexer knows it too: an
+   * unterminated object has read its type name before it runs out of input, and a finding that
+   * drops it says only that something went wrong somewhere.
+   */
+  typeName?: string;
 }
+
+/**
+ * The shared diagnostic vocabulary. The table lives in
+ * `idfkit-conformance/runners/compare.md`; a code outside it is a difference, not a near match.
+ */
+export type ParseDiagnosticCode =
+  | 'UnknownObjectType'
+  | 'InvalidField'
+  | 'Range'
+  | 'DuplicateObject'
+  | 'ParseError'
+  | 'VersionMismatch'
+  | 'UnsupportedVersion'
+  | 'SchemaNotFound';
 
 export interface LexOptions {
   /** Report a problem instead of throwing. */
@@ -98,7 +133,7 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
 
       const typeName = values.shift() ?? '';
       if (typeName === '') {
-        report?.({ message: 'Object with no type name', line: objectLine });
+        report?.({ message: 'Object with no type name', line: objectLine, code: 'ParseError' });
       } else {
         objects.push({ typeName, values, line: objectLine });
       }
@@ -130,6 +165,11 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
     report?.({
       message: `Unterminated object near "${trailing.slice(0, 40) || values[0]}" (missing ";")`,
       line: objectLine,
+      code: 'ParseError',
+      // `values` has not been shifted, because the shift happens on `;` and there was none, so the
+      // type name is still at the front. Reporting it is what lets the corpus compare this finding
+      // against Python's on `(code, line, typeName)`.
+      typeName: values[0],
     });
   }
 
