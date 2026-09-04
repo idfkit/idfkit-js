@@ -203,14 +203,56 @@ function packedFiles(dir) {
   } catch (error) {
     throw new CannotRun(`npm pack --dry-run failed in ${relative(REPO, dir)}: ${error.message}`);
   }
-  // npm prints the JSON array last; anything before it is npm chatter.
-  const start = raw.indexOf('[');
-  if (start === -1)
-    throw new CannotRun(`npm pack --dry-run produced no JSON in ${relative(REPO, dir)}`);
-  const parsed = JSON.parse(raw.slice(start));
-  const entry = parsed[0];
+  // npm changed this payload's SHAPE in v11: `npm pack --json` used to print an array
+  // of packed tarballs and now prints an object keyed by package name. Both are pure
+  // JSON on stdout, so the old "find the first `[` and parse from there" was not
+  // guarding against chatter so much as it was, by luck, finding the array's opening
+  // bracket. Under npm 11 there is no top-level array at all, so hunting for one finds
+  // only the inner `"files": [` and fails on what follows it. Reading the shape is the
+  // fix; searching harder for a bracket is not.
+  //
+  // The `files` assertion below matters for the same reason. Defaulting a missing file
+  // list to `[]` would let a shape this code cannot read report a package with zero
+  // packed files as clean, and a publish gate that passes vacuously is worse than one
+  // that crashes.
+  //
+  // This matters here more than anywhere else in the repository, because CI runs the
+  // npm bundled with Node while the publish job installs npm@latest for trusted
+  // publishing. The two npm versions disagree, and only the release ever sees the
+  // newer one.
+  //
+  // So: parse the whole document, accept either shape, and refuse anything else
+  // loudly rather than describing an empty package.
+  const cleaned = raw
+    .split('\n')
+    .filter(
+      (line) => !/^\s*npm (?:notice|warn|WARN|error|ERR!|info|http|verbose|sill)\b/.test(line)
+    )
+    .join('\n')
+    .trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (error) {
+    throw new CannotRun(
+      `npm pack --dry-run produced no parsable JSON in ${relative(REPO, dir)}: ${error.message}\n` +
+        `Output began: ${cleaned.slice(0, 500)}`
+    );
+  }
+
+  // npm <= 10: an array of tarballs. npm >= 11: an object keyed by package name.
+  const entries = Array.isArray(parsed) ? parsed : Object.values(parsed);
+  const entry = entries[0];
   if (entry === undefined) throw new CannotRun(`npm pack --dry-run described no tarball in ${dir}`);
-  return (entry.files ?? []).map((file) => file.path);
+  // Never fall back to an empty list. A package whose file list we cannot read is a
+  // package we cannot vouch for, and saying so is the whole job of this gate.
+  if (!Array.isArray(entry.files))
+    throw new CannotRun(
+      `npm pack --dry-run described a tarball with no file list in ${relative(REPO, dir)}. ` +
+        `This usually means npm changed its --json shape again; the keys present were: ${Object.keys(entry).join(', ')}`
+    );
+  return entry.files.map((file) => file.path);
 }
 
 /**
