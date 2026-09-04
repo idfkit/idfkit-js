@@ -4,49 +4,80 @@
  *
  * THE CRITERION
  *
- * `contracts/distribution.md`: "Under 1.5 MB on disk under the shared name in
+ * `contracts/distribution.md`: "Under 1.75 MB on disk under the shared name in
  * JavaScript, no opt-in component installed". So: pack the workspace, install
  * `idfkit` and nothing else into an isolated project, and measure.
  *
- * WHICH 1.5 MB, AND WHICH "ON DISK"
+ * WHICH 1.75 MB, AND WHICH "ON DISK"
  *
- * Both halves of that sentence need pinning down, because the answer is close
- * to the line and the wrong reading flips the verdict.
+ * Both halves of that sentence need pinning down, because the two readings of
+ * "on disk" differ by enough to have flipped the verdict under the previous
+ * budget, and will again once the package grows.
  *
- *   1.5 MB      is 1.5 MiB, 1,572,864 bytes. Every other size in the contract
+ *   1.75 MB     is 1.75 MiB, 1,835,008 bytes. Every other size in the contract
  *               is quoted the way npm quotes them, and npm's are binary.
  *
  *   on disk     is APPARENT bytes: the sum of the file sizes, which is what
  *               npm's own `unpackedSize` reports and what every install-size
  *               tool built on the registry means.
  *
- * The alternative reading, allocated blocks, is the one `du` gives, and the
- * measured install straddles the budget between them:
+ * The alternative reading, allocated blocks, is the one `du` gives. Measured on
+ * 2026-09-03, across 141 files:
  *
- *       1.32 MB apparent          88 percent of the budget
- *       1.6 MB by du -sk          109 percent of the budget
+ *       1.33 MB apparent          76 percent of the budget
+ *       1.66 MB by du -sk         95 percent of the budget
  *
- * across 137 files. The 0.3 MB between them is not weight in the package. It is
- * the filesystem rounding 137 mostly-small files up to its allocation unit,
- * 4 KB on the ext4 of a GitHub runner and on the APFS of a laptop. That number
- * would move on a tmpfs, on ZFS with compression, on a filesystem with tail
- * packing, and on any runner image that changes its storage driver. A criterion
- * whose verdict depends on which machine picked up the job is not a criterion,
- * and it is not one the package can be engineered against either: the only way
- * to improve an allocation figure is to ship fewer, larger files, which is a
- * worse package.
+ * The 346 KB between them is not weight in the package. It is the filesystem
+ * rounding 141 mostly-small files up to its allocation unit, 4 KB on the ext4
+ * of a GitHub runner and on the APFS of a laptop. That number would move on a
+ * tmpfs, on ZFS with compression, on a filesystem with tail packing, and on any
+ * runner image that changes its storage driver. A criterion whose verdict
+ * depends on which machine picked up the job is not a criterion, and it is not
+ * one the package can be engineered against either: the only way to improve an
+ * allocation figure is to ship fewer, larger files, which is a worse package.
  *
  * So the gate FAILS ON THE APPARENT FIGURE ONLY, and PRINTS BOTH. The
  * pessimistic number is not hidden, because a gate that quietly picks the
  * flattering measure is the thing this whole contract is written against.
  *
- * HEADROOM IS THIN, AND THE OUTPUT SAYS SO
+ * Both readings sit under the budget today. They did not under the previous one,
+ * where the same install measured 88 percent apparent against 110 percent
+ * allocated, and they will not again once the schema prose lands. The choice of
+ * measure is therefore settled on the principle above rather than on which side
+ * of the line the two figures happen to fall this month.
  *
- * 1.32 of 1.5 MB is 88 percent. There is about 190 KB of slack, which is one
- * moderate dependency or one un-gzipped data file. The gate therefore does not
- * just print PASS: it prints the percentage, the remaining headroom, and the
- * per-package breakdown, so the number that matters is visible in the log of
- * every run rather than only in the run that finally fails.
+ * WHY 1.75 MB, AND WHAT IT WAS BEFORE
+ *
+ * SC-012 read "under 1.5 MB" until 2026-09-03 and was amended to 1.75 MB, in a
+ * change that did nothing else. The reason: describing an object type must
+ * return the schema's explanatory prose in both languages, and that prose costs
+ * 190,471 bytes gzipped for all seventeen supported versions, deduplicated to
+ * 4,772 distinct strings plus the references that make them reachable. Against
+ * 1.5 MiB that landed the install at 100.5 percent, over by 8,352 bytes.
+ *
+ * The budget is self-imposed. No registry limit is anywhere near it: SC-012 is
+ * an improvement target set against this project's own former footprint of
+ * roughly 7.9 MB, and this repository publishes a 2.9 MB type package and 51 MB
+ * of engine assets without difficulty. So the question was whether the prose is
+ * a core capability or an optional component, and it is the former: prose is
+ * part of describing a type, not a component a reader adds.
+ *
+ * 1.6 MiB was rejected. It clears the measurement and leaves 96 KB of slack,
+ * less than the install has today, so it buys one feature and reopens this
+ * conversation with less room to have it in. 1.75 MiB is the round binary
+ * figure nearest the number that preserves the headroom the budget was
+ * originally set with, and it keeps what SC-012 is for: a 4.3x reduction from
+ * 7.9 MB, against 5.0x under the old figure.
+ *
+ * HEADROOM, AND WHAT THE INCREASE IS FOR
+ *
+ * 1.33 of 1.75 MB is 76 percent, about 434 KB of slack. That is not permission
+ * to spend it: roughly 190 KB is already promised to the schema prose, which
+ * will take the install to 86 percent and the slack to about 248 KB. The gate
+ * therefore does not just print PASS: it prints the percentage, the remaining
+ * headroom, and the per-package breakdown, so the number that matters is
+ * visible in the log of every run rather than only in the run that finally
+ * fails.
  *
  * WHAT IS COUNTED
  *
@@ -82,8 +113,8 @@ import {
   walkFiles,
 } from './lib/clean-install.mjs';
 
-/** SC-012, in bytes. 1.5 MiB. */
-const BUDGET = Math.round(1.5 * 1024 * 1024);
+/** SC-012, in bytes. 1.75 MiB. */
+const BUDGET = Math.round(1.75 * 1024 * 1024);
 
 /** What the shared name is allowed to put on disk. Anything else is a finding. */
 const EXPECTED = new Set([FACADE, CORE, SCHEMAS]);
@@ -126,7 +157,7 @@ async function main() {
     );
     console.log(`  files        ${total.count}`);
     console.log('');
-    console.log(`  budget       ${BUDGET.toLocaleString()} bytes  ${mib(BUDGET)} (1.5 MiB)`);
+    console.log(`  budget       ${BUDGET.toLocaleString()} bytes  ${mib(BUDGET)} (1.75 MiB)`);
     console.log(
       `  used         ${percent.toFixed(1)} percent of budget, ` +
         (headroom < 0

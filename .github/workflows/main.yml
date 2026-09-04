@@ -146,9 +146,10 @@ jobs:
     # workspace silently resolves packages it never installed), and measures that. Each takes one
     # to three seconds.
     #
-    #   install size      under 1.5 MB on disk, measured as apparent bytes. The gate's own header
-    #                     says why apparent and not allocated, and prints both. Headroom is thin:
-    #                     1.32 of 1.5 MB, 88 percent.
+    #   install size      under 1.75 MB on disk, measured as apparent bytes. The gate's own header
+    #                     says why apparent and not allocated, prints both, and records why the
+    #                     budget was raised from 1.5 MB on 2026-09-03. 1.33 of 1.75 MB, 76 percent,
+    #                     of which about 190 KB is already promised to the schema prose.
     #   no index          zero stations.json bytes, the weather peer not auto-installed, no
     #                     engine. The peer's tarball is deliberately available to npm during the
     #                     install, so the absence is evidence about peerDependenciesMeta rather

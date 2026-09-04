@@ -10,6 +10,24 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
 
 ## [Unreleased]
 
+### Changed
+
+- The install-size budget for the shared name rose from 1.5 MB to 1.75 MB
+  (SC-012). No package grew: this change moves a threshold and nothing else.
+
+  The budget is self-imposed, an improvement target set against this project's
+  own former footprint of roughly 7.9 MB rather than any registry limit. It was
+  raised to make room for the schema's explanatory prose, which
+  `describeObjectType` must return in both languages and which costs 190,471
+  bytes gzipped for all seventeen supported EnergyPlus versions, deduplicated to
+  4,772 distinct strings plus the references that reach them. Against 1.5 MB that
+  landed a clean install at 100.5 percent, over by 8,352 bytes.
+
+  A clean `npm install idfkit` measures 1.33 MB across 141 files, 76 percent of
+  the new budget. About 190 KB of the remaining 434 KB is already promised to the
+  prose, which will take the install to roughly 86 percent. 1.6 MB was rejected
+  because it would have left less slack than the install has today.
+
 ## [0.2.0-rc.1] - 2026-09-04
 
 ### Added
