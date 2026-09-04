@@ -4,7 +4,9 @@ import { lex, type LexDiagnostic } from '@idfkit/core';
 
 describe('lex', () => {
   it('reads a single-line object', () => {
-    expect(lex('Version, 26.1;')).toEqual([{ typeName: 'Version', values: ['26.1'], line: 1 }]);
+    expect(lex('Version, 26.1;')).toEqual([
+      { typeName: 'Version', values: ['26.1'], line: 1, column: 1, offset: 0 },
+    ]);
   });
 
   it('reads a multi-line object with field comments', () => {
@@ -15,7 +17,9 @@ describe('lex', () => {
       '  1.5;           !- X Origin',
     ].join('\n');
 
-    expect(lex(text)).toEqual([{ typeName: 'Zone', values: ['Zone One', '0', '1.5'], line: 1 }]);
+    expect(lex(text)).toEqual([
+      { typeName: 'Zone', values: ['Zone One', '0', '1.5'], line: 1, column: 1, offset: 0 },
+    ]);
   });
 
   it('ignores full-line comments between objects', () => {
@@ -64,6 +68,43 @@ describe('lex', () => {
     const first = lex('Zone,\n  Z1,\n  4.0');
     const second = lex('Version, 26.1;');
     expect(first).toEqual([]);
-    expect(second).toEqual([{ typeName: 'Version', values: ['26.1'], line: 1 }]);
+    expect(second).toEqual([
+      { typeName: 'Version', values: ['26.1'], line: 1, column: 1, offset: 0 },
+    ]);
+  });
+});
+
+/**
+ * FR-033: a finding carries the same kinds of location in both languages.
+ *
+ * The column is the first NON-BLANK character of the object, not the start of the field text.
+ * Python's `_OBJECT_PATTERN` matches the type name itself and reports `match.start(1)`, so an
+ * indented object reports the indent width plus one there; reporting the padding here instead
+ * would have the corpus comparing two different notions of position.
+ */
+describe('object position (FR-033)', () => {
+  it('reports the column of the type name, not of the indentation', () => {
+    const objects = lex('Version,\n  26.1;\n\n   Zone,\n  Z;\n');
+
+    expect(objects.map((o) => [o.line, o.column])).toEqual([
+      [1, 1],
+      [4, 4],
+    ]);
+  });
+
+  it('counts the column from the start of its own line', () => {
+    const objects = lex('Version, 26.1;\n\n\n     Building, B;\n');
+
+    expect(objects[1]?.line).toBe(4);
+    expect(objects[1]?.column).toBe(6);
+  });
+
+  it('gives an unterminated object a position too', () => {
+    const seen: { line: number; column?: number }[] = [];
+    lex('Version, 26.1;\n\n  Zone,\n  Unfinished', {
+      onDiagnostic: (d) => seen.push({ line: d.line, column: d.column }),
+    });
+
+    expect(seen).toEqual([{ line: 3, column: 3 }]);
   });
 });

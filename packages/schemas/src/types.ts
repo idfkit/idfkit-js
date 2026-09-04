@@ -80,6 +80,28 @@ export interface SlimField {
   u?: string;
   /** Value is case-sensitive and must not be normalized. */
   rc?: 1;
+  /**
+   * The enum also accepts the empty string.
+   *
+   * `e` is filtered of `''` because it is what validation checks against, and
+   * admitting the blank there would change what `validate()` accepts. Python's
+   * `describe_object_type` reports it, so the description path puts it back
+   * from this flag and validation never sees it.
+   *
+   * A flag rather than an index because the blank is first every time: across
+   * all 17 bundled schemas, all 21,962 blank-bearing enums carry it at position
+   * 0. `bundle.test.ts` asserts that, so a schema that breaks it fails loudly
+   * instead of silently reordering a choice list.
+   */
+  eb?: 1;
+  /**
+   * The field's explanatory sentence, as an index into the prose pool.
+   *
+   * An index, not the text: 3,837 distinct field notes are shared across about
+   * 119,000 occurrences. Resolve it against `docs.json.gz`, which is loaded on
+   * demand and is never on the parse path.
+   */
+  n?: number;
 }
 
 export interface SlimExtensible {
@@ -110,6 +132,23 @@ export interface SlimType {
   x?: SlimExtensible;
   /** IDD group, e.g. `Thermal Zones and Surfaces`. */
   g?: string;
+  /**
+   * The type's explanatory sentence, as an index into the prose pool.
+   *
+   * See `SlimField.n`. Present for 845 of 858 types in 26.1.0; a type with no
+   * memo in the source schema has none here, and both languages report nothing
+   * rather than a placeholder.
+   */
+  m?: number;
+  /**
+   * Field names in declaration order, for the types where `f` cannot give it.
+   *
+   * `f` holds only the name for exactly three types in every bundled version,
+   * so the description path would otherwise fall back to the key order of `p` —
+   * which the content-addressing serializer has sorted alphabetically. This
+   * records the order that sort destroys, and is emitted only for those three.
+   */
+  fo?: string[];
 }
 
 /** A manifest maps object type name to a blob hash in the shared store. */

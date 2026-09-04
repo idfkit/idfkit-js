@@ -27,6 +27,36 @@ export interface WriteIdfOptions {
    * @defaultValue true
    */
   versionFirst?: boolean;
+  /**
+   * How object types are ordered.
+   *
+   * `'source'` keeps the order the types first appeared in the document, which is what this writer
+   * has always done and remains the default: no default moves (FR-017). `'sorted'` orders them by
+   * type name, which is the other language's default and what its `!-Option SortedOrder` header
+   * declares.
+   *
+   * An enumeration rather than a boolean, because three behaviours exist across the two languages
+   * and two formats and a flag cannot say which of the three is wanted.
+   *
+   * Orthogonal to `versionFirst`, which pins `Version` ahead of whichever order this selects.
+   *
+   * @defaultValue 'source'
+   */
+  ordering?: 'sorted' | 'source';
+  /**
+   * Put each object on a single line, with no comments and no blank separators.
+   *
+   * The counterpart of the other language's `output_type="compressed"`, and it means the same
+   * thing: type name and values joined by commas, one object per line, no generator header, no
+   * blank line between objects. The corpus checks that the two agree structurally rather than
+   * textually, because the two writers differ on defaults that compressed output does not remove.
+   *
+   * `comments: false` is not this. That skips the padding and the comment and still puts every
+   * field on its own line, which is a different, coarser output that both languages already had.
+   *
+   * @defaultValue false
+   */
+  compressed?: boolean;
 }
 
 /**
@@ -44,13 +74,21 @@ export function writeIdf<M extends AnyTypeMap>(
   document: IdfDocument<M>,
   options: WriteIdfOptions = {}
 ): string {
-  const comments = options.comments ?? true;
+  const compressed = options.compressed ?? false;
+  // Compressed output has no comments by definition. Asking for both is not an error, because the
+  // narrower request is unambiguous: comments cannot survive a single-line object.
+  const comments = compressed ? false : (options.comments ?? true);
   const commentColumn = options.commentColumn ?? 30;
   const indent = options.indent ?? '    ';
   const versionFirst = options.versionFirst ?? true;
+  const ordering = options.ordering ?? 'source';
 
   const parts: string[] = [];
   const types = document.types();
+
+  // Sorted first, then Version pinned, so the two controls compose the way the other language's
+  // output does: its `SortedOrder` header describes the type ordering and Version sits above it.
+  if (ordering === 'sorted') types.sort();
 
   if (versionFirst && types.includes('Version')) {
     types.splice(types.indexOf('Version'), 1);
@@ -61,9 +99,11 @@ export function writeIdf<M extends AnyTypeMap>(
     const collection = document.all(typeName);
     if (collection.size === 0) continue;
     for (const obj of collection) {
-      parts.push(writeObject(obj, { comments, commentColumn, indent }));
+      parts.push(writeObject(obj, { comments, commentColumn, indent, compressed }));
     }
-    parts.push('');
+    // The blank separator after each type is one of the two things compressed removes. The other
+    // is the per-field line break, in `writeObject`.
+    if (!compressed) parts.push('');
   }
 
   return parts.join('\n');
@@ -73,6 +113,8 @@ export interface ObjectWriteOptions {
   comments: boolean;
   commentColumn: number;
   indent: string;
+  /** Put the whole object on one line. See `WriteIdfOptions.compressed`. */
+  compressed?: boolean;
 }
 
 /** Serialize one object. */
@@ -109,10 +151,20 @@ export function writeObject(obj: IdfObject, options: ObjectWriteOptions): string
     }
   }
 
-  const lines: string[] = [`${obj.typeName},`];
+  // Compressed output carries no trailing newline of its own: `writeIdf` joins the parts with one,
+  // and adding a second here is what puts a blank line between objects. Removing that blank line
+  // is half of what compressed means.
   if (cells.length === 0) {
-    return `${obj.typeName};\n`;
+    return options.compressed ? `${obj.typeName};` : `${obj.typeName};\n`;
   }
+
+  if (options.compressed) {
+    // Type name and every value on one line, comma-separated, terminated once. The same shape the
+    // other language produces, whose writer joins the values and skips the header and separators.
+    return `${obj.typeName},${cells.map((cell) => cell.value).join(',')};`;
+  }
+
+  const lines: string[] = [`${obj.typeName},`];
 
   cells.forEach((cell, index) => {
     const terminator = index === cells.length - 1 ? ';' : ',';

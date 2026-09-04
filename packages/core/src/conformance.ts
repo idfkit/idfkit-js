@@ -17,4 +17,4 @@
  * This is not a version number and it is not compared to one. Two installed libraries agree on the
  * formats when they declare the same level, whatever their own versions say (FR-025).
  */
-export const CONFORMANCE_LEVEL = 'conformance-2026.7';
+export const CONFORMANCE_LEVEL = 'conformance-2026.8';

@@ -155,3 +155,160 @@ describe('parseEpJson', () => {
     expect(() => parseEpJson('{not json', v26)).toThrow(/Invalid JSON/);
   });
 });
+
+/**
+ * Feature 002, US3: what a fatal parse carries, and what it must keep carrying.
+ *
+ * The record described this gap as one-sided, "Python raises and TypeScript returns". Neither
+ * library ever did that: `parseIdf` defaults to `strict: true` and throws, `parse_idf` defaults to
+ * `strict_parsing=True` and raises. What actually differed is that this error carried one finding
+ * flattened into two fields while Python's carried the whole collection.
+ */
+describe('feature 002, a fatal parse carries its findings', () => {
+  it('throws by default, which it always did', async () => {
+    const s = await schema('26.1.0');
+
+    expect(() => parseIdf('Version, 26.1;\nNotARealType, x;\n', s)).toThrow(IdfParseError);
+  });
+
+  it('carries the findings as a collection', async () => {
+    const s = await schema('26.1.0');
+
+    let error: IdfParseError | undefined;
+    try {
+      parseIdf('Version, 26.1;\nNotARealType, x;\n', s);
+    } catch (caught) {
+      error = caught as IdfParseError;
+    }
+
+    expect(error).toBeInstanceOf(IdfParseError);
+    expect(error?.diagnostics).toHaveLength(1);
+    expect(error?.diagnostics[0]?.code).toBe('UnknownObjectType');
+    expect(error?.diagnostics[0]?.typeName).toBe('NotARealType');
+  });
+
+  it('keeps the flattened accessors resolving to the first finding', async () => {
+    const s = await schema('26.1.0');
+
+    let error: IdfParseError | undefined;
+    try {
+      parseIdf('Version, 26.1;\nNotARealType, x;\n', s);
+    } catch (caught) {
+      error = caught as IdfParseError;
+    }
+
+    // FR-014: `.line` and `.typeName` are what existing callers read, and they still return what
+    // they returned before. They are a convenience over `diagnostics[0]`, not a second truth.
+    expect(error?.line).toBe(error?.diagnostics[0]?.line);
+    expect(error?.typeName).toBe(error?.diagnostics[0]?.typeName);
+    expect(error?.message).toContain('NotARealType');
+  });
+
+  it('gives every returned finding a code from the shared vocabulary', async () => {
+    const s = await schema('26.1.0');
+
+    const result = parseIdf('Version, 26.1;\nNotARealType, x;\nAlsoNotReal, y;\n', s, {
+      strict: false,
+    });
+
+    // One finding per skip, not one per distinct type name, and each carries a code the corpus
+    // can compare. Message text is deliberately not asserted: it is a presentation choice.
+    expect(result.diagnostics).toHaveLength(2);
+    expect(result.diagnostics.map((d) => d.code)).toEqual([
+      'UnknownObjectType',
+      'UnknownObjectType',
+    ]);
+    expect(result.diagnostics.map((d) => d.typeName)).toEqual(['NotARealType', 'AlsoNotReal']);
+    expect(result.document.has('Version')).toBe(true);
+  });
+});
+
+/**
+ * idfkit-js#36: a value of the wrong kind is reported rather than stored in silence.
+ *
+ * The shape this catches is a missing semicolon swallowing the object below, which slides that
+ * object's type name into a numeric field. The field count still fits, so nothing overflows and no
+ * parser notices by counting.
+ */
+describe('InvalidField diagnostics', () => {
+  const SWALLOWED =
+    'Version,\n  26.1;\n\nBuilding,\n  Conformance,\n  0,\n  ,\n  ,\n  ,\n  ,\nTimestep,\n  4;\n';
+
+  it('reports the wrong kind of value, at the field rather than the object', async () => {
+    const s = await schema('26.1.0');
+
+    const result = parseIdf(SWALLOWED, s, { strict: false });
+    const invalid = result.diagnostics.filter((d) => d.code === 'InvalidField');
+
+    // Line 11 is the swallowed `Timestep,`. Line 4 is where Building starts, which would be true
+    // and useless: the damage is seven lines further down.
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]?.line).toBe(11);
+    expect(invalid[0]?.typeName).toBe('Building');
+  });
+
+  it('does not stop a strict parse', async () => {
+    // FR-014. A value of the wrong KIND still leaves a complete document, unlike an unknown type,
+    // so this finding is recorded rather than thrown even under `strict`.
+    const s = await schema('26.1.0');
+
+    expect(() => parseIdf(SWALLOWED, s)).not.toThrow();
+    expect(parseIdf(SWALLOWED, s).diagnostics.some((d) => d.code === 'InvalidField')).toBe(true);
+  });
+
+  it('accepts a sizing sentinel in any numeric field', async () => {
+    // The check that keeps this diagnostic worth reading. Reading each field's own string branch
+    // literally produced 3,775 findings across the 760 EnergyPlus example files of one release,
+    // every one against a model EnergyPlus accepts: the schema is narrower than the engine.
+    const s = await schema('26.1.0');
+    const text =
+      'Version,\n  26.1;\n\nPlantLoop,\n  Loop,\n  Water,\n  ,\n  ,\n  ,\n  ,\n  ,\n  ,\n  Autosize;\n';
+
+    const result = parseIdf(text, s, { strict: false });
+
+    expect(result.diagnostics.filter((d) => d.code === 'InvalidField')).toEqual([]);
+  });
+
+  it('accepts a sentinel whatever its case', async () => {
+    const s = await schema('26.1.0');
+    const text =
+      'Version,\n  26.1;\n\nPeople,\n  P,\n  Z,\n  Sched,\n  People,\n  1,\n  ,\n  ,\n  AUTOCALCULATE;\n';
+
+    const result = parseIdf(text, s, { strict: false });
+
+    expect(result.diagnostics.filter((d) => d.code === 'InvalidField')).toEqual([]);
+  });
+});
+
+/**
+ * Found by sweeping the EnergyPlus example files in both languages and comparing the output: the
+ * two agreed on the file and the field and disagreed on the line by one.
+ *
+ * A field's comma is routinely followed by `!- Field Name` on the same line. Stopping the scan at
+ * the `!` reports the line the PREVIOUS value sits on. The conformance case for this diagnostic did
+ * not catch it, because its input has no comments.
+ */
+describe('field position with comments between the fields', () => {
+  it('reports the line the value is on, not the line the comment is on', async () => {
+    const s = await schema('26.1.0');
+    const text = [
+      'Version,',
+      '  26.1;',
+      '',
+      'Material,',
+      '  IN46,                    !- Name',
+      '  VeryRough,               !- Roughness',
+      '  NotANumber,              !- Thickness {m}',
+      '  2.3;                     !- Conductivity {W/m-K}',
+      '',
+    ].join('\n');
+
+    const invalid = parseIdf(text, s, { strict: false }).diagnostics.filter(
+      (d) => d.code === 'InvalidField'
+    );
+
+    // `NotANumber` is on line 7. Line 6 is the comment-bearing line above it.
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]?.line).toBe(7);
+  });
+});

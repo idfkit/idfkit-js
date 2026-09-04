@@ -10,6 +10,69 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
 
 ## [Unreleased]
 
+### Added
+
+- `describeObjectType` reports the schema's explanatory prose. It takes an
+  optional third argument, the prose pool, and fills `memo` on a type
+  description and `note` on a field description from it.
+
+  The pool ships in the default install at `@idfkit/schemas`'s `data/`
+  directory, as `docs.json.gz`, and is read the same way the manifests and the
+  type store are. It is 4,878 distinct strings standing in for roughly 119,000
+  occurrences across the seventeen bundled schemas.
+
+  The signature stays synchronous and the pool is passed in rather than reached
+  for. Reading a file is not synchronous, and making the function async to
+  fetch something most callers do not want would be a breaking change serving
+  the minority. **A caller who passes nothing gets exactly what they got
+  before**: `undefined` prose, everywhere.
+
+  The prose never reaches the model-reading path. It is a separate file under
+  `data/`, which the bundle-purity check already fences: an esbuild metafile
+  for a minimal read-and-write page contains zero inputs under any `data/`
+  directory, and that check now covers the pool with no change.
+
+- `writeIdf` takes `compressed`, putting each object on one line with no
+  comments and no blank separators. The counterpart of the Python library's
+  `output_type="compressed"`, and it means the same thing.
+
+  `comments: false` is not this: it skips the padding and the comment and still
+  puts every field on its own line.
+
+- `IdfParseError` carries `diagnostics`, every finding that stopped the parse,
+  rather than one finding flattened into two fields. `.line` and `.typeName`
+  still resolve to the first finding's values, so no existing caller breaks.
+
+- `ParseDiagnostic` gains a `code` and an `objectName`, and declares a `column`
+  and a `filepath` so both libraries carry the same kinds of location. `code` is
+  one of eight values shared with the Python library. Match on it rather than
+  on `message`: the corpus compares findings on `(code, line, typeName)` and
+  never on wording.
+
+  `column` and `filepath` are declared but not yet filled: the lexer counts
+  lines and not columns, and `parseIdf` takes text rather than a path, so
+  neither value exists at the point a finding is built. They are optional, so a
+  reader must treat them as absent until the lexer tracks a column and the
+  file-reading edge attaches the path it read from.
+
+### Fixed
+
+- `enumValues` reports the values it was omitting. The empty string is included
+  for the enums that declare one, and the sentinels `Autosize` and
+  `Autocalculate` are read from the collapsed `anyOf` string branch, which
+  validation has always read and this path never did.
+
+  Validation is unaffected: the blank is still filtered out of the list
+  validation checks against and is restored only in the description.
+
+- Three object types reported their fields in alphabetical order rather than
+  declaration order: `ZoneProperty:UserViewFactors:BySurfaceName`,
+  `ZoneTerminalUnitList`, and `SolarCollector:UnglazedTranspired:Multisystem`.
+  These are the three whose positional field list holds only the name, so the
+  description fell back to the key order of the property map, which the
+  content-addressing serializer had sorted. The bundle now records their
+  declaration order explicitly.
+
 ### Changed
 
 - The install-size budget for the shared name rose from 1.5 MB to 1.75 MB

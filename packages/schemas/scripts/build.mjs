@@ -46,7 +46,7 @@ function versionKey(v) {
  * Collapse a raw epJSON object-type definition into the slim form.
  * Everything dropped here is documentation metadata, not parsing metadata.
  */
-function slimType(raw) {
+function slimType(raw, prose) {
   const legacy = raw.legacy_idd ?? {};
   const out = {};
 
@@ -56,7 +56,32 @@ function slimType(raw) {
   const props = body.properties ?? {};
   const slimProps = {};
   for (const [fieldName, def] of Object.entries(props)) {
-    slimProps[fieldName] = slimField(def);
+    slimProps[fieldName] = slimField(def, prose);
+  }
+
+  // The type's explanatory sentence, as an index into the shared pool. One
+  // integer per record, not the string: 935 distinct memos are shared across
+  // roughly 14,600 type definitions in the 17 versions, so storing the text
+  // inline would pay for the same sentence dozens of times.
+  const memo = prose.ref(raw.memo);
+  if (memo !== undefined) out.m = memo;
+
+  // `f` holds only the name for exactly three types, in every bundled version:
+  // ZoneProperty:UserViewFactors:BySurfaceName (spelled bySurfaceName in 8.9.0
+  // through 9.3.0), ZoneTerminalUnitList and SolarCollector:UnglazedTranspired:
+  // Multisystem. `orderedFieldNames` then falls back to the key order of `p`,
+  // which `canonical()` has sorted for content-addressing, so the reader gets
+  // alphabetical order where Python gives declaration order.
+  //
+  // `fo` records the declaration order the sort is about to destroy. Emitted
+  // only where the fallback would otherwise be reached and the answer would
+  // differ, which is why it costs three entries rather than 858.
+  //
+  // Two of the three actually diverge. SolarCollector's two fixed fields sort
+  // into declaration order by luck; it gets an `fo` anyway, because a schema
+  // edit that renames either field would otherwise break it in silence.
+  if (out.f.length <= 1 && Object.keys(props).length > 1) {
+    out.fo = Object.keys(props);
   }
   out.p = slimProps;
   if (body.required?.length) out.r = body.required;
@@ -78,7 +103,7 @@ function slimType(raw) {
     const items = props[legacy.extension]?.items?.properties ?? {};
     const inner = {};
     for (const fieldName of legacy.extensibles) {
-      inner[fieldName] = slimField(items[fieldName] ?? {});
+      inner[fieldName] = slimField(items[fieldName] ?? {}, prose);
     }
     out.x = { key: legacy.extension, fields: legacy.extensibles, p: inner };
   }
@@ -87,7 +112,7 @@ function slimType(raw) {
   return out;
 }
 
-function slimField(def) {
+function slimField(def, prose) {
   const out = {};
 
   // `anyOf` is always "a number, or a string", in that branch order, in all 17
@@ -135,7 +160,21 @@ function slimField(def) {
 
   if (effective.object_list?.length) out.ol = effective.object_list;
   if (effective.reference?.length) out.ref = effective.reference;
-  if (effective.enum?.length) out.e = effective.enum.filter((v) => v !== '');
+  // The blank is a legal value for 21,962 enum-bearing fields across the 17
+  // versions, and Python reports it. It is still filtered out of `e` rather
+  // than kept, because `e` is what validation checks against and admitting ''
+  // there would change what validate() accepts, which this feature does not do
+  // (FR-014). `eb` carries it alongside instead, and the description path puts
+  // it back.
+  //
+  // A flag is enough because the blank is at index 0 every single time:
+  // measured across all 17 schemas, all 21,962 of them, the distribution of
+  // its index is {0: 21962}. If that ever stops being true this must become an
+  // index, and the bundle test asserts the position so the change is loud.
+  if (effective.enum?.length) {
+    out.e = effective.enum.filter((v) => v !== '');
+    if (effective.enum.includes('')) out.eb = 1;
+  }
   if (effective.default !== undefined) out.d = effective.default;
   if (effective.minimum !== undefined) out.min = effective.minimum;
   if (effective.maximum !== undefined) out.max = effective.maximum;
@@ -144,8 +183,72 @@ function slimField(def) {
   if (effective.units) out.u = effective.units;
   if (effective.retaincase) out.rc = 1;
 
+  // The field's explanatory sentence, as an index into the shared pool.
+  const note = prose.ref(def.note);
+  if (note !== undefined) out.n = note;
+
   if (out.e && out.e.length === 0) delete out.e;
   return out;
+}
+
+/**
+ * The prose pool: every distinct `memo` and `note` string in every bundled
+ * schema, stored once, addressed by index.
+ *
+ * Two passes are needed and the reason is the content addressing. A blob's key
+ * is the hash of its canonical text, so the index a record carries has to be
+ * decided before any record is hashed, and it has to be the same index on
+ * every rebuild or the whole bundle churns. So pass one collects the strings
+ * and sorts them, which fixes the numbering, and pass two builds the records.
+ *
+ * Sorted rather than first-encountered for two reasons: it does not depend on
+ * the order the schema directories happen to be read in, and it puts similar
+ * sentences next to each other, which is worth a few percent to gzip.
+ */
+function createProsePool() {
+  const strings = new Set();
+  let index = null;
+
+  return {
+    /** Pass one: remember a string. */
+    collect(text) {
+      if (typeof text === 'string' && text.length > 0) strings.add(text);
+    },
+    /** Freeze the numbering. Everything after this point resolves against it. */
+    freeze() {
+      const sorted = [...strings].sort();
+      index = new Map(sorted.map((text, position) => [text, position]));
+      return sorted;
+    },
+    /** Pass two: the index for a string, or undefined when there is no prose. */
+    ref(text) {
+      if (index === null) return undefined;
+      if (typeof text !== 'string' || text.length === 0) return undefined;
+      return index.get(text);
+    },
+  };
+}
+
+/**
+ * Walk one raw schema and hand every prose string to the pool. Mirrors the
+ * shape `slimType` and `slimField` read, so a string reachable by one is
+ * reachable by the other.
+ */
+function collectProse(schema, prose) {
+  for (const rawType of Object.values(schema.properties ?? {})) {
+    prose.collect(rawType.memo);
+
+    const body = Object.values(rawType.patternProperties ?? {})[0] ?? {};
+    const props = body.properties ?? {};
+    for (const def of Object.values(props)) prose.collect(def.note);
+
+    // The extensible half lives on the array's `items`, and carries notes too.
+    const legacy = rawType.legacy_idd ?? {};
+    if (legacy.extension && legacy.extensibles?.length) {
+      const items = props[legacy.extension]?.items?.properties ?? {};
+      for (const def of Object.values(items)) prose.collect(def?.note);
+    }
+  }
 }
 
 function pick(obj, keys) {
@@ -183,21 +286,37 @@ function main() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
+  // Sorted so the build does not depend on the order the filesystem lists the
+  // directories in. The pool is sorted too, so this is belt and braces, but a
+  // content-addressed bundle that is rebuilt and diffed in CI cannot afford to
+  // be one readdir away from churning.
+  dirs.sort();
+
+  const readSchema = (dir) =>
+    JSON.parse(
+      gunzipSync(readFileSync(join(SOURCE, dir, 'Energy+.schema.epJSON.gz'))).toString('utf8')
+    );
+
+  // Pass one: every distinct memo and note across every version, numbered.
+  const prose = createProsePool();
+  for (const dir of dirs) collectProse(readSchema(dir), prose);
+  const proseStrings = prose.freeze();
+
   /** hash -> canonical JSON text of one object-type definition. */
   const blobs = new Map();
   const manifests = {};
   const versions = [];
 
+  // Pass two: build the records, now that every prose index is decided.
   for (const dir of dirs) {
     const version = dirToVersion(dir);
     versions.push(version);
 
-    const gz = readFileSync(join(SOURCE, dir, 'Energy+.schema.epJSON.gz'));
-    const schema = JSON.parse(gunzipSync(gz).toString('utf8'));
+    const schema = readSchema(dir);
 
     const manifest = {};
     for (const [typeName, rawType] of Object.entries(schema.properties ?? {})) {
-      const text = canonical(slimType(rawType));
+      const text = canonical(slimType(rawType, prose));
       const h = hash(text);
       if (!blobs.has(h)) blobs.set(h, text);
       manifest[typeName] = h;
@@ -219,6 +338,16 @@ function main() {
     manifestFiles[version] = fileName;
   }
 
+  // The prose, in its own file under `data/`.
+  //
+  // A separate file, not a key in types.json, because the two are read at
+  // different times by different callers. Parsing a model needs the records and
+  // never needs a sentence of English; describing a type for a reader needs
+  // both. Keeping them apart is what lets the parse path stay unaware the pool
+  // exists, which `check-bundle-purity.mjs` asserts by building a minimal
+  // read-and-write graph and failing on any input under a `data/` directory.
+  writeBundleFile('docs.json', proseStrings);
+
   writeBundleFile('index.json', { versions, manifests: manifestFiles });
 
   const totalDefs = Object.values(manifests).reduce((n, m) => n + Object.keys(m).length, 0);
@@ -229,6 +358,10 @@ function main() {
   console.log(`versions        ${versions.length} (${versions[0]} .. ${versions.at(-1)})`);
   console.log(`type defs       ${totalDefs}`);
   console.log(`unique defs     ${blobs.size} (${((100 * blobs.size) / totalDefs).toFixed(1)}%)`);
+  const docsBytes = readFileSync(join(OUT, 'docs.json.gz')).length;
+  console.log(
+    `prose strings   ${proseStrings.length} distinct (${(docsBytes / 1024).toFixed(1)} KB gzipped)`
+  );
   console.log(`bundle on disk  ${(gzTotal / 1024).toFixed(1)} KB gzipped`);
 }
 

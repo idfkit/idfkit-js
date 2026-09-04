@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { httpSource } from '@idfkit/schemas';
-import { localBundle } from '@idfkit/schemas/node';
+import { localBundle, nodeSource } from '@idfkit/schemas/node';
 
 const bundle = localBundle();
 
@@ -213,5 +213,121 @@ describe('Schema', () => {
     // `Space` was introduced well after 9.4.
     expect(v9.has('Space')).toBe(false);
     expect(v26.has('Space')).toBe(true);
+  });
+});
+
+/**
+ * Feature 002, US2: the prose pool, and the three field orders it ships beside.
+ *
+ * These assert the shape of the bundle rather than the description built from
+ * it, because a pool that is present but wrongly indexed produces prose that
+ * looks plausible and belongs to another field.
+ */
+describe('the prose pool', () => {
+  it('ships as its own file under data/', async () => {
+    const pool = (await nodeSource().read('docs.json')) as string[];
+
+    expect(Array.isArray(pool)).toBe(true);
+    expect(pool.length).toBeGreaterThan(4000);
+  });
+
+  it('holds every string once, and no empties', async () => {
+    const pool = (await nodeSource().read('docs.json')) as string[];
+
+    // Deduplication is the whole reason the pool is affordable: 4,878 distinct
+    // strings stand in for roughly 119,000 occurrences across the 17 versions.
+    // A duplicate means the interning broke and the file is paying twice.
+    expect(new Set(pool).size).toBe(pool.length);
+    expect(pool.every((s) => typeof s === 'string' && s.length > 0)).toBe(true);
+  });
+
+  it('is sorted, so the numbering does not depend on read order', async () => {
+    const pool = (await nodeSource().read('docs.json')) as string[];
+
+    // The index a record carries is decided before any record is hashed, and a
+    // content-addressed bundle cannot afford for that numbering to move. Sorted
+    // is what makes it reproducible on a different machine.
+    expect([...pool].sort()).toEqual(pool);
+  });
+
+  it('is reachable without going near the parse path', async () => {
+    // The pool is read through the ordinary bundle source, the same way the
+    // manifests and the type store are. There is no new export and no new
+    // entry point, so nothing on the read-and-write graph can reach it by
+    // accident. `check-bundle-purity.mjs` is the gate that proves the negative;
+    // this asserts the positive half, that a caller who wants it can have it.
+    const pool = await nodeSource().read('docs.json');
+
+    expect(pool).toBeDefined();
+  });
+
+  it('is referenced by index from the type records, never inlined', async () => {
+    const store = (await nodeSource().read('types.json')) as Record<string, unknown>;
+    const pool = (await nodeSource().read('docs.json')) as string[];
+
+    const records = Object.values(store) as {
+      m?: number;
+      p?: Record<string, { n?: number }>;
+    }[];
+
+    const withMemo = records.filter((r) => r.m !== undefined);
+    expect(withMemo.length).toBeGreaterThan(0);
+    // Every reference resolves. An index past the end would render as undefined
+    // prose, which reads exactly like a type that has none.
+    expect(withMemo.every((r) => r.m! >= 0 && r.m! < pool.length)).toBe(true);
+
+    const noteRefs = records.flatMap((r) => Object.values(r.p ?? {}).map((f) => f.n));
+    const present = noteRefs.filter((n): n is number => n !== undefined);
+    expect(present.length).toBeGreaterThan(0);
+    expect(present.every((n) => n >= 0 && n < pool.length)).toBe(true);
+  });
+});
+
+describe('field order and accepted values in the bundle', () => {
+  /**
+   * T028: exactly three types need `fo`, and no fourth may silently join them.
+   *
+   * `fo` is emitted only where `f` holds at most the name and the type has more
+   * than one property, which is the condition under which the description path
+   * would otherwise fall back to the alphabetized key list. If a future schema
+   * adds a fourth such type, this fails and somebody decides deliberately,
+   * rather than a reader quietly getting the wrong field order.
+   */
+  it('records declaration order for exactly three types, in every version', async () => {
+    const index = (await nodeSource().read('index.json')) as { versions: string[] };
+    const store = (await nodeSource().read('types.json')) as Record<string, { fo?: string[] }>;
+
+    for (const version of index.versions) {
+      const manifest = (await nodeSource().read(
+        `manifest-${version.replace(/\./g, '-')}.json`
+      )) as Record<string, string>;
+
+      const withOrder = Object.entries(manifest)
+        .filter(([, hash]) => store[hash]?.fo !== undefined)
+        .map(([typeName]) => typeName)
+        .sort();
+
+      // `bySurfaceName` in 8.9.0 through 9.3.0, `BySurfaceName` after.
+      expect(withOrder.map((n) => n.toLowerCase())).toEqual([
+        'solarcollector:unglazedtranspired:multisystem',
+        'zoneproperty:userviewfactors:bysurfacename',
+        'zoneterminalunitlist',
+      ]);
+    }
+  });
+
+  it('flags the blank enum rather than admitting it into the validated list', async () => {
+    const store = (await nodeSource().read('types.json')) as Record<
+      string,
+      { p?: Record<string, { e?: unknown[]; eb?: 1 }> }
+    >;
+
+    const fields = Object.values(store).flatMap((t) => Object.values(t.p ?? {}));
+    const flagged = fields.filter((f) => f.eb === 1);
+
+    expect(flagged.length).toBeGreaterThan(0);
+    // The flag says the blank was there; `e` must still not contain it, because
+    // `e` is what validate() checks against and this feature does not move that.
+    expect(flagged.every((f) => !(f.e ?? []).includes(''))).toBe(true);
   });
 });
