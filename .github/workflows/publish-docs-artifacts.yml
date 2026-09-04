@@ -119,3 +119,23 @@ jobs:
             --notes "TypeScript examples and TypeDoc reference for the unified documentation site, from ${GITHUB_SHA}." \
             docs-snippets.tar.gz \
             typedoc.json
+
+      # The site is a different repository now, and a level nothing advances is a level that
+      # goes stale silently. This is the JavaScript half of 003-FR-020: publishing an artifact
+      # opens the pull request that renders the site from it, so the site's own checks get to
+      # decide whether the pages survive the new reference. A person relaying it would be one
+      # more thing to forget.
+      #
+      # Best effort on purpose. A publish that succeeded must not be reported as failed because
+      # the notification did not land: the release is the artifact, and the pin can be advanced
+      # by hand from idfkit-developers if this step is skipped.
+      - name: Tell the site there is a new level
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_SITE_DISPATCH_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run bump-docs-level.yml \
+            --repo idfkit/idfkit-developers \
+            -f docs_level="$TAG" \
+          || echo "::warning::Could not dispatch bump-docs-level.yml in idfkit-developers. The release stands; advance [tool.idfkit.docs] there by hand."
