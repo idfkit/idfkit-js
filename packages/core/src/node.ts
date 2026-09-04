@@ -13,7 +13,14 @@ import { localBundle } from '@idfkit/schemas/node';
 
 import type { IdfDocument } from './document.js';
 import { getEpJsonVersion, parseEpJson } from './parse/epjson.js';
-import { getIdfVersion, parseIdf, type ParseOptions, type ParseResult } from './parse/idf.js';
+import {
+  getIdfVersion,
+  IdfParseError,
+  parseIdf,
+  type ParseDiagnostic,
+  type ParseOptions,
+  type ParseResult,
+} from './parse/idf.js';
 import type { AnyTypeMap, UntypedMap } from './typemap.js';
 import { resolveVersion } from './versions.js';
 import { writeEpJson, type WriteEpJsonOptions } from './write/epjson.js';
@@ -79,7 +86,28 @@ export async function loadIdfWithDiagnostics<M extends AnyTypeMap = UntypedMap>(
   // names) that are not valid utf-8 and would otherwise decode to U+FFFD.
   const text = await readFile(path, 'latin1');
   const schema = await schemaFor(getIdfVersion(text), options);
-  return parseIdf<M>(text, schema, options);
+
+  // `parseIdf` takes text and cannot know where the text came from, so the path is attached here,
+  // at the one place that does. Python's parser opens the file itself and fills `filepath` from
+  // its own constructor argument; this is the same field reaching a caller by the only route this
+  // library has (FR-033).
+  //
+  // Stamped on both paths: the findings that stop the parse arrive on the error, and the ones that
+  // do not arrive in the result. Neither is useful without saying which file it was.
+  try {
+    const result = parseIdf<M>(text, schema, options);
+    return { ...result, diagnostics: result.diagnostics.map((d) => withPath(d, path)) };
+  } catch (error) {
+    if (error instanceof IdfParseError) {
+      throw new IdfParseError(error.diagnostics.map((d) => withPath(d, path)));
+    }
+    throw error;
+  }
+}
+
+/** Attach the source path to a finding, leaving one that already names a file alone. */
+function withPath(diagnostic: ParseDiagnostic, path: string): ParseDiagnostic {
+  return diagnostic.filepath === undefined ? { ...diagnostic, filepath: path } : diagnostic;
 }
 
 /** Read and parse an epJSON file. */

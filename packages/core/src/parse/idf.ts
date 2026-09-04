@@ -64,6 +64,7 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
       report({
         message: `Unknown object type "${object.typeName}" in EnergyPlus ${schema.version}`,
         line: object.line,
+        column: object.column,
         typeName: object.typeName,
         // Best effort, and the same rule Python's `_extract_object_name` uses: the first positional
         // value is the name for every named type, and is a real field for the anonymous ones. An
@@ -84,6 +85,7 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
       report({
         message: error instanceof Error ? error.message : String(error),
         line: object.line,
+        column: object.column,
         typeName: canonical,
         objectName: definition.anon === 1 ? undefined : object.values[0],
         code: 'ParseError',

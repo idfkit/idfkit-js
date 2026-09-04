@@ -6,6 +6,8 @@ export interface RawObject {
   values: string[];
   /** 1-based line where the object starts, for diagnostics. */
   line: number;
+  /** 1-based column where the object starts, for diagnostics. */
+  column?: number;
 }
 
 export interface LexDiagnostic {
@@ -86,6 +88,19 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
   let fieldStart = 0;
   let objectLine = 1;
   let objectStarted = false;
+  /** Offset of the first character of the current line, for turning an offset into a column. */
+  let lineStart = 0;
+  /**
+   * Column the current object's type name begins at, or 0 while none has been seen.
+   *
+   * The first NON-BLANK character, not the start of the field text: Python's regex matches the
+   * type name itself, so an object indented three spaces reports column 4 there and has to report
+   * column 4 here too, or the corpus compares two different notions of position.
+   */
+  let objectColumn = 0;
+
+  /** 1-based column of an offset on the line it falls in. Matches Python's `_line_and_column`. */
+  const columnAt = (offset: number): number => offset - lineStart + 1;
 
   const endField = (end: number): string => {
     chunks.push(text.slice(fieldStart, end));
@@ -96,6 +111,14 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
 
   while (index < length) {
     const char = text[index];
+
+    // The first non-blank character of an object fixes where the object starts. Recorded here
+    // rather than at the delimiter, because by then the leading whitespace has been consumed and
+    // the offset that remains points at the padding rather than at the name.
+    if (objectColumn === 0 && char !== undefined && !/\s/.test(char)) {
+      objectLine = line;
+      objectColumn = columnAt(index);
+    }
 
     if (char === '!') {
       // Preserve any field text seen before the comment, then resume after the
@@ -111,9 +134,11 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
       index = newline + 1;
       fieldStart = index;
       line += 1;
+      lineStart = index;
       if (!objectStarted && chunks.join('').trim() === '') {
         chunks = [];
         objectLine = line;
+        objectColumn = 0;
       }
       continue;
     }
@@ -133,18 +158,25 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
 
       const typeName = values.shift() ?? '';
       if (typeName === '') {
-        report?.({ message: 'Object with no type name', line: objectLine, code: 'ParseError' });
+        report?.({
+          message: 'Object with no type name',
+          line: objectLine,
+          column: objectColumn || undefined,
+          code: 'ParseError',
+        });
       } else {
-        objects.push({ typeName, values, line: objectLine });
+        objects.push({ typeName, values, line: objectLine, column: objectColumn || undefined });
       }
       values = [];
       objectStarted = false;
       objectLine = line;
+      objectColumn = 0;
       continue;
     }
 
     if (char === '\n') {
       line += 1;
+      lineStart = index + 1;
       if (
         !objectStarted &&
         chunks.join('').trim() === '' &&
@@ -154,6 +186,7 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
         chunks = [];
         fieldStart = index + 1;
         objectLine = line;
+        objectColumn = 0;
       }
     }
 
@@ -166,6 +199,7 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
       message: `Unterminated object near "${trailing.slice(0, 40) || values[0]}" (missing ";")`,
       line: objectLine,
       code: 'ParseError',
+      column: objectColumn || undefined,
       // `values` has not been shifted, because the shift happens on `;` and there was none, so the
       // type name is still at the front. Reporting it is what lets the corpus compare this finding
       // against Python's on `(code, line, typeName)`.

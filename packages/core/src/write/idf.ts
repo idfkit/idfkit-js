@@ -28,6 +28,22 @@ export interface WriteIdfOptions {
    */
   versionFirst?: boolean;
   /**
+   * How object types are ordered.
+   *
+   * `'source'` keeps the order the types first appeared in the document, which is what this writer
+   * has always done and remains the default: no default moves (FR-017). `'sorted'` orders them by
+   * type name, which is the other language's default and what its `!-Option SortedOrder` header
+   * declares.
+   *
+   * An enumeration rather than a boolean, because three behaviours exist across the two languages
+   * and two formats and a flag cannot say which of the three is wanted.
+   *
+   * Orthogonal to `versionFirst`, which pins `Version` ahead of whichever order this selects.
+   *
+   * @defaultValue 'source'
+   */
+  ordering?: 'sorted' | 'source';
+  /**
    * Put each object on a single line, with no comments and no blank separators.
    *
    * The counterpart of the other language's `output_type="compressed"`, and it means the same
@@ -65,9 +81,14 @@ export function writeIdf<M extends AnyTypeMap>(
   const commentColumn = options.commentColumn ?? 30;
   const indent = options.indent ?? '    ';
   const versionFirst = options.versionFirst ?? true;
+  const ordering = options.ordering ?? 'source';
 
   const parts: string[] = [];
   const types = document.types();
+
+  // Sorted first, then Version pinned, so the two controls compose the way the other language's
+  // output does: its `SortedOrder` header describes the type ordering and Version sits above it.
+  if (ordering === 'sorted') types.sort();
 
   if (versionFirst && types.includes('Version')) {
     types.splice(types.indexOf('Version'), 1);

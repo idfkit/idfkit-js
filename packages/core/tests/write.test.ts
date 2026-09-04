@@ -260,3 +260,62 @@ describe('compressed output (FR-016)', () => {
     expect(writeIdf(model(v26), { compressed: true })).not.toContain('  26.1');
   });
 });
+
+/**
+ * FR-016 and SC-007, the last two controls.
+ *
+ * Feature 002 closed five controls and left two spelled on one side only: this writer had
+ * `versionFirst` and no `ordering`, the other had `ordering` and no way to unpin Version. SC-007
+ * asks for zero one-sided controls and US4's second acceptance scenario names object ordering
+ * explicitly, so both were added rather than argued away.
+ */
+describe('ordering (FR-016, SC-007)', () => {
+  const model = (s: Schema): IdfDocument => {
+    const { document } = parseIdf('Version,\n  26.1;\n\nTimestep,\n  4;\n\nBuilding,\n  Ctl;\n', s);
+    return document;
+  };
+
+  const typeNames = (text: string): string[] =>
+    text
+      .split('\n')
+      .filter((l) => l.length > 0 && !/^\s/.test(l) && l.endsWith(','))
+      .map((l) => l.slice(0, -1));
+
+  it('defaults to source order, which is what this writer always did', () => {
+    // FR-017: the default does not move. Timestep before Building is the document's own order,
+    // not the alphabetical one.
+    expect(typeNames(writeIdf(model(v26)))).toEqual(['Version', 'Timestep', 'Building']);
+  });
+
+  it('sorts by type name when asked', () => {
+    expect(typeNames(writeIdf(model(v26), { ordering: 'sorted' }))).toEqual([
+      'Version',
+      'Building',
+      'Timestep',
+    ]);
+  });
+
+  it('changes the output, so a corpus case using it is not a no-op', () => {
+    // The reason this control had to exist rather than be argued away: `writer-option-ordering`
+    // would otherwise pass on this side even if the runner dropped the option entirely.
+    expect(writeIdf(model(v26), { ordering: 'sorted' })).not.toBe(writeIdf(model(v26)));
+  });
+
+  it('composes with versionFirst rather than overriding it', () => {
+    // Sorted decides the type order; versionFirst pins Version above it. Turning the pin off
+    // leaves Version in whichever position the ordering gives it.
+    expect(typeNames(writeIdf(model(v26), { ordering: 'sorted', versionFirst: false }))).toEqual([
+      'Building',
+      'Timestep',
+      'Version',
+    ]);
+  });
+
+  it('re-reads to the same document under either ordering (FR-019)', () => {
+    const original = model(v26);
+    for (const ordering of ['sorted', 'source'] as const) {
+      const reread = parseIdf(writeIdf(original, { ordering }), v26).document;
+      expect(reread.types().sort()).toEqual(original.types().sort());
+    }
+  });
+});
