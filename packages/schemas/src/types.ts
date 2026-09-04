@@ -160,3 +160,16 @@ export interface BundleIndex {
   /** Per-version manifest file names, keyed by version string. */
   manifests: Record<string, string>;
 }
+
+/**
+ * The schema's explanatory prose, deduplicated across every bundled version.
+ *
+ * A plain array of strings, indexed by `SlimType.m` and `SlimField.n`. It lives
+ * here rather than beside the code that reads it because THE INDICES ARE ONLY
+ * MEANINGFUL AGAINST THE MANIFESTS BUILT IN THE SAME RUN: `build.mjs` writes
+ * `docs.json` and the manifests together, and a pool paired with manifests from
+ * a different build resolves every sentence to the wrong one, silently. Keeping
+ * the type and the loader on `SchemaBundle` is what makes that pairing hard to
+ * get wrong.
+ */
+export type ProsePool = readonly string[];

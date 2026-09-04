@@ -1,5 +1,5 @@
 import { BlobStore, Schema } from './schema.js';
-import type { BundleIndex, Manifest, SlimType } from './types.js';
+import type { BundleIndex, Manifest, ProsePool, SlimType } from './types.js';
 
 export { BlobStore, Schema } from './schema.js';
 export type { SchemaDelta } from './schema.js';
@@ -7,6 +7,7 @@ export type {
   BundleIndex,
   FieldKind,
   Manifest,
+  ProsePool,
   SlimExtensible,
   SlimField,
   SlimType,
@@ -82,6 +83,9 @@ export class SchemaBundle {
   #schemas = new Map<string, Schema>();
   /** In-flight loads, so concurrent callers share one request. */
   #pending = new Map<string, Promise<Schema>>();
+  #prose: ProsePool | undefined;
+  /** In-flight prose read, on the same terms as `#pending`. */
+  #proseInFlight: Promise<ProsePool> | undefined;
 
   constructor(source: BundleSource) {
     this.#source = source;
@@ -120,6 +124,56 @@ export class SchemaBundle {
   /** A version already loaded, or undefined. Synchronous by design. */
   loaded(version: string): Schema | undefined {
     return this.#schemas.get(version);
+  }
+
+  /**
+   * Load the explanatory prose this bundle's manifests index into.
+   *
+   * One pool serves every version: `build.mjs` deduplicates the memos and notes
+   * of all seventeen schemas into a single array and the manifests carry indices
+   * into it, so there is no version to pass here.
+   *
+   * It is a separate call rather than part of `load` because the two are wanted
+   * at different moments by different callers. Parsing a model needs the records
+   * and never needs a sentence of English; describing a type for a reader needs
+   * both. Keeping the fetch separate is what lets the parse path stay unaware the
+   * pool exists, which `check-bundle-purity.mjs` asserts by building a minimal
+   * read-and-write graph and failing on any input under `data/`.
+   *
+   * Repeat calls return the same array; concurrent calls share one read.
+   */
+  async loadProse(): Promise<ProsePool> {
+    if (this.#prose !== undefined) return this.#prose;
+
+    const inFlight = this.#proseInFlight;
+    if (inFlight !== undefined) return inFlight;
+
+    const promise = this.#loadProse().finally(() => {
+      this.#proseInFlight = undefined;
+    });
+    this.#proseInFlight = promise;
+    return promise;
+  }
+
+  /**
+   * The prose pool if it has been loaded, or undefined. Synchronous by design.
+   *
+   * The counterpart of `loaded`, and it exists for the same reason. Everything
+   * that reads prose is synchronous: `describeObjectType` takes a pool rather
+   * than fetching one, and every answer in `@idfkit/language` is a pure function
+   * so an editor server can answer a cursor without holding a thread. A consumer
+   * calls `loadProse` once when a document arrives and reads this on the request
+   * path. Without the pair, a caller would either await inside a path it keeps
+   * synchronous or build a second cache beside the one this class already has.
+   */
+  prose(): ProsePool | undefined {
+    return this.#prose;
+  }
+
+  async #loadProse(): Promise<ProsePool> {
+    const pool = (await this.#source.read('docs.json')) as ProsePool;
+    this.#prose = pool;
+    return pool;
   }
 
   async #load(version: string): Promise<Schema> {

@@ -1,4 +1,4 @@
-import type { Schema, SlimField, SlimType } from '@idfkit/schemas';
+import type { ProsePool, Schema, SlimField, SlimType } from '@idfkit/schemas';
 
 /**
  * Description of a single field in an EnergyPlus object type.
@@ -105,18 +105,6 @@ export interface ObjectDescription {
  * Python raises `UnknownObjectTypeError`, which has no registered TypeScript
  * counterpart and so must not become a new exported class.
  */
-/**
- * The schema's explanatory prose, loaded on demand.
- *
- * A plain array of strings, indexed by `SlimType.m` and `SlimField.n`. It is
- * passed in rather than reached for, and that is deliberate: reading it is
- * asynchronous, `describeObjectType` is synchronous, and making the function
- * async to fetch a file most callers do not want would be a breaking change
- * serving the minority. Loading it is the caller's step, and its cost is
- * visible at the call site instead of hidden inside a description.
- */
-export type ProsePool = readonly string[];
-
 export function describeObjectType(
   schema: Schema,
   objType: string,

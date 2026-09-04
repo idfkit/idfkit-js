@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { httpSource } from '@idfkit/schemas';
+import { httpSource, SchemaBundle } from '@idfkit/schemas';
 import { localBundle, nodeSource } from '@idfkit/schemas/node';
 
 const bundle = localBundle();
@@ -329,5 +329,68 @@ describe('field order and accepted values in the bundle', () => {
     // The flag says the blank was there; `e` must still not contain it, because
     // `e` is what validate() checks against and this feature does not move that.
     expect(flagged.every((f) => !(f.e ?? []).includes(''))).toBe(true);
+  });
+});
+
+/**
+ * Reaching the pool through the bundle that indexes into it.
+ *
+ * The pool is only meaningful against manifests built in the same run, because
+ * `build.mjs` writes `docs.json` and the manifests together and the indices point
+ * into that exact array. Putting the loader on `SchemaBundle` is what keeps the
+ * two together: a consumer cannot pair this pool with somebody else's manifests
+ * without going out of its way.
+ */
+describe('SchemaBundle prose', () => {
+  it('loads the pool and then serves it synchronously', async () => {
+    const own = localBundle();
+
+    // Nothing before the load, and no throw for asking.
+    expect(own.prose()).toBeUndefined();
+
+    const loaded = await own.loadProse();
+    expect(Array.isArray(loaded)).toBe(true);
+    expect(loaded.length).toBeGreaterThan(4000);
+
+    // The synchronous accessor is the point: every reader of prose is sync, so a
+    // consumer loads once when a document arrives and reads on the request path.
+    expect(own.prose()).toBe(loaded);
+  });
+
+  it('returns the same array on repeat calls and shares one read', async () => {
+    const own = localBundle();
+
+    // Concurrent callers must not each fetch. Both promises resolve to one array.
+    const [a, b] = await Promise.all([own.loadProse(), own.loadProse()]);
+    expect(a).toBe(b);
+    expect(await own.loadProse()).toBe(a);
+  });
+
+  it('reads docs.json and nothing else', async () => {
+    const read = vi.fn(async (name: string) => nodeSource().read(name));
+    const own = new SchemaBundle({ read });
+
+    await own.loadProse();
+
+    // Not index.json, not types.json, not a manifest: the pool is one file and
+    // loading it must not drag the parse path's inputs in behind it.
+    expect(read.mock.calls.map(([name]) => name)).toEqual(['docs.json']);
+  });
+
+  it('indexes what the manifests point at', async () => {
+    const own = localBundle();
+    const schema = await own.load('26.1.0');
+    const pool = await own.loadProse();
+
+    // A pool that is present but wrongly indexed produces prose that looks
+    // plausible and belongs to another field, so this checks the join rather
+    // than the array.
+    const type = schema.require('BuildingSurface:Detailed');
+    expect(type.m).toBeDefined();
+    expect(pool[type.m!]).toContain('heat transfer surfaces');
+
+    const field = schema.field('BuildingSurface:Detailed', 'construction_name');
+    expect(field?.n).toBeDefined();
+    expect(typeof pool[field!.n!]).toBe('string');
   });
 });
