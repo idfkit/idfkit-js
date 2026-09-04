@@ -1,7 +1,7 @@
 # Contributing to idfkit-js
 
 Contributions are welcome. This file covers the development workflow; for what
-the library does and why, see [the documentation](https://js.idfkit.com/) or
+the library does and why, see [the documentation](https://developers.idfkit.com/) or
 [`CLAUDE.md`](CLAUDE.md) for the short version.
 
 ## Setup
@@ -113,8 +113,34 @@ have no implicit index signature and cannot satisfy `Record<string, object>`.
 
 ## Documentation
 
-The site is MkDocs with Material, and the API reference is generated from the
-TypeScript sources by TypeDoc through `mkdocstrings-typescript`.
+### Where a documentation change goes
+
+**Not here.** The published site is <https://developers.idfkit.com>, and its source is a
+third repository, [idfkit/idfkit-developers](https://github.com/idfkit/idfkit-developers),
+which belongs to neither library. It teaches both languages from one navigation: a page
+about loading a model is one page with two idioms on it, so prose changes are made there.
+
+What this repository owes that site is an **artifact**, published by
+`.github/workflows/publish-docs-artifacts.yml` as a `docs-YYYY.N` release carrying two
+things together:
+
+- `docs-snippets.tar.gz` — every TypeScript example the site publishes, as the real modules
+  `npm run typecheck:docs` compiled, so a page cannot show text that was never compiled;
+- `typedoc.json` — the TypeDoc JSON the TypeScript reference is generated from.
+
+One release carries both, so the reference and the examples on a page always describe the
+same commit. The site pins the tag in `[tool.idfkit.docs]`, vendors the trees, and compares
+them byte for byte on every run, so cutting a new level is how a change to a documented
+TypeScript example reaches a reader.
+
+Cut one by pushing a `docs-YYYY.N` tag, or by dispatching that workflow with the tag as its
+input. A level is immutable: to change what a level contains, cut the next one.
+
+### The local site under docs/
+
+The site below is `js.idfkit.com`, which is retired and redirects to the unified site. It is
+MkDocs with Material, and the API reference is generated from the TypeScript sources by
+TypeDoc through `mkdocstrings-typescript`.
 
 ```bash
 npm run docs:serve   # http://127.0.0.1:8000

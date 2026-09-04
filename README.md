@@ -8,6 +8,11 @@ Python [idfkit](https://github.com/idfkit/idfkit), not a transliteration of it.
 [How-to guides](https://developers.idfkit.com/how-to/) ·
 [API reference](https://developers.idfkit.com/reference/)
 
+> Documentation source lives in
+> [idfkit/idfkit-developers](https://github.com/idfkit/idfkit-developers), not here. This
+> repository publishes the TypeScript examples and the TypeDoc reference to it as a pinned
+> `docs-YYYY.N` release; see CONTRIBUTING.md.
+
 One site teaches both languages. `js.idfkit.com` is retired and redirects there.
 
 | Package            | What it is                                        | npm                                                                |
