@@ -10,7 +10,50 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
 
 ## [Unreleased]
 
+## [0.2.0-rc.1] - 2026-09-04
+
 ### Added
+
+- Validation, object type introspection, and documentation URLs, ported from the
+  Python library and reaching JavaScript for the first time.
+
+  `validateDocument(doc)` and `validateObject(obj, schema)` check a model against
+  its schema. Nothing throws: a finding is a record carrying a `severity`, the
+  object it was found on, the `field` it concerns, a `message`, and a `code`.
+  Match on `code`, never on `message`: the codes are shared verbatim with the
+  Python library (`E001` required field missing, `E003` wrong type, `E004` value
+  not among the permitted values, `E005` to `E008` the four bounds, `E009`
+  dangling reference, `E010` singleton violation, and `W002`/`W003` for an
+  unknown type and an unknown field), while the messages differ between the two
+  runtimes because number formatting and type names do.
+
+  Validation is on demand and parsing never triggers it, so reading a file costs
+  what it always did. `validateObject` takes its schema as an argument rather
+  than reading it off the object, which means an object can be checked while it
+  is still detached, before it goes anywhere near a document:
+
+  ```ts
+  const candidate = zone.clone();
+  candidate.set('ceiling_height', -1);
+  const findings = validateObject(candidate, doc.schema);
+  // [{ code: 'E005', field: 'ceiling_height', message: 'Value -1 is below minimum 0', ... }]
+  ```
+
+  `describeObjectType(typeName, schema)` reports what a type declares, as an
+  `ObjectDescription`: every field with its type, whether it is required, its
+  default, its units, its permitted values and its bounds, plus whether the type
+  carries a name and whether it has an extensible group. It is the schema read as
+  a description rather than as storage, which is what a form generator or a field
+  editor wants. One sharp edge is worth knowing before you rely on the bounds:
+  `exclusiveMinimum` and `exclusiveMaximum` come back as `true` rather than as a
+  number on EnergyPlus 8.9.0 through 9.5.0, whose draft-04 schemas use the
+  keyword as a flag qualifying `minimum` and `maximum` instead of as a bound of
+  its own. Python reports the same raw value. Prefer `validateObject` over
+  reading the bounds yourself, which is the case this quirk most easily breaks.
+
+  `docsUrlForObject`, `ioReferenceUrl`, `engineeringReferenceUrl` and `searchUrl`
+  return links into the EnergyPlus documentation for an object type, so a tool
+  can point at the reference rather than embedding it.
 
 - `idfkit` is now the install name in JavaScript, as it already is on PyPI. It
   carries no implementation: it re-exports `@idfkit/core` at `idfkit`, its Node
@@ -71,6 +114,46 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`, and
   always meant.
 
 ### Fixed
+
+- Validation reads the constraints inside an `anyOf` field instead of discarding
+  them, and three declared types in `@idfkit/schemas` that did not match what the
+  bundle actually held are now honest.
+
+  The validator was deliberately bug-compatible with Python, which never read
+  inside an `anyOf` branch. Python is fixed, so the guard is gone. Doing it
+  correctly needed the bundle to stop throwing information away: `slimField`
+  collapsed an `anyOf` to its numeric branch plus `auto: 1` and discarded the
+  string branch, so nothing recorded _which_ sentinel a field accepts. That
+  distinction is not academic, since 1,781 fields take `Autocalculate` rather
+  than `Autosize` and 646 accept any string at all, and a library that accepts
+  either everywhere accepts values EnergyPlus rejects. `SlimField` gains `se`,
+  the string branch's enum verbatim, with absent meaning the branch declared no
+  enum; the empty string is kept as a value, because "only the empty string" and
+  "any string" are opposite claims. The bundle grows 5,416 bytes, 0.52%.
+
+  **Breaking for anyone reading `SlimField` directly:** `xmin` and `xmax` were
+  typed `number` but hold a boolean on 8.9.0 through 9.5.0, where draft-04 makes
+  the flag qualify its sibling bound. A consumer trusting the old type computed
+  `value <= true` and rejected everything at or below 1 in a positive-bounded
+  field. `e` was typed `string[]` but holds numbers for the 68 fields carrying a
+  numeric enum. Both types now describe what is really there, so code reading
+  them may need to widen. `describeObjectType` follows the widened types and now
+  reports `integer|string` for `number_of_beams`, closing its last known
+  divergence from Python.
+
+  The same change removes reference-check false positives from lists nothing can
+  populate, `ZoneList`-expanded names, and implicit remainder spaces. Across the
+  760 EnergyPlus example files that is 19,793 spurious findings gone, and files
+  that validate cleanly rise from 149 to 470.
+
+- Reading an unknown object type no longer modifies the document. `all()`
+  resolves the type name through the schema, but on a miss it used to store the
+  new empty collection, so `doc.all('Zoen')` permanently added a junk key as a
+  side effect of a read. The read path now returns a detached `IdfCollection` and
+  leaves the document alone; only `attach()` and a rename may add a key. An
+  unknown name still returns empty rather than throwing, matching Python, because
+  a schemaless document cannot tell a typo from a valid type and version-generic
+  code legitimately asks for types that exist in some releases and not others.
 
 - A blank `Name` is no longer given an invented name. A type with an optional Name
   field left blank now keeps the blank verbatim as the epJSON key `""`; the
@@ -188,6 +271,7 @@ First published release. The API is not yet stable.
   no schema matches, because loading the wrong schema mis-maps every positional
   field instead of failing.
 
-[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.1...HEAD
+[0.2.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/idfkit/idfkit-js/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/idfkit/idfkit-js/releases/tag/v0.0.1
