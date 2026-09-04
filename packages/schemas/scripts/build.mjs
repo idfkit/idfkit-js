@@ -2,10 +2,13 @@
 /**
  * Build the content-addressed schema bundle from idfkit's bundled epJSON schemas.
  *
- * 87% of object-type definitions are byte-identical across EnergyPlus versions
- * (Zone has not changed since 8.9), so the bundle stores each unique definition
- * once and gives every version a manifest of `typeName -> hash`. Supporting all
- * 17 versions therefore costs barely more than supporting one.
+ * 82% of the object-type definitions across the EnergyPlus versions are a
+ * byte-identical repeat of a definition another version already carries
+ * (Construction has changed once in 17 releases), so the bundle stores each
+ * unique definition once and gives every version a manifest of
+ * `typeName -> hash`. Supporting all 17 versions therefore costs barely more
+ * than supporting one. The `unique defs` line this script prints is the
+ * complement, so the figure is re-measured on every rebuild.
  *
  * Usage: node scripts/build.mjs [--source <dir>]
  */
@@ -87,14 +90,31 @@ function slimType(raw) {
 function slimField(def) {
   const out = {};
 
-  // `anyOf` means "a number, or the literal Autosize/Autocalculate". Collapse it
-  // to the numeric branch plus a flag, so the writer knows both are legal.
+  // `anyOf` is always "a number, or a string", in that branch order, in all 17
+  // bundled versions: 13060 fields, every one of them exactly two branches
+  // carrying nothing but `type`, `enum` and the four bound keywords. Collapse it
+  // to the numeric branch plus `auto`, and keep the string branch's enum in `se`
+  // so a consumer can still tell the branches apart.
+  //
+  // `se` is what makes the collapse lossless enough to validate from. Without it
+  // the bundle says only "some string is legal here", which is three different
+  // things: `Autosize` on 10565 fields, `Autocalculate` on 1781, ANY string on
+  // 646, and only the empty string on the 68 that carry a numeric enum on the
+  // number branch. Absent `se` with `auto` set is the "any string" case, which
+  // is why the empty string is kept verbatim here rather than filtered out the
+  // way `e` filters it: `se: ['']` and no `se` at all are opposite meanings.
   let effective = def;
   if (Array.isArray(def.anyOf)) {
-    const numeric = def.anyOf.find((b) => b.type === 'number');
+    // `integer` as well as `number`: eight fields across the versions declare
+    // `anyOf: [{integer}, {string}]`, and matching only `number` left
+    // `AirTerminal:SingleDuct:ConstantVolume:CooledBeam.number_of_beams` with no
+    // `auto` flag and a `default` of `Autosize` its own declared type rejects.
+    const numeric = def.anyOf.find((b) => b.type === 'number' || b.type === 'integer');
     if (numeric) {
       effective = { ...numeric, ...pick(def, ['units', 'default', 'object_list', 'reference']) };
       out.auto = 1;
+      const stringly = def.anyOf.find((b) => b.type === 'string');
+      if (stringly?.enum?.length) out.se = stringly.enum;
     } else {
       effective = { ...def.anyOf[0], ...pick(def, ['units', 'default']) };
     }

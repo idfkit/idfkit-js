@@ -29,10 +29,6 @@
     "./node": {
       "types": "./dist/node.d.ts",
       "default": "./dist/node.js"
-    },
-    "./types/*": {
-      "types": "./dist/types/*.d.ts",
-      "default": "./dist/types/*.js"
     }
   },
   "files": [
@@ -45,11 +41,18 @@
   "engines": {
     "node": ">=20"
   },
+  "idfkit": {
+    "conformance": "conformance-2026.7",
+    "governance": "governance-2026.9"
+  },
   "dependencies": {
     "@idfkit/schemas": "0.0.0"
   },
+  "devDependencies": {
+    "@idfkit/types-v26-1": "*",
+    "@idfkit/types-v9-4": "*"
+  },
   "scripts": {
-    "build": "tsc --build",
-    "codegen": "node scripts/emit-types.mjs"
+    "build": "tsc --build"
   }
 }

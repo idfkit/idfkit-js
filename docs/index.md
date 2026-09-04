@@ -26,7 +26,7 @@ hide:
 
 ```ts
 import { loadIdf, saveIdf } from '@idfkit/core/node';
-import type { TypeMap } from '@idfkit/core/types/v26-1';
+import type { TypeMap } from '@idfkit/types-v26-1';
 
 const doc = await loadIdf<TypeMap>('model.idf');
 
@@ -106,8 +106,9 @@ that one handles the simulation. They meet over IDF text — see
 
   ***
 
-  87% of object-type definitions are identical across releases, so each is
-  stored once and shared by content hash. A cross-version diff is a manifest
+  82% of what the 17 releases carry is a byte-identical repeat of a
+  definition another release already has, so each is stored once and shared
+  by content hash. A cross-version diff is a manifest
   comparison, not a deep walk.
 
   [Why](explanation/content-addressed-schemas.md)

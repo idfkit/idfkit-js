@@ -6,9 +6,10 @@ your architecture.
 
 ## The observation
 
-87% of object-type definitions are byte-identical across EnergyPlus releases.
-`Zone` has not changed since 8.9. Shipping 17 schemas means shipping the same
-definition of `Zone` seventeen times.
+The 17 manifests name 14,092 object-type definitions between them, and only
+2,568 of those are distinct: 82% of what the releases carry is a byte-identical
+repeat. `Construction` has changed once in 17 releases, so shipping 17 schemas
+means shipping the same definition of `Construction` sixteen times over.
 
 So the bundle stores each unique definition once, keyed by a hash of its
 content, and gives every version a manifest mapping type name to hash.
@@ -29,7 +30,7 @@ parse. Content-addressing removes the duplication that remains. See
 Publish `@idfkit/schemas-26-1`, `@idfkit/schemas-25-2`, and so on, and let people
 install the one they need.
 
-It is the wrong move, for two reasons. It duplicates the shared 87% across every
+It is the wrong move, for two reasons. It duplicates the shared 82% across every
 package, so the ecosystem-wide total goes _up_. And it makes cross-version work —
 migration tooling, diffing, a viewer that opens whatever file it is handed —
 require several installs and a dynamic import strategy, which is exactly the

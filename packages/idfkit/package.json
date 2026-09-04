@@ -1,0 +1,71 @@
+{
+  "name": "idfkit",
+  "version": "0.0.0",
+  "description": "The shared install name for idfkit in JavaScript: subpath re-exports of @idfkit/core, @idfkit/schemas and the optional @idfkit/weather",
+  "type": "module",
+  "license": "MIT",
+  "author": "Samuel Letellier-Duchesne <developers@idfkit.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idfkit/idfkit-js.git",
+    "directory": "packages/idfkit"
+  },
+  "homepage": "https://js.idfkit.com/",
+  "bugs": {
+    "url": "https://github.com/idfkit/idfkit-js/issues"
+  },
+  "keywords": [
+    "energyplus",
+    "idf",
+    "epjson",
+    "building-energy",
+    "simulation"
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./node": {
+      "types": "./node.d.ts",
+      "default": "./node.js"
+    },
+    "./schemas": {
+      "types": "./schemas.d.ts",
+      "default": "./schemas.js"
+    },
+    "./weather": {
+      "types": "./weather.d.ts",
+      "default": "./weather.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "node.js",
+    "node.d.ts",
+    "schemas.js",
+    "schemas.d.ts",
+    "weather.js",
+    "weather.d.ts",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@idfkit/core": "0.0.0",
+    "@idfkit/schemas": "0.0.0"
+  },
+  "peerDependencies": {
+    "@idfkit/weather": "0.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@idfkit/weather": {
+      "optional": true
+    }
+  }
+}

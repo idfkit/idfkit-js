@@ -1,6 +1,6 @@
 # A synchronous core with async edges
 
-`parseIdf`, `writeIdf`, and every method on `IDFDocument` are synchronous and
+`parseIdf`, `writeIdf`, and every method on `IdfDocument` are synchronous and
 take strings. None of them can read a file, fetch a URL, or return a promise.
 Everything that touches a disk or a network lives in one of two places:
 `@idfkit/core/node`, or `SchemaBundle`.

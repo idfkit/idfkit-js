@@ -1,7 +1,7 @@
 # Contributing to idfkit-js
 
 Contributions are welcome. This file covers the development workflow; for what
-the library does and why, see [the documentation](https://js.idfkit.com/) or
+the library does and why, see [the documentation](https://developers.idfkit.com/) or
 [`CLAUDE.md`](CLAUDE.md) for the short version.
 
 ## Setup
@@ -87,20 +87,60 @@ definitions a release actually changed.
 ## Regenerating the TypeScript interfaces
 
 ```bash
-npm run codegen -w @idfkit/core -- 26.1.0
+npm run codegen -- 26.1.0
 ```
 
 This also reads the Python repository's schemas, which is why the output is
 committed rather than generated at install time. Interfaces are committed for
-26.1.0 and 9.4.0.
+26.1.0 and 9.4.0, one opt-in package each: `packages/types-v26-1` and
+`packages/types-v9-4`.
+
+The generator writes the whole package — `index.d.ts`, manifest, tsconfig,
+README — so running it for a version that has none creates one. Add the new
+package to the `references` in `tsconfig.json` and to the publish loop in
+`.github/workflows/publish.yml`; the script prints that reminder when it
+finishes.
+
+The output is a `.d.ts`, not a `.ts`, and that is load-bearing: a type package
+must contain no runtime code (FR-039), and nothing compiles a declaration file
+into any. TypeScript will still accept an exported `const` inside one — it emits
+nothing for it, which makes it a phantom export that crashes whoever imports it
+— so `npm run check:type-packages` fails on a single byte of JavaScript and on
+any exported value declaration.
 
 `TypeMap` must be emitted as a `type` alias, never an `interface`: interfaces
 have no implicit index signature and cannot satisfy `Record<string, object>`.
 
 ## Documentation
 
-The site is MkDocs with Material, and the API reference is generated from the
-TypeScript sources by TypeDoc through `mkdocstrings-typescript`.
+### Where a documentation change goes
+
+**Not here.** The published site is <https://developers.idfkit.com>, and its source is a
+third repository, [idfkit/idfkit-developers](https://github.com/idfkit/idfkit-developers),
+which belongs to neither library. It teaches both languages from one navigation: a page
+about loading a model is one page with two idioms on it, so prose changes are made there.
+
+What this repository owes that site is an **artifact**, published by
+`.github/workflows/publish-docs-artifacts.yml` as a `docs-YYYY.N` release carrying two
+things together:
+
+- `docs-snippets.tar.gz` — every TypeScript example the site publishes, as the real modules
+  `npm run typecheck:docs` compiled, so a page cannot show text that was never compiled;
+- `typedoc.json` — the TypeDoc JSON the TypeScript reference is generated from.
+
+One release carries both, so the reference and the examples on a page always describe the
+same commit. The site pins the tag in `[tool.idfkit.docs]`, vendors the trees, and compares
+them byte for byte on every run, so cutting a new level is how a change to a documented
+TypeScript example reaches a reader.
+
+Cut one by pushing a `docs-YYYY.N` tag, or by dispatching that workflow with the tag as its
+input. A level is immutable: to change what a level contains, cut the next one.
+
+### The local site under docs/
+
+The site below is `js.idfkit.com`, which is retired and redirects to the unified site. It is
+MkDocs with Material, and the API reference is generated from the TypeScript sources by
+TypeDoc through `mkdocstrings-typescript`.
 
 ```bash
 npm run docs:serve   # http://127.0.0.1:8000

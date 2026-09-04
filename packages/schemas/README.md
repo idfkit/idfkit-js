@@ -16,10 +16,12 @@ npm install @idfkit/schemas
 The raw epJSON schemas are ~10 MB each, 17 of them, 11.9 MB gzipped in total. In
 a Python wheel nobody notices. On a page load it decides your architecture.
 
-87% of object-type definitions are byte-identical across releases: `Zone` has not
-changed since EnergyPlus 8.9. So this package stores each unique definition once,
-keyed by a content hash, and gives every version a manifest mapping type name to
-hash.
+The 17 manifests name 14,092 object-type definitions between them, and only
+2,568 of those are distinct. 82% of what the releases carry is a byte-identical
+repeat of a definition another release already has: `Construction`, for
+instance, has changed once in 17 releases. So this package stores each unique
+definition once, keyed by a content hash, and gives every version a manifest
+mapping type name to hash.
 
 |                                          | All 17 versions, gzipped |
 | ---------------------------------------- | ------------------------ |
@@ -28,7 +30,7 @@ hash.
 | Content-addressed (this package)         | ~1,000 KB                |
 
 Splitting per version would have been the obvious move and is the wrong one: it
-duplicates the shared 87% across packages and makes cross-version work require
+duplicates the shared 82% across packages and makes cross-version work require
 several installs. The longer argument is in [Content-addressed
 schemas](https://js.idfkit.com/explanation/content-addressed-schemas/).
 

@@ -37,6 +37,13 @@ jobs:
 
       - run: npm run format:check
 
+      - name: Check the exported conformance level against the declared one
+        # FR-024 makes the level a claim the release asserts, and CONFORMANCE_LEVEL is generated
+        # from the pin in packages/core/package.json rather than restated beside it. A pin advanced
+        # without regenerating would export a claim one tag stale, and nothing else here would
+        # notice: the constant compiles, every test passes, and the wrong tag ships.
+        run: npm run check:conformance-level
+
       - name: Typecheck sources and tests
         # tsconfig.test.json, not tsconfig.json: vitest transpiles without
         # typechecking, so the `@ts-expect-error` assertions in typed.test.ts
@@ -44,6 +51,154 @@ jobs:
         run: npx tsc -p tsconfig.test.json
 
       - run: npx tsc --build
+
+      - name: Type-check the documentation examples
+        # Constitution VI, SC-019. Every TypeScript example the documentation publishes is a real
+        # module in docs-snippets/, compiled here against the BUILT packages, resolved through
+        # node_modules exactly as a reader resolves them. A renamed export, a changed signature or
+        # a field that no longer exists fails this step and names the file, which carries the page
+        # in its path. Before this, every fence on 18 pages was hand-typed text nothing compiled.
+        #
+        # After tsc --build, not before: resolution goes through each package's "types" entry,
+        # which points inside dist.
+        run: npm run typecheck:docs
+
+  type-packages:
+    name: Type packages carry no runtime
+    runs-on: ubuntu-latest
+
+    # BLOCKING, and it is meant to be. @idfkit/types-v26-1 and @idfkit/types-v9-4 exist so a
+    # reader can decline 5.3 MB of generated declarations; that only holds while declining them
+    # declines all of them. A type package with runtime in it is a package something can import a
+    # value from, and the opt-in is gone the moment one consumer does (FR-039, FR-041, and
+    # data-model section 7, where runtime_bytes "Must be zero").
+    #
+    # The regression this exists for already happened once: every generated module used to end
+    # with `export const VERSION = '26.1.0'`, which nothing imported and which compiled to a
+    # 256-byte .js file that went unnoticed for months. One line in the generator brings it back.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # After the build, never before it. The gate measures emitted JavaScript, so a .ts module
+      # that slipped into a type package has to be compiled before there is anything to find.
+      - run: npx tsc --build
+
+      - run: npm run check:type-packages
+
+  facade:
+    name: The shared install name is the contracted surface
+    runs-on: ubuntu-latest
+
+    # BLOCKING. `idfkit` is the name a reader installs without ever learning the scoped names,
+    # and it contains no implementation, so its entire content is its published surface. Four
+    # one-word edits break it silently and none of them fail a test:
+    #
+    #   a fifth export entry            ships a subpath that resolves to nothing, which is how a
+    #                                   name reserved in the naming register leaks into the
+    #                                   published surface (FR-077);
+    #   @idfkit/weather promoted to     puts a 1.6 MB station index on disk for every reader who
+    #   dependencies                    never asked for weather (FR-043, SC-016);
+    #   @idfkit/engine added anywhere   drags in 51 MB of WebAssembly and pins every facade user
+    #                                   to one EnergyPlus release (FR-070);
+    #   a name added to weather         exists under @idfkit/weather and not under
+    #                                   idfkit/weather, with the types insisting otherwise,
+    #                                   because weather.js cannot use `export *` (FR-074).
+    #
+    # The shape of what gets installed under a name is what that name means, and changing it
+    # after publication breaks everyone who installed it.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # After the build: the drift half of the gate imports @idfkit/weather to read its real
+      # exports, and that is dist output.
+      - run: npx tsc --build
+
+      - run: npm run check:facade
+
+  distribution:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    # BLOCKING, all six. These are the criteria that say what `npm install idfkit` puts on a
+    # stranger's disk and in their browser bundle, and they are the only ones in this feature that
+    # cannot be corrected after the fact: the shape of what gets installed under a name IS what
+    # that name means, and changing it later breaks everyone who installed it.
+    #
+    # None of them can be measured against this workspace, because a workspace install is a tree
+    # of symlinks into packages/ and therefore contains every byte of everything, including the
+    # 5.3 MB of generated declarations the type split exists to keep out. So each gate runs
+    # `npm pack`, installs the resulting tarballs into a project under the runner's temp directory
+    # (never inside this checkout: Node resolves node_modules UPWARD, and a fixture in the
+    # workspace silently resolves packages it never installed), and measures that. Each takes one
+    # to three seconds.
+    #
+    #   install size      under 1.5 MB on disk, measured as apparent bytes. The gate's own header
+    #                     says why apparent and not allocated, and prints both. Headroom is thin:
+    #                     1.32 of 1.5 MB, 88 percent.
+    #   no index          zero stations.json bytes, the weather peer not auto-installed, no
+    #                     engine. The peer's tarball is deliberately available to npm during the
+    #                     install, so the absence is evidence about peerDependenciesMeta rather
+    #                     than about what the registry could serve.
+    #   ignore-scripts    no package declares an install lifecycle hook, and the tree installed
+    #                     with --ignore-scripts is identical file for file to the one without.
+    #   opt-out typing    zero generated declaration bytes anywhere on disk, a strict TypeScript
+    #                     project working without a map, and a control proving one still attaches.
+    #   bundle purity     an esbuild metafile for a minimal read-and-write page, with zero inputs
+    #                     matching schema data, stations.json or types-v.
+    #   absent component  importing idfkit/weather without the peer names `npm install
+    #                     @idfkit/weather` rather than raising a bare ERR_MODULE_NOT_FOUND, a
+    #                     project that never imports it type-checks clean, and the subpath works
+    #                     once the peer is added.
+    #
+    # Do not add continue-on-error to any of them. Each one guards a number that only ever moves
+    # in one direction unless something stops it.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - script: check:install-size
+            name: Install size under the shared name (SC-012)
+          - script: check:no-index
+            name: No station index, no auto-installed peer (FR-043, SC-016)
+          - script: check:ignore-scripts
+            name: Install succeeds with --ignore-scripts (SC-015)
+          - script: check:opt-out-typing
+            name: Type packages are opt-out and free (SC-014)
+          - script: check:bundle-purity
+            name: A browser bundle carries no unrequested bytes (SC-013)
+          - script: check:absent-component
+            name: An absent opt-in component names its install (FR-074, SC-031)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Before packing, not after. Every package ships dist and none declares a prepack script,
+      # so `npm pack` copies whatever is on disk: pack before the build and the tarball has no
+      # runtime in it, which every measurement downstream would then take at face value.
+      - run: npx tsc --build
+
+      - run: npm run ${{ matrix.script }}
 
   test:
     name: Test (Node ${{ matrix.node }})

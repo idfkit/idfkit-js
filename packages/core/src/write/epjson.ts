@@ -1,4 +1,4 @@
-import type { IDFDocument } from '../document.js';
+import type { IdfDocument } from '../document.js';
 import type { AnyTypeMap } from '../typemap.js';
 import type { EpJson } from '../parse/epjson.js';
 
@@ -12,7 +12,7 @@ export interface WriteEpJsonOptions {
 
 /** Serialize a document to epJSON text. */
 export function writeEpJson<M extends AnyTypeMap>(
-  document: IDFDocument<M>,
+  document: IdfDocument<M>,
   options: WriteEpJsonOptions = {}
 ): string {
   const indent = options.indent ?? 2;
@@ -20,6 +20,6 @@ export function writeEpJson<M extends AnyTypeMap>(
 }
 
 /** Serialize a document to a plain epJSON object. */
-export function toEpJson<M extends AnyTypeMap>(document: IDFDocument<M>): EpJson {
+export function toEpJson<M extends AnyTypeMap>(document: IdfDocument<M>): EpJson {
   return document.toJSON();
 }

@@ -1,0 +1,43 @@
+{
+  "name": "@idfkit/types-v26-1",
+  "version": "0.0.0",
+  "description": "Generated TypeScript interfaces and TypeMap for EnergyPlus 26.1.0",
+  "type": "module",
+  "license": "MIT",
+  "author": "Samuel Letellier-Duchesne <developers@idfkit.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idfkit/idfkit-js.git",
+    "directory": "packages/types-v26-1"
+  },
+  "homepage": "https://js.idfkit.com/",
+  "bugs": {
+    "url": "https://github.com/idfkit/idfkit-js/issues"
+  },
+  "keywords": [
+    "energyplus",
+    "idf",
+    "epjson",
+    "types",
+    "typescript"
+  ],
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts"
+    }
+  },
+  "files": [
+    "index.d.ts",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "@idfkit/core": ">=0.0.0"
+  }
+}

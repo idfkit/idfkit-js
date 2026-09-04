@@ -1,0 +1,242 @@
+name: Conformance
+
+# Runs the shared cross-language corpus (idfkit/idfkit-conformance) against this workspace at the
+# level pinned in packages/core/package.json, plus the two governance gates that read the register
+# and the ledger at the pinned governance tag.
+#
+# Every job here is blocking. A disagreement with the corpus, an unregistered public name, or a
+# capability the ledger and the exports disagree about all stop the merge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pins:
+    name: Pinned levels
+    runs-on: ubuntu-latest
+    outputs:
+      conformance: ${{ steps.pin.outputs.conformance }}
+      governance: ${{ steps.pin.outputs.governance }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve the pinned levels
+        id: pin
+        # Each pin is one declared value, read here and by the release check, so what CI runs and
+        # what a release claims cannot drift apart (FR-024). Hence reading them out of package.json
+        # rather than writing the tags into this file: a literal here would be a second place to
+        # forget. The values are the full tag forms, conformance-YYYY.N and governance-YYYY.N, and
+        # they are used verbatim as the refs the corpus is checked out at.
+        run: |
+          set -euo pipefail
+          PKG=packages/core/package.json
+          CONFORMANCE="$(node -p "JSON.parse(require('fs').readFileSync('$PKG', 'utf8')).idfkit?.conformance ?? ''")"
+          GOVERNANCE="$(node -p "JSON.parse(require('fs').readFileSync('$PKG', 'utf8')).idfkit?.governance ?? ''")"
+
+          # A level is an immutable git tag, so the declared value is the ref to check out. Checking
+          # the shape here rather than letting checkout fail: a typo otherwise reports as a missing
+          # ref, which reads like the corpus is broken.
+          case "$CONFORMANCE" in
+            conformance-[0-9][0-9][0-9][0-9].[0-9]*) ;;
+            '') echo "::error::No idfkit.conformance in $PKG; nothing to pin to" && exit 1 ;;
+            *) echo "::error::idfkit.conformance is '$CONFORMANCE'; expected conformance-YYYY.N" && exit 1 ;;
+          esac
+
+          case "$GOVERNANCE" in
+            governance-[0-9][0-9][0-9][0-9].[0-9]*) ;;
+            '') echo "::error::No idfkit.governance in $PKG; nothing to pin to" && exit 1 ;;
+            *) echo "::error::idfkit.governance is '$GOVERNANCE'; expected governance-YYYY.N" && exit 1 ;;
+          esac
+
+          echo "Pinned conformance level: $CONFORMANCE"
+          echo "Pinned governance level: $GOVERNANCE"
+          {
+            echo "conformance=$CONFORMANCE"
+            echo "governance=$GOVERNANCE"
+          } >> "$GITHUB_OUTPUT"
+
+  conformance:
+    name: Cross-library conformance
+    needs: pins
+    runs-on: ubuntu-latest
+
+    # No EnergyPlus is installed anywhere in this job, and none is needed. Every case's expected
+    # epJSON is produced offline by ConvertInputFormat and committed to the corpus (FR-013), so CI
+    # compares against committed files rather than running the oracle. Installing EnergyPlus would
+    # also be ruinous: a full set of supported releases is roughly 13.6 GB, and the corpus is
+    # required to run in under five minutes on a machine with no simulation software installed
+    # (SC-005). Regenerating expectations is a maintainer task, run locally through the corpus's
+    # tools/regenerate.sh.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check out the conformance corpus at the pinned level
+        # idfkit/idfkit-conformance is public, so the default GITHUB_TOKEN reads it and no extra
+        # credential is configured here.
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: ${{ needs.pins.outputs.conformance }}
+          path: conformance
+
+      - run: npm ci
+
+      # The runner imports the built package, not the sources: @idfkit/core resolves through the
+      # "exports" entry in its package.json, which points inside dist. Without this it finds
+      # nothing to test.
+      - run: npx tsc --build
+
+      - name: Run the corpus against this workspace
+        # --library takes the path to the library under test, never a language word: the runner
+        # file already fixes the language, run.mjs for JavaScript and run.py for Python. The runner
+        # is invoked from the corpus checkout, which is where it defaults --corpus to.
+        working-directory: conformance
+        run: node runners/run.mjs --library "$GITHUB_WORKSPACE"
+
+  naming:
+    name: Naming register
+    needs: pins
+    runs-on: ubuntu-latest
+
+    # BLOCKING. The rename batch has landed: IdfDocument, getIdfVersion and getEpJsonVersion are
+    # public, collection() is withdrawn to in-package use, and all six findings that named them are
+    # gone. One finding remains and it is on the register's side, not this repository's: the
+    # [register] governs list is [idfkit, @idfkit/core] while seven entries name @idfkit/weather
+    # members, which the gate reports as a governs gap. It clears when the register either widens
+    # that list or moves those entries, under cross-language review. Do not add continue-on-error
+    # and do not weaken the gate to get a green build: a naming gate that never fails is a naming
+    # gate that never caught anything.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check out the governance register at the pinned level
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: ${{ needs.pins.outputs.governance }}
+          path: conformance
+          # The gate reads the register with "git show <tag>:governance/naming.toml" and compares
+          # it against the governance tag before it, so the checkout needs every tag rather than
+          # only the commit this ref lands on. Without the history the rename check silently
+          # degrades to "no earlier governance tag".
+          fetch-depth: 0
+
+      - run: npm ci
+
+      # The gate reads built output, not sources: the .d.ts files each package's "exports" map
+      # points at, plus the TypeDoc JSON. Both are absent on a clean checkout, and the gate exits 2
+      # rather than guessing, so produce them here instead of letting the check be skipped.
+      - run: npx tsc --build
+
+      - run: npm run docs:api
+
+      - name: Check the public surface against the naming register
+        run: npm run check:naming -- --corpus conformance
+
+  parity:
+    name: Parity ledger
+    needs: pins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check out the parity ledger at the pinned level
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: ${{ needs.pins.outputs.governance }}
+          path: conformance
+          fetch-depth: 0
+
+      - run: npm ci
+
+      # No build step. This gate derives the exported capability set from each package's "exports"
+      # map, resolving a ./dist/x.js target back to src/x.ts, so it runs against the sources on a
+      # clean checkout.
+      - name: Check the exported capabilities against the parity ledger
+        run: npm run check:parity -- --corpus conformance
+
+  publication:
+    name: Publication preconditions (FR-044)
+    needs: pins
+    runs-on: ubuntu-latest
+
+    # BLOCKING, but on a narrow question. `scripts/check-publication.mjs` is the gate that stands
+    # between the four FR-044 preconditions and `npm publish idfkit`, and it lives in
+    # publish.yml, where a refusal stops the release. FR-088 is why it exists at all: publication
+    # under the shared name is irreversible, so its preconditions have to be verified by a check
+    # rather than by somebody saying they landed, and a claim later found untrue is corrected by a
+    # further release and never by withdrawing the version.
+    #
+    # This job runs it with --report, which prints the same table and exits 0 unless the check
+    # ITSELF could not run. That distinction is the whole point of having the job:
+    #
+    #   a precondition not yet met   is a fact about how far the work has got. Blocking every
+    #                                merge on it would mean nothing could land until everything
+    #                                had landed.
+    #   the check not running        is a defect. A publication gate that has quietly started
+    #                                exiting 2 -- a missing corpus tag, a renamed gate, a
+    #                                .typedoc.json nobody generates any more -- is worth nothing
+    #                                on the day it is finally consulted, and exit 2 is NOT
+    #                                permission to publish.
+    #
+    # So: this job fails when the gate rots, and reports when the work is unfinished. The
+    # publish workflow is where an unmet precondition actually refuses.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check out the conformance corpus
+        # fetch-depth 0, and no `ref`: this gate reads BOTH pinned tags out of the one checkout,
+        # exports the corpus at the conformance tag with `git archive` to run it, and reads
+        # governance/parity.toml at the governance tag. A shallow single-ref checkout has neither.
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          path: conformance
+          fetch-depth: 0
+
+      - run: npm ci
+
+      # The distribution gates pack the workspace, and the naming gate reads built .d.ts files.
+      - run: npx tsc --build
+
+      # The naming gate reads TypeDoc JSON and exits 2 without it, and the publication check will
+      # not approve or refuse a precondition it could not evaluate.
+      - run: npm run docs:api
+
+      - name: Report on the FR-044 preconditions
+        run: npm run check:publication -- --report --corpus conformance

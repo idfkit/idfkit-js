@@ -11,6 +11,10 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "declaration": true,
+    // `@internal` members are in-package seams, not API. Without this they are tagged in
+    // the sources, hidden from TypeDoc by `excludeInternal`, and still importable from the
+    // built .d.ts, which is the surface that decides what is public.
+    "stripInternal": true,
     "declarationMap": true,
     "sourceMap": true,
     "composite": true,

@@ -5,12 +5,18 @@ library is worth writing rather than merely possible.
 
 `scripts/emit-types.mjs` turns one version's epJSON schema into TypeScript: 858
 interfaces for EnergyPlus 26.1, one per object type, plus a `TypeMap` joining
-each type name to its interface. Parameterizing a document with that map is the
-whole opt-in:
+each type name to its interface. Each version's output is its own package, so
+you install the ones you want and nothing else:
+
+```bash
+npm install --save-dev @idfkit/types-v26-1
+```
+
+Parameterizing a document with that map is the whole opt-in:
 
 ```ts
 import { loadIdf } from '@idfkit/core/node';
-import type { TypeMap } from '@idfkit/core/types/v26-1';
+import type { TypeMap } from '@idfkit/types-v26-1';
 
 const doc = await loadIdf<TypeMap>('model.idf');
 
@@ -46,9 +52,15 @@ Here the schema is compiled into the type system, so the same typo is a build
 error. That is the practical argument for passing the `TypeMap` even in a
 codebase that is otherwise loosely typed.
 
-## It costs nothing at runtime
+## It costs nothing, installed or not
 
-`TypeMap` is a type, not a value. It is erased at build time. A typed document
+The maps are big. EnergyPlus 26.1 is 2.7 MB of declarations and 9.4 is another
+2.4 MB, against roughly 170 KB for the whole of `@idfkit/core`. That is why they
+are separate packages rather than a subpath of core: install neither and you
+have a complete, working library and zero bytes of either map on disk.
+
+Installed, they still cost nothing at run time. `TypeMap` is a type, not a
+value. It is erased at build time. A typed document
 and an untyped one are the same object graph, running the same code, and
 `doc.all('Zone')` really is just a string argument. Omit the parameter and
 everything still works, untyped:
@@ -77,6 +89,22 @@ allowing dynamic field names. Using two costs nothing and gives both.
 `TypeNameOf` has a similar subtlety: its `(string & {})` arm is what keeps
 literal completion alive while still accepting arbitrary strings. Without it
 TypeScript widens the parameter to `string` and the 858 suggestions disappear.
+
+## Declarations only, and it is checked
+
+A type package holds one `index.d.ts` and nothing else. No `main`, no
+`dependencies`, no build step, and no JavaScript: nothing compiles a declaration
+file, so there is nowhere for runtime code to be produced the way it was when
+these were ordinary `.ts` modules inside `@idfkit/core`. `npm run
+check:type-packages` measures the emitted JavaScript in every type package, both
+in the working tree and in what `npm pack` would ship, and fails the build on
+one byte of it — or on an exported value, which a declaration file will accept
+and then emit nothing for, leaving an export that crashes whoever imports it.
+
+`@idfkit/core` is a peer range rather than an exact version. The map borrows
+exactly one type from core, `ExtensibleGroup`, and neither package carries
+runtime, so a skew between the two is a type error at your build and never a
+failure at run time.
 
 ## How this is kept honest
 

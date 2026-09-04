@@ -87,7 +87,7 @@ export class IdfCollection<T extends IdfObject = IdfObject> implements Iterable<
     });
   }
 
-  // --- mutation, used by IDFDocument -------------------------------------
+  // --- mutation, used by IdfDocument -------------------------------------
 
   /** @internal */
   insert(obj: T): void {

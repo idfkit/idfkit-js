@@ -1,6 +1,6 @@
 import type { Schema, SlimType } from '@idfkit/schemas';
 
-import { IDFDocument } from '../document.js';
+import { IdfDocument } from '../document.js';
 import type { ExtensibleGroup, FieldValues, StoredValue } from '../object.js';
 import type { AnyTypeMap, UntypedMap } from '../typemap.js';
 import { lex, type LexDiagnostic, type RawObject } from './lexer.js';
@@ -21,7 +21,7 @@ export interface ParseOptions {
 }
 
 export interface ParseResult<M extends AnyTypeMap = UntypedMap> {
-  document: IDFDocument<M>;
+  document: IdfDocument<M>;
   diagnostics: ParseDiagnostic[];
 }
 
@@ -50,7 +50,7 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
   };
 
   const raw = lex(text, { onDiagnostic: report });
-  const document = new IDFDocument<M>(schema);
+  const document = new IdfDocument<M>(schema);
 
   for (const object of raw) {
     const canonical = schema.resolve(object.typeName);
@@ -194,7 +194,7 @@ export class IdfParseError extends Error {
  * version lives inside the file. This does the minimum scan needed to break
  * the cycle, and does not validate anything else.
  */
-export function detectVersion(text: string): string | undefined {
+export function getIdfVersion(text: string): string | undefined {
   // Strip comments first. Trying to tolerate them inside the pattern means
   // guessing how many comment lines sit between the comma and the value, which
   // is exactly the kind of thing that works on the file you tested and fails on

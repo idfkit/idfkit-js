@@ -1,6 +1,6 @@
 import type { FieldKind, SlimType } from '@idfkit/schemas';
 
-import type { IDFDocument } from '../document.js';
+import type { IdfDocument } from '../document.js';
 import type { AnyTypeMap } from '../typemap.js';
 import type { IdfObject, StoredValue } from '../object.js';
 
@@ -41,7 +41,7 @@ export interface WriteIdfOptions {
  * yet.
  */
 export function writeIdf<M extends AnyTypeMap>(
-  document: IDFDocument<M>,
+  document: IdfDocument<M>,
   options: WriteIdfOptions = {}
 ): string {
   const comments = options.comments ?? true;

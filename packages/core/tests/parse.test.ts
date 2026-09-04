@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  detectEpJsonVersion,
-  detectVersion,
+  getEpJsonVersion,
+  getIdfVersion,
   IdfParseError,
   parseEpJson,
   parseIdf,
@@ -28,21 +28,21 @@ Zone,
   0.0;          !- Z Origin
 `;
 
-describe('detectVersion', () => {
+describe('getIdfVersion', () => {
   it('reads a two-part version and pads the patch', () => {
-    expect(detectVersion('Version, 26.1;')).toBe('26.1.0');
+    expect(getIdfVersion('Version, 26.1;')).toBe('26.1.0');
   });
 
   it('reads a three-part version', () => {
-    expect(detectVersion('Version,9.0.1;')).toBe('9.0.1');
+    expect(getIdfVersion('Version,9.0.1;')).toBe('9.0.1');
   });
 
   it('is case-insensitive and tolerates a field comment', () => {
-    expect(detectVersion('VERSION,\n  24.2;  !- Version Identifier')).toBe('24.2.0');
+    expect(getIdfVersion('VERSION,\n  24.2;  !- Version Identifier')).toBe('24.2.0');
   });
 
   it('returns undefined when there is no version object', () => {
-    expect(detectVersion('Zone, Z1;')).toBeUndefined();
+    expect(getIdfVersion('Zone, Z1;')).toBeUndefined();
   });
 });
 
@@ -143,7 +143,7 @@ describe('parseEpJson', () => {
 
   it('detects the version from epJSON', () => {
     const json = '{"Version":{"Version 1":{"version_identifier":"26.1"}}}';
-    expect(detectEpJsonVersion(json)).toBe('26.1.0');
+    expect(getEpJsonVersion(json)).toBe('26.1.0');
   });
 
   it('rejects unknown fields in strict mode', () => {

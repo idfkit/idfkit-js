@@ -3,10 +3,17 @@
 EnergyPlus IDF and epJSON tooling for JavaScript and TypeScript. A sibling to the
 Python [idfkit](https://github.com/idfkit/idfkit), not a transliteration of it.
 
-**[Documentation](https://js.idfkit.com/)** ·
-[Tutorial](https://js.idfkit.com/tutorials/first-model/) ·
-[How-to guides](https://js.idfkit.com/how-to/) ·
-[API reference](https://js.idfkit.com/reference/)
+**[Documentation](https://developers.idfkit.com/)** ·
+[Tutorial](https://developers.idfkit.com/tutorials/first-model/) ·
+[How-to guides](https://developers.idfkit.com/how-to/) ·
+[API reference](https://developers.idfkit.com/reference/)
+
+> Documentation source lives in
+> [idfkit/idfkit-developers](https://github.com/idfkit/idfkit-developers), not here. This
+> repository publishes the TypeScript examples and the TypeDoc reference to it as a pinned
+> `docs-YYYY.N` release; see CONTRIBUTING.md.
+
+One site teaches both languages. `js.idfkit.com` is retired and redirects there.
 
 | Package            | What it is                                        | npm                                                                |
 | ------------------ | ------------------------------------------------- | ------------------------------------------------------------------ |
@@ -17,14 +24,40 @@ Python [idfkit](https://github.com/idfkit/idfkit), not a transliteration of it.
 It sits alongside [`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine),
 which runs EnergyPlus itself in the browser via WebAssembly. This repository
 handles the model; that one handles the simulation. See
-[How to run a simulation](https://js.idfkit.com/how-to/run-a-simulation/) for how
-the two fit together.
+[How to run a simulation in the browser](https://developers.idfkit.com/how-to/run-a-simulation-in-the-browser/)
+for how the two fit together.
 
-> **Status: prototype.** The core is complete and tested against the full
-> EnergyPlus example set, but nothing has been published and the API is not yet
-> stable. See [Parity with the Python
-> library](https://js.idfkit.com/explanation/parity/) for what is deliberately
-> missing.
+> [!IMPORTANT]
+> **The next release renames four exports and moves the generated types out of
+> `@idfkit/core`.**
+>
+> | Before                                              | After                                                |
+> | --------------------------------------------------- | ---------------------------------------------------- |
+> | `IDFDocument`                                       | `IdfDocument`                                        |
+> | `detectVersion(text)`                               | `getIdfVersion(text)`                                |
+> | `detectEpJsonVersion(text)`                         | `getEpJsonVersion(text)`                             |
+> | `doc.collection(type)`                              | `doc.all(type)`                                      |
+> | `import type { TypeMap } from '@idfkit/core/types'` | `import type { TypeMap } from '@idfkit/types-v26-1'` |
+>
+> Every one is a build-time failure naming the file and line, in plain JavaScript
+> as well as TypeScript, so nothing here reaches runtime. The type move is what
+> takes `@idfkit/core` from 6.7 MB unpacked to 286 KB. Full notes in the
+> [changelog](CHANGELOG.md#migration).
+
+> **Status: beta, and first-tier only.** `@idfkit/core`, `@idfkit/schemas` and
+> `@idfkit/weather` are published at 0.1.0. The API is not yet stable.
+>
+> All thirteen first-tier capabilities exist here: parsing, the object model,
+> references, writers, schema access, validation, introspection, documentation
+> addresses, generated object types, parse diagnostics, the weather station
+> index, weather file retrieval, and geocoding. Second- and third-tier
+> capabilities are Python-only for now, and a few are permanently so.
+>
+> That is a real difference between the two libraries and not a rounding error,
+> so read [Capability
+> parity](https://developers.idfkit.com/explanation/parity/) before assuming an
+> operation you know from Python exists here. It lists every capability, its
+> state in each language, and whether an absence is temporary or permanent.
 
 ## Install
 
@@ -32,11 +65,23 @@ the two fit together.
 npm install @idfkit/core @idfkit/schemas
 ```
 
+Static per-version field types are opt-in and installed by name, so nobody pays
+5.3 MB of declarations to parse a file. Everything below works without them,
+untyped.
+
+```bash
+npm install --save-dev @idfkit/types-v26-1
+```
+
+> The type packages are built and gated but not yet on the registry, so that
+> install fails today. Drop the `TypeMap` import from the quickstart until they
+> publish; the runtime behaviour is identical either way.
+
 ## Quickstart
 
 ```ts
 import { loadIdf, saveIdf } from '@idfkit/core/node';
-import type { TypeMap } from '@idfkit/core/types/v26-1';
+import type { TypeMap } from '@idfkit/types-v26-1';
 
 const doc = await loadIdf<TypeMap>('model.idf');
 
@@ -71,24 +116,24 @@ const index = await loadStationIndex('/stations.json.gz');
 const epw = await fetchEpw(index.search('chicago ohare')[0].station);
 ```
 
-See [How to fetch a weather
-file](https://js.idfkit.com/how-to/fetch-weather-files/).
+See [Download weather
+files](https://developers.idfkit.com/weather/downloads/).
 
 New to the library? [Build your first
-model](https://js.idfkit.com/tutorials/first-model/) goes from nothing to a
-model on disk in about fifteen minutes.
+model](https://developers.idfkit.com/tutorials/first-model/) goes from nothing
+to a model on disk in about fifteen minutes.
 
 ## Why it is built this way
 
 Five decisions shape the API, each chosen over an obvious alternative:
 
-| Decision                                                                                       | In short                                                                                         |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [A synchronous core with async edges](https://js.idfkit.com/explanation/sync-core-async-edge/) | The same core runs in Node, a browser, a worker, and an edge runtime.                            |
-| [Real accessors, not a `Proxy`](https://js.idfkit.com/explanation/accessors-not-proxies/)      | Editors can see the fields, V8 can optimize them, and the setter keeps the reference graph live. |
-| [Static types generated from the schema](https://js.idfkit.com/explanation/generated-types/)   | 858 interfaces per version, so a misspelled field is a compile error.                            |
-| [Content-addressed schemas](https://js.idfkit.com/explanation/content-addressed-schemas/)      | All 17 versions in ~1 MB gzipped instead of 11.9 MB.                                             |
-| [epJSON field names verbatim](https://js.idfkit.com/explanation/epjson-field-names/)           | `zone_name`. No name-conversion layer to get wrong.                                              |
+| Decision                                                                                               | In short                                                                                         |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| [A synchronous core with async edges](https://developers.idfkit.com/explanation/sync-core-async-edge/) | The same core runs in Node, a browser, a worker, and an edge runtime.                            |
+| [Real accessors, not a `Proxy`](https://developers.idfkit.com/explanation/accessors-not-proxies/)      | Editors can see the fields, V8 can optimize them, and the setter keeps the reference graph live. |
+| [Static types generated from the schema](https://developers.idfkit.com/explanation/generated-types/)   | 858 interfaces per version, so a misspelled field is a compile error.                            |
+| [Content-addressed schemas](https://developers.idfkit.com/explanation/content-addressed-schemas/)      | All 17 versions in ~1 MB gzipped instead of 11.9 MB.                                             |
+| [epJSON field names verbatim](https://developers.idfkit.com/explanation/epjson-field-names/)           | `zone_name`. No name-conversion layer to get wrong.                                              |
 
 ## Correctness
 
@@ -108,7 +153,7 @@ throughput     ~36k objects/sec (parse + write + re-parse)
 IDF is a positional format, so its edge cases corrupt a model quietly rather than
 failing. Every such case the example set has surfaced is pinned in
 `packages/core/tests/regressions.test.ts`. See [How conformance is
-established](https://js.idfkit.com/explanation/conformance/).
+established](https://developers.idfkit.com/explanation/conformance/).
 
 ## Development
 

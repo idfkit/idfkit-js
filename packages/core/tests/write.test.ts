@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { IDFDocument, parseIdf, writeEpJson, writeIdf } from '@idfkit/core';
+import { IdfDocument, parseIdf, writeEpJson, writeIdf } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema } from './helpers.js';
@@ -10,9 +10,9 @@ beforeAll(async () => {
   v26 = await schema('26.1.0');
 });
 
-let doc: IDFDocument;
+let doc: IdfDocument;
 beforeEach(() => {
-  doc = new IDFDocument(v26);
+  doc = new IdfDocument(v26);
 });
 
 describe('writeIdf', () => {

@@ -4,8 +4,9 @@
  * This is deliberately NOT the raw epJSON schema. Keys are single letters and
  * documentation metadata (`note`, `ip-units`, `field_info`) is dropped, because
  * this bundle is on the critical path of every parse and, in a browser, every
- * page load. Human-facing metadata lives in `@idfkit/schemas/docs`, which only
- * tooling that renders documentation needs to pull in.
+ * page load. This package republishes that metadata nowhere; tooling that
+ * renders documentation reads the raw epJSON schemas directly, or uses
+ * idfkit-docs (https://docs.idfkit.com).
  */
 
 /** Field storage class, mirroring how the IDF writer must format the value. */
@@ -22,22 +23,59 @@ export type FieldKind =
 export interface SlimField {
   /** Storage class. */
   t: FieldKind;
-  /** Field accepts `Autosize` / `Autocalculate` in addition to a number. */
+  /**
+   * Field is an `anyOf` of a numeric branch and a string branch, in that order.
+   *
+   * Set for every one of the 13060 such fields across the 17 bundled versions.
+   * The numeric branch's type, enum and bounds are hoisted onto this record;
+   * the string branch survives as `se`.
+   */
   auto?: 1;
+  /**
+   * String literals the `anyOf` string branch accepts, verbatim from the schema.
+   *
+   * Only meaningful together with `auto`. Absent while `auto` is set means the
+   * string branch carries no enum at all and ANY string is legal there, which is
+   * the shape of 646 fields including `Schedule:Compact`'s extensible `field`.
+   * That is why the empty string is kept here rather than filtered out the way
+   * `e` filters it: `se: ['']` (the whole string branch of the 68 fields whose
+   * number branch carries a numeric enum) and no `se` at all mean the opposite
+   * of one another.
+   *
+   * The sentinel is not a constant: 10565 fields take `Autosize` and 1781 take
+   * `Autocalculate`, so a validator that accepts either everywhere accepts a
+   * value EnergyPlus rejects.
+   */
+  se?: string[];
   /** Names of reference lists this field points *into* (i.e. it is a foreign key). */
   ol?: string[];
   /** Names of reference lists this field contributes *to* (i.e. it is a key). */
   ref?: string[];
-  /** Permitted values for a choice field. */
-  e?: string[];
+  /**
+   * Permitted values for a choice field.
+   *
+   * Numbers, not strings, on the 68 fields across the versions that express a
+   * choice numerically (`e: [1, 3]` on `Site:GroundDomain:Slab.phase`). Compare
+   * strings case-insensitively and numbers by value.
+   */
+  e?: (string | number)[];
   /** Schema default, applied on write when the field is absent. */
   d?: string | number;
   min?: number;
   max?: number;
-  /** Exclusive minimum. */
-  xmin?: number;
-  /** Exclusive maximum. */
-  xmax?: number;
+  /**
+   * Exclusive minimum, in whichever JSON Schema dialect the version shipped.
+   *
+   * A number is the bound itself (draft-06+, 9.6.0 onwards). The boolean `true`
+   * qualifies the sibling `min`, making it exclusive (draft-04, 8.9.0 through
+   * 9.5.0). Measured across the bundled schemas: `xmin` is boolean 9013 times
+   * in the older seven versions and numeric 13840 times in the newer ten;
+   * `xmax` behaves identically, and no version mixes the two. Branch on the
+   * value's type, never on the version.
+   */
+  xmin?: number | boolean;
+  /** Exclusive maximum. Number or boolean, exactly as `xmin`. */
+  xmax?: number | boolean;
   /** SI units, used by the unit-conversion helpers. */
   u?: string;
   /** Value is case-sensitive and must not be normalized. */

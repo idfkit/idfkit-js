@@ -36,7 +36,7 @@ npx tsc -p tsconfig.test.json                # typecheck sources AND tests
 npx tsc --build                              # build to dist/
 npm run format:check                         # prettier
 npm run build:schemas                        # regenerate the schema bundle
-npm run codegen -w @idfkit/core -- 26.1.0    # regenerate TypeScript interfaces
+npm run codegen -- 26.1.0                    # regenerate a @idfkit/types-* package
 npm run docs:serve                           # docs at 127.0.0.1:8000
 npm run docs:build                           # --strict; what CI runs
 ```
@@ -52,7 +52,7 @@ typechecking, so the `@ts-expect-error` assertions in `packages/core/tests/typed
 
 ### Core object model
 
-- **`IDFDocument<M>`** — collections by type, live reference graph, bound to one
+- **`IdfDocument<M>`** — collections by type, live reference graph, bound to one
   EnergyPlus version. `M` is an optional generated type map (see below).
 - **`IdfObject`** — one EnergyPlus object. Fields are real accessors on a
   per-type prototype, built in `shape.ts`.
@@ -76,7 +76,10 @@ alternative for a reason that is not visible from the code alone.
    `Object.defineProperty` accessors, shared by every instance. The setter is
    what keeps the reference graph live.
 
-3. **Generated static types** (`scripts/emit-types.mjs`, `typemap.ts`). The
+3. **Generated static types** (`scripts/emit-types.mjs`, `typemap.ts`). They
+   live in opt-in packages, `@idfkit/types-v26-1` and `@idfkit/types-v9-4`, one
+   `index.d.ts` each and no runtime code at all — `npm run check:type-packages`
+   fails the build on a single emitted JavaScript byte. The
    `TypeMap` must be emitted as a `type` alias, not an `interface`: interfaces
    have no implicit index signature and cannot satisfy `Record<string, object>`.
    `add()` takes `ValuesOf` (exact interface, so typos are caught) while `all()`

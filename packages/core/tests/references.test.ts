@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { IDFDocument } from '@idfkit/core';
+import { IdfDocument } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema } from './helpers.js';
@@ -10,9 +10,9 @@ beforeAll(async () => {
   v26 = await schema('26.1.0');
 });
 
-let doc: IDFDocument;
+let doc: IdfDocument;
 beforeEach(() => {
-  doc = new IDFDocument(v26);
+  doc = new IdfDocument(v26);
   doc.add('Zone', 'Z1');
   doc.add('Construction', 'C1', { outside_layer: 'M1' });
   doc.add('BuildingSurface:Detailed', 'S1', { zone_name: 'Z1', construction_name: 'C1' });
