@@ -90,6 +90,18 @@ jobs:
           tar --create --gzip --file docs-snippets.tar.gz docs-snippets tsconfig.docs.json
           ls -l docs-snippets.tar.gz .typedoc.json
 
+      - name: Name the TypeDoc asset the way the site fetches it
+        # TypeDoc writes a dotfile, and a release asset's name comes from the file's basename.
+        # GitHub will not serve an asset whose name begins with a dot, so it rewrites
+        # `.typedoc.json` to `default.typedoc.json` on upload. `gh release create` accepts a
+        # `file#label` suffix, but that sets the DISPLAY LABEL and leaves the name alone, so the
+        # rewrite happens anyway and the download URL the consumer builds is a 404.
+        #
+        # The consumer is scripts/sync_js_artifacts.py in idfkit-developers, which fetches
+        # releases/download/<tag>/typedoc.json by construction rather than by listing the
+        # release. Copying the file to the name it is fetched under is the whole fix.
+        run: cp .typedoc.json typedoc.json
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -106,4 +118,4 @@ jobs:
             --title "Documentation artifacts $TAG" \
             --notes "TypeScript examples and TypeDoc reference for the unified documentation site, from ${GITHUB_SHA}." \
             docs-snippets.tar.gz \
-            '.typedoc.json#typedoc.json'
+            typedoc.json
