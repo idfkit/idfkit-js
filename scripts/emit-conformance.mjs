@@ -32,6 +32,8 @@ import { dirname, join, relative } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = join(ROOT, 'packages', 'core', 'package.json');
 const OUTPUT = join(ROOT, 'packages', 'core', 'src', 'conformance.ts');
+/** The publication gate, whose attested level must not fall behind the pin. */
+const PUBLICATION_GATE = join(ROOT, 'scripts', 'check-publication.mjs');
 
 const LEVEL_PATTERN = /^conformance-\d{4}\.\d+$/;
 
@@ -103,7 +105,39 @@ if (checkOnly) {
     );
     process.exit(1);
   }
-  console.log(`✅ CONFORMANCE_LEVEL matches the declared ${level}`);
+  // The publication gate's own copy of the level, which is a HUMAN ATTESTATION rather than a
+  // lookup: FR-044's proven-agreement precondition is a property of two libraries and that check
+  // can only see one, so someone writes down the level after checking both. It is deliberately not
+  // derived from the pin, which is exactly why it can fall behind one.
+  //
+  // It did, between conformance-2026.7 and 2026.8, and nothing said so until a release was
+  // attempted: the CI job passes --report, and --report exits 0 on a finding. Comparing the two
+  // here fails the cheap gate on the change that moves the pin instead. Moving the pin is now the
+  // moment you are asked to re-attest, which is when you have the evidence in front of you.
+  const gate = readFileSync(PUBLICATION_GATE, 'utf8');
+  const attested = /^const REQUIRED_CONFORMANCE = '([^']+)';$/m.exec(gate)?.[1];
+  if (attested === undefined) {
+    console.error(
+      `❌ no REQUIRED_CONFORMANCE constant in ${relative(ROOT, PUBLICATION_GATE)}.\n` +
+        '   The publication gate states the level both libraries publish at; it cannot be dropped.'
+    );
+    process.exit(1);
+  }
+  if (attested !== level) {
+    console.error(
+      `❌ ${relative(ROOT, PUBLICATION_GATE)} attests ${attested}, but the pin in ` +
+        `${relative(ROOT, MANIFEST)} is ${level}.\n` +
+        '   That constant is what FR-044 rests on: it says the level BOTH libraries publish at,\n' +
+        '   and only a human who checked the other library can move it. Confirm the Python pin in\n' +
+        "   idfkit's pyproject.toml under [tool.idfkit.conformance] and that its Conformance job\n" +
+        '   is green at that level, then update REQUIRED_CONFORMANCE and its evidence comment.'
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `✅ CONFORMANCE_LEVEL matches the declared ${level}, and the publication gate attests it`
+  );
 } else {
   writeFileSync(OUTPUT, rendered, 'utf8');
   console.log(`Wrote ${relative(ROOT, OUTPUT)} declaring ${level}`);

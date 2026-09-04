@@ -101,15 +101,31 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 class CannotRun extends Error {}
 
 /**
- * The conformance level this release publishes against. Both pins must be at it.
+ * The conformance level this release publishes against. Both libraries must be at it.
  *
- * T101 names conformance-2026.6, the level that proved the Tier 1 port. This is 2026.7, which
- * contains all of it plus the type-lookup assertion and its case, so FR-044's "proven agreement"
- * precondition is met more strongly rather than less. Advance this whenever both pins advance:
- * the check asserts the two pins agree with each other AND with the level named here, so a pin
- * that moves without this constant is caught, and so is this constant moving on its own.
+ * A HUMAN ATTESTATION, and that is the whole point of it being a constant rather than a lookup.
+ * FR-044's first precondition is proven agreement, which is a property of TWO libraries, and this
+ * check can only see one: it runs the corpus against the JavaScript side, while the Python side is
+ * asserted by the run in that repository and is not observable from here. So the level is written
+ * down by someone who checked both, and moving it is the act of re-attesting.
+ *
+ * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.8, and the
+ * evidence for it, taken rather than recalled:
+ *
+ *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.8
+ *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.8
+ *   idfkit       the Conformance job on main                       green at that level
+ *
+ * Each level since 2026.6 contains all of it and adds cases, so the precondition is met more
+ * strongly rather than less.
+ *
+ * ADVANCE THIS WHENEVER BOTH PINS ADVANCE. It went stale once, between 2026.7 and 2026.8, and the
+ * staleness surfaced only when a release was attempted, because the CI job runs with --report and
+ * --report exits 0 on a finding. `emit-conformance.mjs --check` now compares this constant against
+ * the pin on every run, so the next time the two part company it fails a cheap gate on the change
+ * that caused it rather than a release months later.
  */
-const REQUIRED_CONFORMANCE = 'conformance-2026.7';
+const REQUIRED_CONFORMANCE = 'conformance-2026.8';
 
 /** The distribution gates, precondition 4. Order is cheapest first. */
 const DISTRIBUTION_GATES = [
@@ -464,7 +480,11 @@ function firstTier(corpus, pins, argv, override) {
     (entry) =>
       (entry.python === 'partial' || entry.typescript === 'partial') && entry.differences === ''
   );
-  p.probe('tier-1 partials described', undescribed.length === 0, `${undescribed.length} without differences`);
+  p.probe(
+    'tier-1 partials described',
+    undescribed.length === 0,
+    `${undescribed.length} without differences`
+  );
   if (undescribed.length > 0) {
     p.fail(
       `${undescribed.length} partial tier-1 capability(ies) carry no differences note: ${undescribed.map((e) => e.id).join(', ')}`,
@@ -578,7 +598,9 @@ async function main() {
   console.log(`  pins         ${pins.conformance}, ${pins.governance}`);
   console.log(`  mode         ${report ? '--report (informational)' : 'publication gate'}`);
   if (override !== undefined) {
-    console.log(`  OVERRIDE     governance read from ${override} (working tree), not ${pins.governance}`);
+    console.log(
+      `  OVERRIDE     governance read from ${override} (working tree), not ${pins.governance}`
+    );
     console.log('               Never do this in CI, and never to approve a publication.');
   }
   console.log('');
@@ -620,7 +642,9 @@ async function main() {
     return 0;
   }
 
-  console.log(`${findings.length} finding${findings.length === 1 ? '' : 's'} across ${unmet.length} precondition(s)`);
+  console.log(
+    `${findings.length} finding${findings.length === 1 ? '' : 's'} across ${unmet.length} precondition(s)`
+  );
   for (const p of unmet) {
     for (const finding of p.findings) {
       console.log(`\n  [${p.number}. ${p.clause}] ${finding.message}`);
