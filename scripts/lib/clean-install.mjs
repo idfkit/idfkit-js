@@ -4,7 +4,7 @@
  * WHAT A "CLEAN INSTALL" HAS TO MEAN HERE
  *
  * Five of the criteria in `contracts/distribution.md` are statements about what
- * `npm install idfkit` puts on a stranger's disk: under 1.5 MB (SC-012), zero
+ * `npm install idfkit` puts on a stranger's disk: under 1.75 MB (SC-012), zero
  * station-index bytes (SC-016), zero type-package bytes (SC-014), no
  * post-install scripting (SC-015), and a browser bundle that pulls in none of
  * the data (SC-013). None of them can be measured against this workspace. A
@@ -294,13 +294,16 @@ export function npmInstall(dir, extraFlags = []) {
  *
  * WHY BOTH, AND WHY THE CRITERION IS THE APPARENT ONE
  *
- * A clean facade install is 137 files, and it measures 1.32 MB of file content
- * against 1.6 MB of allocated disk blocks. The gap is not waste in the package:
- * it is the filesystem rounding 137 small files up to its allocation unit,
+ * A clean facade install is 141 files, and it measures 1.33 MB of file content
+ * against 1.66 MB of allocated disk blocks. The gap is not waste in the package:
+ * it is the filesystem rounding 141 small files up to its allocation unit,
  * 4 KB on the ext4 of a GitHub runner and on the APFS of a developer's laptop.
  *
- * That gap straddles the 1.5 MB budget of SC-012, so the choice of measure
- * decides the verdict. This gate measures APPARENT bytes, for two reasons:
+ * That gap straddled the 1.5 MB budget SC-012 carried until 2026-09-03, so the
+ * choice of measure decided the verdict outright; under the amended 1.75 MB both
+ * readings pass today, and both will not once the schema prose lands. Either way
+ * this gate measures APPARENT bytes, for two reasons that do not depend on where
+ * the line currently sits:
  *
  *   1. Allocated size is a property of the filesystem, not of the package. The
  *      same tarball measures differently on ext4, APFS, ZFS with compression,

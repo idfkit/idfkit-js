@@ -13,7 +13,7 @@
  *                    functional without it" (FR-043)
  *
  * The index is 1.6 MB, which is 92 percent of the weather package's footprint
- * and more than the entire remaining install. SC-012's budget of 1.5 MB cannot
+ * and more than the entire remaining install. SC-012's budget of 1.75 MB cannot
  * absorb it, so the saving is taken by moving weather out of what the shared
  * name installs rather than by moving the index anywhere. Nothing is retrieved
  * at run time and no hosted index exists (R11): the file still ships, inside a
