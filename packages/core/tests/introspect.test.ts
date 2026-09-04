@@ -9,7 +9,7 @@ import type { Schema } from '@idfkit/schemas';
 import { describeObjectType } from '../src/introspect/describe.js';
 import type { FieldDescription, ObjectDescription } from '../src/introspect/describe.js';
 
-import { schema } from './helpers.js';
+import { prose as loadProse, schema } from './helpers.js';
 
 let v26: Schema;
 beforeAll(async () => {
@@ -271,7 +271,9 @@ const PYTHON_SHAPES: Record<string, PythonShape> = {
 const PYTHON_FIELD_NAME_DIGEST = '9a62d871cc2c194a1ae1b273db7c9730195f4161202696c8058a9772f6955925';
 
 /**
- * The only two types whose field ORDER cannot be reproduced from the bundle.
+ * The two types whose field ORDER could not be reproduced from the bundle, until
+ * feature 002 recorded declaration order in `SlimType.fo`. Kept, with Python's
+ * order as the expectation, so the closure cannot silently come undone.
  *
  * Both take Python's fallback path — `legacy_idd.fields` is just `["name"]`, so
  * Python orders their fields by the schema's property declaration order. The
@@ -280,11 +282,11 @@ const PYTHON_FIELD_NAME_DIGEST = '9a62d871cc2c194a1ae1b273db7c9730195f4161202696
  * gone. For 57 of the 59 fallback types in 26.1.0 that is invisible, because
  * they have at most one fixed property; these two have two.
  *
- * Deliberately not patched with an "array key sorts last" rule: it would happen
- * to fix both here, and it is wrong for `SolarCollector:UnglazedTranspired:Multisystem`
- * in 8.9.0 through 9.2.0, where the array really is declared first. Closing this
- * needs the bundle to record declaration order, which is a `@idfkit/schemas`
- * change.
+ * It was deliberately not patched with an "array key sorts last" rule: that
+ * would have happened to fix both here and is wrong for
+ * `SolarCollector:UnglazedTranspired:Multisystem` in 8.9.0 through 9.2.0, where
+ * the array really is declared first. It was closed the way that comment said
+ * it had to be, by recording declaration order in the bundle.
  *
  * These two are the whole list for 9.4.0 through 26.1.0. 8.9.0 through 9.2.0 add
  * six more, because there the array's `items.properties` order also differs from
@@ -350,8 +352,8 @@ function field(description: ObjectDescription, name: string): FieldDescription {
 }
 
 /** Every description in the version, computed once and reused. */
-function describeAll(s: Schema): ObjectDescription[] {
-  return s.typeNames.map((name) => describeObjectType(s, name));
+function describeAll(s: Schema, prosePool?: readonly string[]): ObjectDescription[] {
+  return s.typeNames.map((name) => describeObjectType(s, name, prosePool));
 }
 
 describe('describeObjectType', () => {
@@ -451,13 +453,15 @@ describe('agreement with Python', () => {
     expect(digest).toBe('02aef807379219fa13dcf3c7df3c6592126dfca01684e1c868b3b5dae5fdeadd');
   });
 
-  it('diverges from Python on exactly the two documented orderings', () => {
+  it('agrees with Python on the two orderings that used to diverge', () => {
+    // Closed by feature 002, exactly as the comment on KNOWN_ORDER_DIVERGENCES
+    // said it would have to be: the bundle now records declaration order in
+    // `SlimType.fo` for the three types whose `legacy_idd.fields` holds only
+    // the name, and `orderedFieldNames` reads it instead of falling back to the
+    // alphabetized key list.
     for (const [typeName, expected] of Object.entries(KNOWN_ORDER_DIVERGENCES)) {
       const names = describeObjectType(v26, typeName).fields.map((f) => f.name);
-      expect(names).toEqual(expected.typescript);
-      expect(names).not.toEqual(expected.python);
-      // The names are all there; only their order differs.
-      expect([...names].sort()).toEqual([...expected.python].sort());
+      expect(names).toEqual(expected.python);
     }
   });
 
@@ -670,36 +674,40 @@ describe('ordinary field constraints', () => {
   });
 });
 
-describe('metadata the slim schema does not carry', () => {
-  it('reports memo and note as absent rather than inventing them', () => {
-    // Python fills memo for 845 of 858 types and note for 6212 of 12712 fields,
-    // both from keys the slim bundle drops on purpose (see @idfkit/schemas'
-    // types.ts header). The members stay in the type — the naming register
-    // requires the same field set on both sides — but nothing here fabricates a
-    // value from the type or field name.
+/**
+ * Feature 002 closed all three of these. Each `it` below asserted the gap until
+ * 2026-09-04 and now asserts the agreement, which is the same test pointed the
+ * other way rather than a new one.
+ */
+describe('metadata the slim schema carries since feature 002', () => {
+  it('reports memo and note as absent when no prose pool is supplied', () => {
+    // The pool is opt-in and the signature stayed synchronous, so a caller who
+    // passes nothing must see exactly what they saw before (FR-014). This is
+    // the guarantee that makes the change additive, and it is permanent.
     const zone = describeObjectType(v26, 'Zone');
 
     expect(zone.memo).toBeUndefined();
     expect(zone.fields.every((f) => f.note === undefined)).toBe(true);
   });
 
-  it('drops the empty-string choice that Python keeps', () => {
-    // The bundle filters "" out of every enum. Python keeps it: 1378 of its
-    // 2293 enum-bearing fields in 26.1.0 include "". Not recoverable here.
-    const compact = field(describeObjectType(v26, 'Zone'), 'part_of_total_floor_area');
+  it('keeps the empty-string choice Python keeps', () => {
+    // The bundle still filters "" out of `e`, because `e` is what validation
+    // checks against and admitting the blank there would change what validate()
+    // accepts. `eb` records that it was there and the description path restores
+    // it, which is why this agrees with Python without validation moving.
+    const partOfArea = field(describeObjectType(v26, 'Zone'), 'part_of_total_floor_area');
 
-    expect(compact.enumValues).toEqual(['No', 'Yes']);
+    expect(partOfArea.enumValues).toEqual(['', 'No', 'Yes']);
   });
 
-  it('has no enum for an autosizable field, where Python reports the branch enum', () => {
-    // Python's `enum_values` falls through to the first anyOf branch carrying an
-    // enum, which for these fields is ["", "Autocalculate"] or ["", "Autosize"].
-    // `enumValues` reports the NUMERIC branch's enum, which these fields do not
-    // have. The string branch's literals are in the bundle — `se`, which is what
-    // validation reads — but surfacing them here would change a difference the
-    // parity ledger records, which is a decision for that ledger and not for
-    // this port.
-    expect(field(describeObjectType(v26, 'Zone'), 'ceiling_height').enumValues).toBeUndefined();
+  it('reports the branch enum for an autosizable field, as Python does', () => {
+    // `se` holds the collapsed anyOf string branch and validation has always
+    // read it. The description path now reads it too, so the sentinels are
+    // visible on both sides: Autosize on 10,565 fields, Autocalculate on 1,781.
+    expect(field(describeObjectType(v26, 'Zone'), 'ceiling_height').enumValues).toEqual([
+      '',
+      'Autocalculate',
+    ]);
   });
 });
 
@@ -742,5 +750,166 @@ describe('purity', () => {
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
     expect(first.fields[0]).not.toBe(second.fields[0]);
+  });
+});
+
+/**
+ * Feature 002, US2: the three closures, asserted from the reader's side.
+ *
+ * These began as pins of the pre-closure behaviour, written before anything was
+ * touched so that a regression would be a red test rather than a discovery.
+ * They now assert what the closure produces. The two that still assert absence
+ * are not leftovers: they are the FR-014 guarantee that a caller who supplies
+ * no prose pool sees exactly what they saw before, which is permanent.
+ */
+describe('feature 002, describing a type agrees across both languages', () => {
+  it('reports no type prose when no pool is supplied', () => {
+    const zone = describeObjectType(v26, 'Zone');
+
+    expect(zone.memo).toBeUndefined();
+  });
+
+  it('reports no field prose when no pool is supplied', () => {
+    const zone = describeObjectType(v26, 'Zone');
+    const ceilingHeight = zone.fields.find((f) => f.name === 'ceiling_height');
+
+    expect(ceilingHeight).toBeDefined();
+    expect(ceilingHeight?.note).toBeUndefined();
+  });
+
+  it('reports the type prose Python reports, when a pool is supplied', async () => {
+    const prose = await loadProse();
+    const zone = describeObjectType(v26, 'Zone', prose);
+
+    // Length and prefix rather than the whole paragraph, which is 485
+    // characters. The exhaustive check is the digest below; this one is here so
+    // that a failure is readable.
+    expect(zone.memo).toMatch(/^Defines a thermal zone of the building\./);
+    expect(zone.memo).toHaveLength(485);
+  });
+
+  it('reports the field prose Python reports, when a pool is supplied', async () => {
+    const prose = await loadProse();
+    const zone = describeObjectType(v26, 'Zone', prose);
+    const ceilingHeight = zone.fields.find((f) => f.name === 'ceiling_height');
+
+    expect(ceilingHeight?.note).toMatch(/^If this field is 0\.0, negative or autocalculate/);
+    expect(ceilingHeight?.note).toHaveLength(352);
+  });
+
+  /**
+   * SC-005, the whole of it: every type in the version, every field, memo and
+   * note, against a digest taken from Python.
+   *
+   * Regenerate from the idfkit checkout with:
+   *
+   * ```py
+   * import hashlib
+   * from idfkit import get_schema, LATEST_VERSION
+   * from idfkit.introspection import describe_object_type
+   * s = get_schema(LATEST_VERSION)
+   * parts = []
+   * for name in sorted(s.object_types):
+   *     d = describe_object_type(s, name)
+   *     parts.append(f"{name}|{d.memo or ''}|" + ",".join((f.note or '') for f in d.fields))
+   * print(hashlib.sha256("\n".join(parts).encode()).hexdigest())
+   * ```
+   *
+   * This is the assertion that makes the prose closure real. One sentence
+   * matching proves the pool is wired; 858 types matching proves it is the
+   * right pool, indexed correctly, for every record in the version.
+   */
+  it('matches Python on every memo and note in the version', async () => {
+    const prose = await loadProse();
+    const lines = [...v26.typeNames].sort().map((name) => {
+      const d = describeObjectType(v26, name, prose);
+      const notes = d.fields.map((f) => f.note ?? '').join(',');
+      return `${name}|${d.memo ?? ''}|${notes}`;
+    });
+
+    const digest = createHash('sha256').update(lines.join('\n')).digest('hex');
+    expect(digest).toBe('dd4edd387ac4a365192cc6ba0b831e923d9f125ade8be2b9265d80c7d656800a');
+  });
+
+  /**
+   * Acceptance scenario 2: where the schema carries no prose, both languages
+   * report its absence rather than filling it with a placeholder.
+   *
+   * 13 of the 858 types in 26.1.0 have no memo. The pool cannot express "no
+   * prose" as a string, so a type with none carries no index at all, and the
+   * lookup returns undefined for the same reason it does with no pool.
+   */
+  it('reports absent prose as absent, even with a pool supplied', async () => {
+    const prose = await loadProse();
+    const all = describeAll(v26, prose);
+
+    const withoutMemo = all.filter((d) => d.memo === undefined);
+    expect(withoutMemo.length).toBeGreaterThan(0);
+    // Absent, never an empty string and never a fabricated stand-in.
+    expect(withoutMemo.every((d) => d.memo === undefined)).toBe(true);
+
+    const notes = all.flatMap((d) => d.fields.map((f) => f.note));
+    expect(notes.some((n) => n === undefined)).toBe(true);
+    expect(notes.every((n) => n === undefined || n.length > 0)).toBe(true);
+  });
+
+  it('keeps the blank that an enum declares', () => {
+    // Not `do_zone_sizing_calculation`, which BOTH sides drop: SimulationControl
+    // is anonymous, so the positional `[1:]` slice eats its first real field.
+    // That is a separate, already-recorded divergence and not this one.
+    const control = describeObjectType(v26, 'SimulationControl');
+    const doSystemSizing = control.fields.find((f) => f.name === 'do_system_sizing_calculation');
+
+    expect(doSystemSizing?.enumValues).toEqual(['', 'No', 'Yes']);
+  });
+
+  it('reports the sentinels held in the collapsed anyOf string branch', () => {
+    const layer = describeObjectType(v26, 'WindowMaterial:Glazing:EquivalentLayer');
+    const transmittance = layer.fields.find(
+      (f) => f.name === 'diffuse_diffuse_solar_transmittance'
+    );
+
+    expect(transmittance?.enumValues).toEqual(['', 'Autocalculate']);
+  });
+
+  /**
+   * The three types whose positional field list holds only the name, in every
+   * one of the 17 bundled versions. Two of them diverged from Python; the third,
+   * SolarCollector, agreed by alphabetical luck and is fixed anyway, because a
+   * schema edit renaming either field would otherwise break it in silence.
+   */
+  it('puts the name first for ZoneProperty:UserViewFactors:BySurfaceName', () => {
+    expect(
+      describeObjectType(v26, 'ZoneProperty:UserViewFactors:BySurfaceName').fields.map((f) => f.name)
+    ).toEqual([
+      'zone_or_zonelist_or_space_or_spacelist_name',
+      'view_factors',
+      'from_surface',
+      'to_surface',
+      'view_factor',
+    ]);
+  });
+
+  it('puts the name first for ZoneTerminalUnitList', () => {
+    expect(describeObjectType(v26, 'ZoneTerminalUnitList').fields.map((f) => f.name)).toEqual([
+      'zone_terminal_unit_list_name',
+      'terminal_units',
+      'zone_terminal_unit_name',
+    ]);
+  });
+
+  it('leaves SolarCollector:UnglazedTranspired:Multisystem where it already was', () => {
+    expect(
+      describeObjectType(v26, 'SolarCollector:UnglazedTranspired:Multisystem').fields.map(
+        (f) => f.name
+      )
+    ).toEqual([
+      'solar_collector_name',
+      'systems',
+      'outdoor_air_system_collector_inlet_node',
+      'outdoor_air_system_collector_outlet_node',
+      'outdoor_air_system_mixed_air_node',
+      'outdoor_air_system_zone_node',
+    ]);
   });
 });

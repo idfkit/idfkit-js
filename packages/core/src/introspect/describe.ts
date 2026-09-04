@@ -105,7 +105,23 @@ export interface ObjectDescription {
  * Python raises `UnknownObjectTypeError`, which has no registered TypeScript
  * counterpart and so must not become a new exported class.
  */
-export function describeObjectType(schema: Schema, objType: string): ObjectDescription {
+/**
+ * The schema's explanatory prose, loaded on demand.
+ *
+ * A plain array of strings, indexed by `SlimType.m` and `SlimField.n`. It is
+ * passed in rather than reached for, and that is deliberate: reading it is
+ * asynchronous, `describeObjectType` is synchronous, and making the function
+ * async to fetch a file most callers do not want would be a breaking change
+ * serving the minority. Loading it is the caller's step, and its cost is
+ * visible at the call site instead of hidden inside a description.
+ */
+export type ProsePool = readonly string[];
+
+export function describeObjectType(
+  schema: Schema,
+  objType: string,
+  prose?: ProsePool
+): ObjectDescription {
   const type = schema.require(objType);
   // Exact-cased input resolves to itself, so this matches Python's verbatim
   // echo of the argument for every name Python accepts.
@@ -119,13 +135,17 @@ export function describeObjectType(schema: Schema, objType: string): ObjectDescr
   const fieldNames = orderedFieldNames(type);
 
   const fields: FieldDescription[] = fieldNames.map((name) =>
-    describeField(name, properties[name], required.has(name))
+    describeField(name, properties[name], required.has(name), prose)
   );
 
   return {
     objType: canonical,
-    // Not carried by the slim bundle. See ObjectDescription.memo.
-    memo: undefined,
+    // Resolved from the pool when one is supplied, and `undefined` otherwise —
+    // which is exactly what this returned before the pool existed, so a caller
+    // who passes nothing sees no change at all (FR-014). A type with no memo in
+    // the source schema also reports `undefined`, in both languages: absence is
+    // reported as absence rather than filled with a placeholder.
+    memo: lookupProse(type.m, prose),
     fields,
     requiredFields: [...requiredFields],
     hasName: type.anon !== 1,
@@ -162,7 +182,11 @@ function orderedFieldNames(type: SlimType): string[] {
   // not schema order. `AvailabilityManagerAssignmentList` is the type that shows
   // it — its two extensible fields are declared object-type first and sort
   // name first.
-  const ordered = names.length > 0 ? names : Object.keys(type.p);
+  // `fo` is the declaration order, recorded by the bundle for the three types
+  // whose `f` holds only the name. Without it the fallback below returns the
+  // key order of `p`, which `canonical()` sorted for content-addressing, and
+  // the reader gets alphabetical order where Python gives declaration order.
+  const ordered = names.length > 0 ? names : (type.fo ?? Object.keys(type.p)).slice();
 
   if (type.x !== undefined) {
     for (const name of type.x.fields) {
@@ -187,7 +211,8 @@ function mergedProperties(type: SlimType): Record<string, SlimField> {
 function describeField(
   name: string,
   field: SlimField | undefined,
-  required: boolean
+  required: boolean,
+  prose?: ProsePool
 ): FieldDescription {
   if (field === undefined) {
     // In the positional order but absent from the schema. Python reaches the
@@ -225,15 +250,60 @@ function describeField(
     required,
     default: field.d,
     units: field.u,
-    enumValues: field.e === undefined ? undefined : [...field.e],
+    enumValues: acceptedValues(field),
     minimum: collapsedAnyOf ? undefined : field.min,
     maximum: collapsedAnyOf ? undefined : field.max,
     exclusiveMinimum: collapsedAnyOf ? undefined : field.xmin,
     exclusiveMaximum: collapsedAnyOf ? undefined : field.xmax,
-    note: undefined,
+    note: lookupProse(field.n, prose),
     isReference: field.ol !== undefined,
     objectList: field.ol === undefined ? undefined : [...field.ol],
   };
+}
+
+/**
+ * Resolve a prose index against the pool.
+ *
+ * Returns `undefined` for a record with no prose, and for every record when no
+ * pool was supplied. Out-of-range is `undefined` too rather than a throw: a
+ * caller who hands in a pool from a different bundle build gets no prose, which
+ * is the same thing they had before, instead of a description that cannot be
+ * produced at all.
+ *
+ * @internal
+ */
+function lookupProse(index: number | undefined, prose: ProsePool | undefined): string | undefined {
+  if (index === undefined || prose === undefined) return undefined;
+  return prose[index];
+}
+
+/**
+ * The values a field accepts, as Python reports them.
+ *
+ * Two sources, and until feature 002 this read neither completely:
+ *
+ * - `e`, the choice list, with the empty string filtered out by the bundle
+ *   because `e` is what validation checks against. Python keeps the blank, so
+ *   `eb` records that it was there and it goes back on the front. It is always
+ *   the front: measured across all 17 schemas, all 21,962 blank-bearing enums
+ *   carry it at position 0.
+ * - `se`, the collapsed `anyOf` string branch, which holds the sentinels.
+ *   `Autosize` on 10,565 fields and `Autocalculate` on 1,781. Validation has
+ *   always read it (`validate/validate.ts:543`); this path never did, so
+ *   `WindowMaterial:Glazing:EquivalentLayer.diffuse_diffuse_solar_transmittance`
+ *   reported nothing where Python reported `['', 'Autocalculate']`.
+ *
+ * A field carries one or the other, never both: `se` exists only when the field
+ * was an `anyOf`, and `e` is then hoisted from the numeric branch. The 68
+ * fields that carry both are the numeric-enum ones, and Python reports the
+ * string branch for those, which is what taking `se` first does.
+ *
+ * @internal
+ */
+function acceptedValues(field: SlimField): (string | number)[] | undefined {
+  if (field.se !== undefined) return [...field.se];
+  if (field.e === undefined) return undefined;
+  return field.eb === 1 ? ['', ...field.e] : [...field.e];
 }
 
 /**
