@@ -244,14 +244,19 @@ jobs:
     #
     # Why it can fail on a shared runner at all. Every enforced number is a RATIO between two
     # figures measured in the same process on the same machine in the same run: a cursor answer
-    # against parseIdf over the same text, scanIdf against parseIdf, parseIdf against lex, and the
-    # same cursor answer on the reference model against a file one hundredth its size. A slower
-    # runner moves both halves together and the ratio does not move. Absolute milliseconds are
-    # printed for a human to read and nothing is held against them.
+    # against parseIdf over the same text, scanIdf against parseIdf, parseIdf against lex, the
+    # same cursor answer on the reference model against a file one hundredth its size, and the
+    # same answer at the two ends of one comment-free file. A slower runner moves both halves
+    # together and the ratio does not move. Absolute milliseconds are printed for a human to read
+    # and nothing is held against them.
     #
-    # The last of those four is the one that pins the design. A ratio against parseIdf could be
-    # met by a merely fast reparse; independence from file size could not, and a reparse shows a
-    # hundredfold difference on any machine.
+    # The last two are the ones that pin the design, and they pin different axes. A ratio against
+    # parseIdf could be met by a merely fast reparse; independence from file SIZE could not, and a
+    # reparse shows a hundredfold difference on any machine. But size independence compares two
+    # files and cannot see a cost that grows with the OFFSET, because both of its readings sit at
+    # the same place in their own file. That is a real defect rather than a hypothetical one: a
+    # backward search for an exclamation mark reads the whole prefix in a file that holds none,
+    # and it measured 925x here while every other gate on this list stayed green.
     steps:
       - uses: actions/checkout@v4
 

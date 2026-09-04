@@ -235,8 +235,8 @@ function checkExportMap(manifest, findings) {
     findings.push(
       new Finding(
         `the export map has ${extra.length} entry beyond the contract: ${extra.join(', ')}`,
-        'contracts/distribution.md pins the facade to exactly ' +
-          `${contracted.join(', ')}. A fifth subpath is how a name reserved in the register ` +
+        'contracts/distribution.md, plus the ./language entry, pins the facade to exactly ' +
+          `${contracted.join(', ')}. A sixth subpath is how a name reserved in the register ` +
           'leaks into the published surface as a subpath that resolves to nothing (FR-077).'
       )
     );
@@ -245,7 +245,7 @@ function checkExportMap(manifest, findings) {
     findings.push(
       new Finding(
         `the export map is missing ${missing.join(', ')}`,
-        'All four subpaths are mandatory. A flat facade with one eager entry point drags the ' +
+        'All five subpaths are mandatory. A flat facade with one eager entry point drags the ' +
           'schema data and the station index into every browser bundle (FR-038).'
       )
     );
@@ -287,8 +287,9 @@ function checkSubpathTargets(manifest, findings) {
         );
       }
 
-      const specifiers = new Set(reexportedSpecifiers(read(path)));
-      for (const match of read(path).matchAll(DYNAMIC_IMPORT)) specifiers.add(match[1]);
+      const source = read(path);
+      const specifiers = new Set(reexportedSpecifiers(source));
+      for (const match of source.matchAll(DYNAMIC_IMPORT)) specifiers.add(match[1]);
       if (specifiers.size === 0) {
         findings.push(
           new Finding(

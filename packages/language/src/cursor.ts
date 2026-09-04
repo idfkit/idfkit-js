@@ -147,10 +147,17 @@ function statementScanStart(text: string, offset: number): number {
  * Back to the start of its line, then forward for an exclamation mark before it. There are no
  * string literals and no escapes, so an exclamation mark on the line before this character always
  * opened a comment that is still open here, and one line is all it costs to know.
+ *
+ * The forward search is what keeps that promise. `lastIndexOf('!', index)` answers the same
+ * question and reads the whole prefix to do it whenever the file holds no exclamation mark before
+ * `index`, which is every position in a machine-written file that carries no comments at all: the
+ * cost then grows with how far into the file the cursor is, which is precisely what this module
+ * exists not to do. Searching forward from the line's own start stops at the line's end instead.
  */
 function insideComment(text: string, index: number): boolean {
   const lineStart = index === 0 ? 0 : text.lastIndexOf('\n', index - 1) + 1;
-  return text.lastIndexOf('!', index) >= lineStart;
+  const opened = text.indexOf('!', lineStart);
+  return opened !== -1 && opened <= index;
 }
 
 /** What one forward pass over a single statement found. */

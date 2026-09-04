@@ -1,0 +1,10 @@
+# The syntax fixture corpus is bytes, not text.
+#
+# `packages/core/tests/fixtures/syntax/` holds three files that differ from one another only in
+# their line endings, and the CI matrix runs the suite on windows-latest, where git's default
+# `core.autocrlf=true` rewrites every LF on checkout. Under that rewrite `line-endings-lf.idf` and
+# `line-endings-mixed.idf` both arrive as CRLF, the three fixtures become one fixture, and the tests
+# written for the distinction keep passing while measuring nothing.
+#
+# `-text` disables all end-of-line conversion for these paths in both directions.
+packages/core/tests/fixtures/syntax/*.idf -text

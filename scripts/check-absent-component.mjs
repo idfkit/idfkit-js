@@ -86,6 +86,7 @@ import {
   CannotRun,
   FACADE,
   Finding,
+  LANGUAGE,
   REPO,
   WEATHER,
   fixtureRoot,
@@ -98,8 +99,6 @@ import {
   writeJson,
 } from './lib/clean-install.mjs';
 
-/** The opt-in component reached as `idfkit/language` (FR-046). */
-const LANGUAGE = '@idfkit/language';
 
 /**
  * Importing an opt-in subpath with no peer. Prints the error rather than dying

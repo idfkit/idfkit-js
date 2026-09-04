@@ -82,7 +82,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { referenceModel, smallModel } from './corpus.mjs';
+import { commentFreeModel, referenceModel, smallModel } from './corpus.mjs';
 
 /* -------------------------------------------------------------------------- */
 /* The budgets, as data (FR-035)                                               */
@@ -98,6 +98,7 @@ import { referenceModel, smallModel } from './corpus.mjs';
  * @property {number} scanOverParse Largest multiple of `parseIdf` that `scanIdf` may cost.
  * @property {number} parseOverLex Largest multiple of `lex` that `parseIdf` may cost.
  * @property {number} fileSizeIndependence Largest factor between the same answer on the two models.
+ * @property {number} offsetIndependence Largest factor between the two ends of one comment-free file.
  * @property {number} cursorP95Ms SC-001's absolute figure. Reported, never enforced.
  */
 
@@ -128,6 +129,20 @@ export const BUDGETS = {
   // those two populations, and 3 is an order of magnitude below the linear one
   // while leaving 1.8x above the worst honest reading.
   fileSizeIndependence: 3,
+
+  // The same reasoning as above, turned on the other axis. `fileSizeIndependence`
+  // compares two files and so cannot see a cost that grows with the OFFSET rather
+  // than with the size: both of its readings sit at the same place in their own
+  // file. This one compares the first statement and the last of one file, and it
+  // uses a comment-free file because that is the shape that exposes the defect.
+  //
+  // Measured today at about 1. The defect this gate exists to catch measured
+  // 8,385 before it was fixed: `insideComment` searched backwards for an
+  // exclamation mark, which reads the whole prefix when the file holds none, so
+  // every answer cost grew with how far into the file the cursor sat. Nothing
+  // else in this script could see it, because the reference model puts a comment
+  // on nearly every line and the backward search always stopped within one.
+  offsetIndependence: 3,
 
   // SC-001. Reported, not enforced: an absolute millisecond figure is a statement
   // about a reference machine, and this script does not know which machine it is
@@ -567,6 +582,7 @@ async function main() {
   const built = await loadBuilt();
   const model = referenceModel();
   const variant = smallModel();
+  const commentFree = commentFreeModel();
 
   // `schemaFor`, not `bundle.load`, because that is the path a reader takes and
   // it is the one that resolves a declared version onto a bundled one: the corpus
@@ -707,6 +723,31 @@ async function main() {
     });
   }
 
+  // The other axis: cost that grows with the offset rather than with the file.
+  // Both readings are in ONE file, so a size ratio cannot explain a breach, and
+  // the file carries no comments because that is the shape that exposes it.
+  for (const answer of answers) {
+    const near = summarize(
+      timeAnswerAt((offset) => answer.ask(commentFree.text, offset), commentFree.near)
+    );
+    const far = summarize(
+      timeAnswerAt((offset) => answer.ask(commentFree.text, offset), commentFree.far)
+    );
+    gates.push({
+      name: `${answer.name}, last vs first statement, no comments`,
+      measured: Math.max(far.median / near.median, near.median / far.median),
+      budget: BUDGETS.offsetIndependence,
+      unit: 'times',
+      because:
+        'FR-033, on the axis the two-model gate cannot see. Both readings are in the same file, ' +
+        'so its size divides out and only the distance from the start differs. Any search that ' +
+        'runs backwards to a character the file does not contain reads the whole prefix, and ' +
+        'this ratio then grows with the file: it measured 8,385 when insideComment searched ' +
+        'backwards for an exclamation mark. The reference model cannot show it, because a ' +
+        'comment on nearly every line stops that search within one.',
+    });
+  }
+
   /* ------------------------------------------------------------------------ */
   /* The report, printed                                                      */
   /* ------------------------------------------------------------------------ */
@@ -799,12 +840,18 @@ async function main() {
     return 1;
   }
 
-  const independence = Math.max(...gates.slice(-answers.length).map((gate) => gate.measured));
+  // The last two batches of gates, each one per answer: file-size independence
+  // first, then offset independence. Reported apart because they are different
+  // claims and one passing says nothing about the other.
+  const worstOf = (batch) => Math.max(...batch.map((gate) => gate.measured));
+  const bySize = worstOf(gates.slice(-2 * answers.length, -answers.length));
+  const byOffset = worstOf(gates.slice(-answers.length));
   console.log(
     `PASS: all ${gates.length} gates hold. The slowest cursor answer costs ` +
       `${inUnit(worstAnswerP95 / wholeFile.parseIdf.median, 'percent')} of a full read of the ` +
-      `same text, and costs within ${inUnit(independence, 'times')} of the same in a file a ` +
-      'hundredth the size.'
+      `same text, costs within ${inUnit(bySize, 'times')} of the same in a file a hundredth ` +
+      `the size, and within ${inUnit(byOffset, 'times')} of the same at the far end of a ` +
+      'comment-free file.'
   );
   return 0;
 }

@@ -423,5 +423,14 @@ function fold(value: string): string {
  * different pairs produce one key.
  */
 function nameKey(type: string, name: string): string {
-  return `${type}\\u0000${name}`;
+  return `${type}${SEPARATOR}${name}`;
 }
+
+/**
+ * The NUL character itself, written as a constant rather than as an escape inside the template.
+ *
+ * `\u0000` inside a template literal needs one backslash, and a second one turns it into the
+ * six printable characters `\u0000`, which a name may perfectly well contain: the join would then
+ * be ambiguous in exactly the way the doc comment above says it is not.
+ */
+const SEPARATOR = '\u0000';

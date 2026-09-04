@@ -766,6 +766,58 @@ export function smallModel() {
 }
 
 /**
+ * The reference model with every comment removed, and its two extreme offsets.
+ *
+ * WHY THIS EXISTS. The composition above puts `!- Field Name` on very nearly
+ * every line, which is what a human-edited file looks like and is why the model
+ * is written that way. It also hides one whole class of defect: any backward
+ * search for an exclamation mark terminates within a line here, whatever the
+ * implementation, so a search that is unbounded and a search that is bounded to
+ * the line measure the same. A machine exporter writes no comments at all, and
+ * against that file the unbounded form reads the entire prefix and its cost
+ * grows with how far into the file the cursor sits.
+ *
+ * That is not a size effect, so `fileSizeIndependence` cannot see it: both
+ * offsets are in the same file. It is an offset effect, and it needs its own
+ * model and its own gate. This one was a live defect, measured at 8,385x
+ * between the two ends of an 800 KB comment-free file before it was fixed.
+ *
+ * Comments are stripped from the reference model rather than generated away, so
+ * the statements are the same statements and nothing about the composition can
+ * drift between the two.
+ *
+ * Not a `GeneratedModel`: it carries no `probe`, because the probe statement is
+ * identified by its comment and stripping the comments is the whole point. The
+ * two offsets it does carry are the only ones its gate asks for.
+ *
+ * @returns {{ text: string, statements: number, lines: number, bytes: number,
+ *             meaningfulTokens: number, near: number, far: number }}
+ */
+export function commentFreeModel() {
+  const source = referenceModel();
+  // From an exclamation mark to the end of its line, the newline kept. There are
+  // no string literals and no escapes, so nothing can hide an exclamation mark
+  // from this and it needs no scanner of its own.
+  const text = source.text.replace(/![^\n]*/g, '').replace(/^\s*\n/, '');
+  if (text.includes('!')) throw new Error('the comment-free model still carries a comment');
+
+  // The first statement, and the last one. Both are found in the text rather
+  // than computed from a length, so neither moves when the composition is edited.
+  const near = text.indexOf('Version') + 4;
+  const far = text.lastIndexOf(';');
+
+  return {
+    text,
+    statements: source.statements,
+    lines: text.split('\n').length - 1,
+    bytes: Buffer.byteLength(text, 'utf8'),
+    meaningfulTokens: countMeaningfulTokens(text),
+    near,
+    far,
+  };
+}
+
+/**
  * @param {GeneratedModel} model
  * @param {number} statements
  * @param {number} lines
