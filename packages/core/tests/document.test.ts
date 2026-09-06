@@ -330,13 +330,19 @@ describe('what positioning a finding depends on', () => {
 });
 
 /**
- * The three write paths a preserving writer has to hear about (feature 006, research R3).
+ * The three write paths a preserving writer has to hear about (feature 006).
  *
  * `get extensible()` handed back the live data array, so pushing a vertex or assigning into one
  * reached the object's data without passing any accessor and notified nobody. A writer that trusts
  * the listener emits that object's original vertices and discards the edit, in a file that loads.
  * These assert the notification rather than the writer, because the notification is what the
  * writer is entitled to trust.
+ *
+ * Every one of them reads with `preserveFormatting`, and that is load-bearing rather than
+ * incidental: hearing an in-place repeat edit costs an accessor on every field of every repeat,
+ * which is roughly thirty times a plain property read over the vertices of a real model. It is
+ * charged only where there is a touched record to maintain. The last test here is the other half
+ * of that rule.
  */
 describe('the document hears about every change to an object', () => {
   /** Records what the document was told, and still does everything it did before. */
@@ -349,72 +355,122 @@ describe('the document hears about every change to an object', () => {
     }
   }
 
-  let recording: Recording;
-  beforeEach(() => {
-    recording = new Recording(v26);
-  });
+  const SURFACE = [
+    'Version, 26.1;',
+    '',
+    'BuildingSurface:Detailed,',
+    '  S1,           !- Name',
+    '  Wall,         !- Surface Type',
+    '  C1,           !- Construction Name',
+    '  Z1,           !- Zone Name',
+    '  ,             !- Space Name',
+    '  Outdoors,     !- Outside Boundary Condition',
+    '  ,             !- Outside Boundary Condition Object',
+    '  SunExposed,   !- Sun Exposure',
+    '  WindExposed,  !- Wind Exposure',
+    '  ,             !- View Factor to Ground',
+    '  ,             !- Number of Vertices',
+    // The Z coordinate is left blank, so the repeat carries a field the file never wrote.
+    '  1.0, 0.0, ;',
+    '',
+  ].join('\n');
+
+  /**
+   * A preserving read whose document records what it is told.
+   *
+   * The parser builds an `IdfDocument`, so the recording subclass is given the parsed document's
+   * innards rather than the other way round: what is under test is the notification, and the
+   * cheapest way to observe it without a second parser is to re-add the objects to a recording
+   * document that carries the same retained source.
+   */
+  function recordingRead(): { doc: Recording; surface: IdfObject } {
+    const parsed = parseIdf(SURFACE, v26, { strict: false, preserveFormatting: true });
+    const doc = parsed.document as unknown as Recording;
+    Object.defineProperty(doc, 'changed', { value: [], writable: true, enumerable: false });
+    const original = doc.onFieldChanged.bind(doc);
+    doc.onFieldChanged = (obj, field, previous, next) => {
+      doc.changed.push(field);
+      original(obj, field, previous, next);
+    };
+    return { doc, surface: doc.require('BuildingSurface:Detailed', 'S1') };
+  }
 
   it('hears a push onto an extensible group', () => {
-    const surface = recording.add('BuildingSurface:Detailed', 'S1');
-    recording.changed.length = 0;
+    const { doc, surface } = recordingRead();
+    doc.changed.length = 0;
 
     surface.extensible.push({ vertex_x_coordinate: 1 });
 
-    expect(recording.changed).toEqual(['vertices']);
+    expect(doc.changed).toEqual(['vertices']);
   });
 
   it('hears an assignment into a repeat already in the group', () => {
-    const surface = recording.add('BuildingSurface:Detailed', 'S1');
-    surface.extensible.push({ vertex_x_coordinate: 1 });
-    recording.changed.length = 0;
+    const { doc, surface } = recordingRead();
+    expect(surface.extensible.length).toBeGreaterThan(0);
+    doc.changed.length = 0;
 
     surface.extensible[0]!['vertex_x_coordinate'] = 5;
 
-    expect(recording.changed).toEqual(['vertices']);
+    expect(doc.changed).toEqual(['vertices']);
   });
 
   it('hears a repeat spliced in, and does NOT hear one replaced by index', () => {
     // The one spelling the wrapper cannot catch, pinned so that it is a decision rather than a
     // surprise. Index assignment writes through the array's own slot, and catching it needs either
     // a Proxy or an accessor per index, both of which charge every vertex READ to catch a write.
-    // `splice` is the tracked way to say the same thing, and it is asserted here beside it so the
-    // test shows the alternative rather than only the gap.
-    const surface = recording.add('BuildingSurface:Detailed', 'S1');
-    surface.extensible.push({ vertex_x_coordinate: 1 });
-    recording.changed.length = 0;
+    // `splice` is the tracked way to say the same thing, asserted here beside it.
+    const { doc, surface } = recordingRead();
+    doc.changed.length = 0;
 
     surface.extensible[0] = { vertex_x_coordinate: 9 };
-    expect(recording.changed).toEqual([]);
+    expect(doc.changed).toEqual([]);
 
     surface.extensible.splice(0, 1, { vertex_x_coordinate: 9 });
-    expect(recording.changed).toEqual(['vertices']);
+    expect(doc.changed).toEqual(['vertices']);
   });
 
   it('hears a field written on a repeat the file never carried', () => {
     // A coordinate the file left blank is armed but not enumerable, so a repeat spreads and
     // compares exactly as a plain object until someone writes it. Writing it is a change.
-    const surface = recording.add('BuildingSurface:Detailed', 'S1');
-    surface.extensible.push({ vertex_x_coordinate: 1 });
-    expect({ ...surface.extensible[0] }).toEqual({ vertex_x_coordinate: 1 });
-    recording.changed.length = 0;
+    const { doc, surface } = recordingRead();
+    expect({ ...surface.extensible[0] }).toEqual({
+      vertex_x_coordinate: 1,
+      vertex_y_coordinate: 0,
+    });
+    doc.changed.length = 0;
 
     surface.extensible[0]!['vertex_z_coordinate'] = 3;
 
-    expect(recording.changed).toEqual(['vertices']);
+    expect(doc.changed).toEqual(['vertices']);
     expect({ ...surface.extensible[0] }).toEqual({
       vertex_x_coordinate: 1,
+      vertex_y_coordinate: 0,
       vertex_z_coordinate: 3,
     });
   });
 
   it('still reads as an array to everything that only reads it', () => {
-    const surface = recording.add('BuildingSurface:Detailed', 'S1');
-    surface.extensible.push({ vertex_x_coordinate: 1 }, { vertex_x_coordinate: 2 });
+    const { surface } = recordingRead();
+    surface.extensible.push({ vertex_x_coordinate: 2 });
 
     expect(Array.isArray(surface.extensible)).toBe(true);
     expect(surface.extensible).toHaveLength(2);
     expect(surface.extensible[1]?.['vertex_x_coordinate']).toBe(2);
     expect([...surface.extensible].map((g) => g['vertex_x_coordinate'])).toEqual([1, 2]);
     expect(surface.extensible.map((g) => g['vertex_x_coordinate'])).toEqual([1, 2]);
+  });
+
+  it('leaves the repeats plain on a document that is not preserving', () => {
+    // The other half of the rule, and the reason it exists. A document read without preservation
+    // has no touched record to maintain and nothing a preserving write would consult, so it keeps
+    // the plain array and a geometry consumer reads a coordinate at the cost it always has.
+    const { document } = parseIdf(SURFACE, v26, { strict: false });
+    const surface = document.require('BuildingSurface:Detailed', 'S1');
+
+    const vertices = surface.extensible;
+
+    expect(Array.isArray(vertices)).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(vertices[0]!, 'vertex_x_coordinate')?.value).toBe(1);
+    expect(vertices[0]?.['vertex_x_coordinate']).toBe(1);
   });
 });
