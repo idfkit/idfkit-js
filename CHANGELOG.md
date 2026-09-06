@@ -10,6 +10,88 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
 
 ## [Unreleased]
 
+## [0.3.0-rc.1] - 2026-09-06
+
+This release moves to `conformance-2026.10` and `governance-2026.14`. Those two
+levels are what a formatting-preserving writer costs in a corpus that proves
+agreement: the assertion was cut at `conformance-2026.9` while this library
+still failed it, with one divergence entry per case, and `conformance-2026.10`
+is that level with the entries removed by the change that ended the absence.
+
+### Added
+
+- **`preserveFormatting` on the read, and a write that gives the file back.**
+  `parseIdf(text, schema, { preserveFormatting: true })` retains the syntax
+  layer and an index from each statement to the object it produced. `writeIdf`
+  then walks the two together: every object nothing has changed is reproduced
+  from the characters it was read from, and everything between the objects is
+  copied.
+
+  That last clause is most of the value. The comments, the blank lines that
+  group four hundred surfaces into rooms, the indentation as the author left
+  it, the line endings whatever they are, and whether the file ends in a
+  newline all survive, because every character is either inside a statement or
+  in a gap and nothing in a gap belongs to an object.
+
+  Off by default. A caller who does not ask pays neither the scan nor the
+  retention, and reading costs what it cost before.
+
+- **`IdfDocument.rawText`**, the text a document was read from, or `undefined`
+  after an ordinary read. How an editor answers whether saving will reformat
+  the file without reaching into anything.
+
+- **`preserveFormatting` on `writeIdf` and `writeEpJson`**, tri-state: absent
+  decides from the document, `true` preserves and refuses a contradictory
+  request, `false` formats. Preservation asked for on a document read without
+  it is not an error, because nothing was promised.
+
+  Asking to preserve _and_ to reformat is refused: `indent`, `commentColumn`,
+  `ordering` and `versionFirst` all raise a `TypeError` naming the whole class
+  of controls. Asking to preserve and for a different output _form_,
+  `compressed` or `comments: false`, produces the form, because a form is a
+  different artifact the original text was never going to express.
+
+- **The object notation preserves on all-or-nothing terms.** `parseEpJson` with
+  the option retains its text, and `writeEpJson` reproduces it only while
+  nothing has been touched, added or removed. It has no statements, so there is
+  nothing to anchor one object's characters to. This differs from the text
+  format's per-object terms and differs the same way in Python.
+
+### Changed
+
+- **An extensible group now tells the document when it is mutated.**
+  `get extensible()` returned the object's own array, so `push` and writing a
+  repeat's field reached the object without passing any accessor and notified
+  nobody — an edit a preserving writer would discard in a file that loads. It
+  now returns an `Array` subclass whose mutators are heard, holding repeats
+  whose fields are own accessors.
+
+  It is still an array to everything that reads it: `Array.isArray` is true,
+  indexing and iteration are unchanged, `map` and `filter` return plain arrays,
+  and a repeat spreads and compares as the plain object it replaces.
+
+  **The accessors are installed only on a document read with
+  `preserveFormatting`.** Reading a coordinate through one costs about 33 times
+  a plain property read, and a document with no retained source has no record
+  to keep, so a geometry pipeline reads vertices at the cost it always has.
+
+  One spelling is not heard: replacing a whole repeat by index,
+  `obj.extensible[0] = {...}`. Catching it needs a `Proxy` or an accessor per
+  index, both of which charge every vertex read to catch a write. Use `splice`,
+  or write the repeat's fields.
+
+- **A rename marks every object it rewrites.** `onNameChanged` rewrites
+  referencing fields directly, bypassing the accessor on purpose, so none of
+  those objects reported a change. A preserving write emitted them from their
+  original text, producing a file that loads and names a construction layer
+  that no longer exists. Both branches of the retarget loop now mark, including
+  references reached through an extensible repeat.
+
+- **The install budget (SC-012) rose from 1.75 MB to 1.875 MB.** The writer is
+  47.7 KB of `dist` and does not fit the old figure. The reasoning is in
+  `scripts/check-install-size.mjs`, including the lever left unpulled: 396 KB of
+  the install is source maps, which serve debugging and nothing at runtime.
+
 ## [0.2.0] - 2026-09-04
 
 This release stays on `conformance-2026.8`, the corpus level `CONFORMANCE_LEVEL`
