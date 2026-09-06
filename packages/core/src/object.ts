@@ -25,6 +25,14 @@ export type FieldValues = Record<string, StoredValue | null | undefined>;
 export interface ObjectOwner {
   onFieldChanged(obj: IdfObject, field: string, previous: unknown, next: unknown): void;
   onNameChanged(obj: IdfObject, previous: string, next: string): void;
+  /**
+   * Whether an in-place edit to an extensible repeat has to be heard.
+   *
+   * True only while the document carries a retained source, because that is the only time there is
+   * a touched record to maintain. Hearing it costs an accessor on every field of every repeat, and
+   * an accessor read is far dearer than a plain one over the vertices of a real model.
+   */
+  tracksExtensibleEdits(): boolean;
 }
 
 /**
@@ -197,10 +205,16 @@ export class IdfObject {
    * iteration are unchanged, `map` and `filter` hand back plain arrays, and a repeat spreads and
    * compares exactly as the plain object it replaces.
    *
-   * The wrapper is built the first time a caller asks for it and then kept, so a read costs one
-   * `instanceof` and a geometry consumer walking every vertex pays for the wrapping once per
-   * object. A parse nobody reaches into pays nothing at all, which is what keeps reading without
-   * preservation costing what it costs today.
+   * **Only when the document carries a retained source.** A repeat's fields are own accessors, and
+   * an accessor read is roughly thirty times the cost of a plain property read; over the 33,000
+   * vertices of a real model that is measurable, and charging every vertex read is exactly what
+   * rejecting a `Proxy` was meant to avoid. A document read without preservation has no touched
+   * record to maintain, so it keeps the plain array and today's speed. A document read WITH
+   * preservation is being edited, and an edit that reaches the file matters more there than the
+   * throughput of reading a coordinate.
+   *
+   * The wrapper is built once and kept, so a read of a preserving document costs one `instanceof`
+   * after the first.
    *
    * One spelling is not heard: replacing a whole repeat by index, `obj.extensible[0] = {...}`,
    * writes through the array's own index slot, which cannot be caught without charging every
@@ -211,6 +225,12 @@ export class IdfObject {
     if (key === undefined) return [];
     const held = this[DATA][key];
     if (held instanceof ExtensibleList) return held;
+    if (this[OWNER]?.tracksExtensibleEdits() !== true) {
+      if (Array.isArray(held)) return held;
+      const empty: ExtensibleGroup[] = [];
+      this[DATA][key] = empty;
+      return empty;
+    }
 
     const list = ExtensibleList.adopt(
       Array.isArray(held) ? held : [],

@@ -348,6 +348,17 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
 
   // --- ObjectOwner ------------------------------------------------------
 
+  /**
+   * Whether an in-place edit to an extensible repeat has to be heard.
+   *
+   * Only while this document carries a retained source. Without one there is no touched record to
+   * maintain and nothing a preserving write would consult, so the repeats stay plain objects and a
+   * geometry consumer reads a coordinate at the cost it has always read one at.
+   */
+  tracksExtensibleEdits(): boolean {
+    return this.#source !== undefined;
+  }
+
   onFieldChanged(obj: IdfObject, field: string, previous: unknown, next: unknown): void {
     // No longer the characters it was read from. This fires exactly when a value actually changed,
     // because the accessor compares before writing, so "a write of the value already held marks
