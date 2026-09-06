@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { parseEpJson, parseIdf, scanIdf, writeEpJson, writeIdf } from '@idfkit/core';
+import { parseEpJson, parseIdf, scanIdf, writeEpJson, writeIdf, writeObject } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema, syntaxFixture, syntaxFixtures } from './helpers.js';
@@ -930,5 +930,87 @@ describe('where an object\'s characters were', () => {
     for (let i = 1; i < regions.length; i += 1) {
       expect(regions[i]!.start).toBeGreaterThanOrEqual(regions[i - 1]!.end);
     }
+  });
+});
+
+describe('the text that belongs in that range', () => {
+  // The third leg. Knowing WHICH objects change and WHERE the old text is buys a consumer nothing
+  // while producing the new text for ONE object has no correct form: `writeObject` called with
+  // options built by hand comes back with the author's units as generated labels, because the
+  // annotations a preserving write hands it are internal.
+  const TEXT = [
+    'Version, 26.1;',
+    '',
+    'Building,',
+    '  My Building,   !- Name',
+    '  0.0;           !- North Axis {deg}',
+    '',
+    'Timestep, 4;',
+    '',
+  ].join('\n');
+
+  const read = () => parseIdf(TEXT, v26, { strict: false, preserveFormatting: true }).document;
+
+  it('keeps the unit that the ordinary per-object writer drops', () => {
+    const document = read();
+    const building = document.require('Building', 'My Building');
+    building.set('north_axis', 42);
+
+    expect(document.renderObject(building)).toContain('!- North Axis {deg}');
+    // What a consumer would have had to reach for, and what it costs.
+    expect(writeObject(building, { comments: true, commentColumn: 30, indent: '    ' })).not.toContain(
+      '{deg}'
+    );
+  });
+
+  it('splices into its own range to give back exactly what a whole write gives back', () => {
+    // The claim the three names make together, pinned as one assertion. If this ever fails, an
+    // editor built on them is silently writing a different file from the one `writeIdf` writes.
+    const document = read();
+    document.require('Building', 'My Building').set('north_axis', 42);
+    [...document.all('Timestep')][0]!.set('number_of_timesteps_per_hour', 6);
+
+    let spliced = document.rawText!;
+    // Back to front, so an earlier edit does not move a later range.
+    const changed = [...document.changedObjects()]
+      .map((obj) => ({ at: document.regionOf(obj)!, text: document.renderObject(obj)! }))
+      .sort((a, b) => b.at.start - a.at.start);
+    expect(changed).toHaveLength(2);
+    for (const { at, text } of changed) {
+      spliced = spliced.slice(0, at.start) + text + spliced.slice(at.end);
+    }
+
+    expect(spliced).toBe(writeIdf(document));
+  });
+
+  it('takes the one option a preserving write honours, and no others', () => {
+    // `indent`, `commentColumn`, `ordering` and `versionFirst` are refused by `writeIdf` alongside
+    // `preserveFormatting`; `comments: false` and `compressed` defeat preservation entirely and
+    // send the document down the formatting path. Accepting any of them here would render one
+    // object on terms the surrounding file was not written on.
+    // A source with a field the author wrote BARE, which is what the option is about.
+    const bare = 'Version, 26.1;\n\nBuilding,\n  My Building,   !- Name\n  0.0,           !- North Axis {deg}\n  City;\n';
+    const { document } = parseIdf(bare, v26, { strict: false, preserveFormatting: true });
+    const building = document.require('Building', 'My Building');
+    building.set('north_axis', 42);
+
+    // Bare stays bare, and asking for labels is the one thing that changes.
+    expect(document.renderObject(building)).not.toContain('!- Terrain');
+    expect(document.renderObject(building, { fieldComments: 'generate' })).toContain('!- Terrain');
+  });
+
+  it('ends where the range ends, with no line break of its own', () => {
+    const document = read();
+
+    expect(document.renderObject(document.require('Building', 'My Building'))).not.toMatch(/\n$/);
+  });
+
+  it('answers nothing for an object the retained source does not hold', () => {
+    const document = read();
+
+    expect(document.renderObject(document.addRaw('Zone', 'Late Arrival', {}))).toBeUndefined();
+    expect(parseIdf(TEXT, v26, { strict: false }).document.renderObject(
+      parseIdf(TEXT, v26, { strict: false }).document.require('Building', 'My Building')
+    )).toBeUndefined();
   });
 });

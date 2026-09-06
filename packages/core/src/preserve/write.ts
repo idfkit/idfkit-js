@@ -63,16 +63,33 @@ function statementPart(
   // the object would mean holding a reference to something the document has let go.
   if (anchored[OWNER] === undefined) return '';
   if (isUntouched(anchored, source)) return verbatim;
+  return renderStatement(source, index, options);
+}
+
+/**
+ * One statement's object, rendered the way this walk renders it.
+ *
+ * Factored out rather than inlined because `IdfDocument.renderObject` has to produce exactly this
+ * text: a consumer splicing something else into the range `regionOf` returns gets a file that
+ * differs from `writeIdf`, silently. Two copies of this would be two answers to one question.
+ *
+ * Without a trailing newline. A statement's extent ends at its terminator, or at the comment on
+ * that same line, and in neither case does it include the line break: the break is the first
+ * character of the gap. `writeObject` ends with one because it is also used to write whole
+ * documents, so emitting it here would put the break in twice and grow the file by a blank line
+ * per reformatted object. Every object in a file, edited and saved twice, would grow it twice.
+ *
+ * @internal
+ */
+export function renderStatement(
+  source: PreservedSource,
+  index: number,
+  options: ObjectWriteOptions
+): string {
   // Re-render the VALUES, and keep the author's comments. An edit asks for the first and never for
   // the second, and rebuilding a comment destroys whatever the schema cannot regenerate: a note to
   // a colleague, and the field's unit, which the ordinary label does not carry.
-  //
-  // Without its trailing newline. A statement's extent ends at its terminator, or at the comment on
-  // that same line, and in neither case does it include the line break: the break is the first
-  // character of the gap. `writeObject` ends with one because it is also used to write whole
-  // documents, so emitting it here would put the break in twice and grow the file by a blank line
-  // per reformatted object. Every object in a file, edited and saved twice, would grow it twice.
-  const written = writeObject(anchored, {
+  const written = writeObject(source.anchors[index]!, {
     ...options,
     annotations: annotations(source, index),
   });

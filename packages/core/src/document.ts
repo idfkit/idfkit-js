@@ -4,9 +4,10 @@ import { IdfCollection } from './collection.js';
 import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
 import { IdfObject, type FieldValues, type ObjectOwner, type StoredValue } from './object.js';
 import { isUntouched, type PreservedSource } from './preserve/source.js';
-import { extentEnds } from './preserve/write.js';
+import { extentEnds, renderStatement } from './preserve/write.js';
 import { ReferenceGraph } from './references.js';
 import type { Region } from './syntax/region.js';
+import type { WriteIdfOptions } from './write/idf.js';
 import type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
 
 /**
@@ -392,6 +393,54 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
     // Computed once per document, since the retained source does not change after the read.
     this.#extents ??= extentEnds(source);
     return { start: statement.region.start, end: this.#extents[at] ?? statement.region.end };
+  }
+
+  /**
+   * One object, rendered exactly as a preserving write would render it.
+   *
+   * The text that belongs in the range {@link regionOf} returns, so the two compose into an edit
+   * that leaves the file byte for byte where {@link writeIdf} would have left it. `undefined` for
+   * an object the retained source does not hold, which is the same set `regionOf` declines.
+   *
+   * ```ts
+   * for (const obj of document.changedObjects()) {
+   *   const at = document.regionOf(obj);
+   *   const text = document.renderObject(obj);
+   *   if (at === undefined || text === undefined) continue; // added since the read
+   *   edits.push({ range: at, newText: text });
+   * }
+   * ```
+   *
+   * `writeObject` is not this, and that is the reason this exists. A preserving write hands that
+   * function the author's own per-field annotations, which are internal, so calling it with options
+   * built by hand comes back with the author's units and notes as generated labels: `!- North Axis
+   * {deg}` becomes `!- North Axis`. That is a unit lost from an engineering model by an editor
+   * asked to save a file, and no doc comment is a good enough guard against it.
+   *
+   * `fieldComments` is the ONLY option, because it is the only one a preserving write honours.
+   * `indent`, `commentColumn`, `ordering` and `versionFirst` are refused by {@link writeIdf}
+   * alongside `preserveFormatting`, and `comments: false` and `compressed` defeat preservation and
+   * send the whole document down the formatting path instead. Accepting any of them here would let
+   * a caller render one object on terms the surrounding file was not written on, which is the exact
+   * divergence this method exists to prevent.
+   *
+   * No trailing line break: the range this fills ends at the terminator, or at the comment on that
+   * line, and the break after it is the first character of what separates one object from the next,
+   * which a preserving write leaves in place.
+   */
+  renderObject(obj: IdfObject, options: Pick<WriteIdfOptions, 'fieldComments'> = {}): string | undefined {
+    const source = this.#source;
+    if (source === undefined) return undefined;
+    const at = obj[ORIGIN];
+    if (at === undefined || source.anchors[at] !== obj) return undefined;
+    // The same defaults `writeIdf` resolves for its preserving branch, which is the only branch
+    // that can reach this text.
+    return renderStatement(source, at, {
+      comments: true,
+      commentColumn: 30,
+      indent: '    ',
+      labelBareFields: options.fieldComments === 'generate',
+    });
   }
 
   /** Reference targets that no object provides. */
