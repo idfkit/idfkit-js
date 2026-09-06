@@ -109,12 +109,18 @@ class CannotRun extends Error {}
  * asserted by the run in that repository and is not observable from here. So the level is written
  * down by someone who checked both, and moving it is the act of re-attesting.
  *
- * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.8, and the
- * evidence for it, taken rather than recalled:
+ * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.10, the level
+ * that carries the preserved-text assertion with the second language's divergence entries removed,
+ * and the evidence for it, taken rather than recalled:
  *
- *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.8
- *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.8
- *   idfkit       the Conformance job on main                       green at that level
+ *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.10
+ *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.10
+ *   idfkit-js    npm run check:release                             green at that level
+ *   idfkit       uv run python scripts/check_release_conformance.py green at that level
+ *
+ * Both were run against the corpus checkout on the day this moved, rather than read off a CI
+ * badge, because the two levels that preceded this one were cut hours apart and a badge would have
+ * been reporting the older of them.
  *
  * Each level since 2026.6 contains all of it and adds cases, so the precondition is met more
  * strongly rather than less.
@@ -125,7 +131,7 @@ class CannotRun extends Error {}
  * the pin on every run, so the next time the two part company it fails a cheap gate on the change
  * that caused it rather than a release months later.
  */
-const REQUIRED_CONFORMANCE = 'conformance-2026.8';
+const REQUIRED_CONFORMANCE = 'conformance-2026.10';
 
 /** The distribution gates, precondition 4. Order is cheapest first. */
 const DISTRIBUTION_GATES = [
