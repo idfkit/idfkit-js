@@ -47,6 +47,11 @@ export const SOURCE = Symbol('idfkit.source');
  * were, which is exactly the question a consumer building a minimal edit has to ask about a
  * CHANGED object. This is the same number, recorded once and never cleared.
  *
- * @internal
+ * Deliberately untagged, as `SOURCE` above is. `stripInternal` drops a declaration whose JSDoc
+ * carries the tag, and `object.ts` declares a property keyed on this symbol, so tagging it emits a
+ * `.d.ts` that references a symbol its own module no longer declares and the build stops. Being
+ * absent from the package index is what makes this module internal, and that part holds.
+ *
+ * The tag is matched as TEXT anywhere in the comment, so naming it here would strip this too.
  */
 export const ORIGIN = Symbol('idfkit.origin');

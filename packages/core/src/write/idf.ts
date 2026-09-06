@@ -114,20 +114,15 @@ export function writeIdf<M extends AnyTypeMap>(
 ): string {
   const preserved = decidePreservation(document, options);
   if (preserved !== undefined) {
-    return writePreserved(document, preserved, {
-      comments: options.comments ?? true,
-      commentColumn: options.commentColumn ?? 30,
-      indent: options.indent ?? '    ',
-      labelBareFields: options.fieldComments === 'generate',
-    });
+    return writePreserved(document, preserved, preservingOptions(options));
   }
 
   const compressed = options.compressed ?? false;
   // Compressed output has no comments by definition. Asking for both is not an error, because the
   // narrower request is unambiguous: comments cannot survive a single-line object.
   const comments = compressed ? false : (options.comments ?? true);
-  const commentColumn = options.commentColumn ?? 30;
-  const indent = options.indent ?? '    ';
+  const commentColumn = options.commentColumn ?? DEFAULT_COMMENT_COLUMN;
+  const indent = options.indent ?? DEFAULT_INDENT;
   const versionFirst = options.versionFirst ?? true;
   const ordering = options.ordering ?? 'source';
 
@@ -195,6 +190,35 @@ function decidePreservation<M extends AnyTypeMap>(
     return undefined;
   }
   return source;
+}
+
+/** Where `!-` goes, counted from 1. See {@link WriteIdfOptions.commentColumn}. */
+export const DEFAULT_COMMENT_COLUMN = 30;
+
+/** The indent before each field line. See {@link WriteIdfOptions.indent}. */
+export const DEFAULT_INDENT = '    ';
+
+/**
+ * The options a PRESERVING write resolves, which is the only set a preserved object can be
+ * rendered on.
+ *
+ * `IdfDocument.renderObject` has to produce exactly the bytes this walk produces, so it resolves
+ * its options here rather than restating the defaults. Restating them is how the two drift: the
+ * comment column has a reason behind its value, and moving that reason in one place while the
+ * other kept the old number would break the byte-for-byte agreement `renderObject` promises.
+ *
+ * The controls are not read from the caller because a preserving write refuses them. `indent`,
+ * `commentColumn`, `ordering` and `versionFirst` throw when set alongside `preserveFormatting`,
+ * and `comments: false` and `compressed` defeat preservation and send the document down the
+ * formatting path, so on this path they are always their defaults.
+ */
+export function preservingOptions(options: WriteIdfOptions): ObjectWriteOptions {
+  return {
+    comments: true,
+    commentColumn: DEFAULT_COMMENT_COLUMN,
+    indent: DEFAULT_INDENT,
+    labelBareFields: options.fieldComments === 'generate',
+  };
 }
 
 export interface ObjectWriteOptions {
@@ -286,6 +310,11 @@ export function writeObject(obj: IdfObject, options: ObjectWriteOptions): string
   // example files that is 20,571 lines, more than any other difference a rewrite makes.
   //
   // Only on this path. A write with no author behind it keeps trimming, as it always has.
+  //
+  // Counted as an INDEX into the fixed fields, with the name subtracted out, because the
+  // annotations lead with the name. Python states the same rule as a count of emitted values with
+  // the name included. Both are right against their own annotations and neither would notice if
+  // the other's convention moved, so a change to either belongs in both.
   const authored = options.annotations?.length ?? 0;
   const lastAuthored = authored - (obj.isNamed ? 1 : 0) - 1;
   const lastFixed =

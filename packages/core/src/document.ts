@@ -3,11 +3,11 @@ import type { Schema, SlimType } from '@idfkit/schemas';
 import { IdfCollection } from './collection.js';
 import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
 import { IdfObject, type FieldValues, type ObjectOwner, type StoredValue } from './object.js';
-import { isUntouched, type PreservedSource } from './preserve/source.js';
-import { extentEnds, renderStatement } from './preserve/write.js';
+import { isUntouched, originOf, type PreservedSource } from './preserve/source.js';
+import { derivedOf, renderStatement } from './preserve/write.js';
 import { ReferenceGraph } from './references.js';
 import type { Region } from './syntax/region.js';
-import type { WriteIdfOptions } from './write/idf.js';
+import { preservingOptions, type WriteIdfOptions } from './write/idf.js';
 import type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
 
 /**
@@ -373,16 +373,10 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    * Offsets, not a line and column: `Region` carries the conversion, and a consumer that wants one
    * has the text to compute it from, while going the other way costs a scan.
    */
-  #extents: number[] | undefined;
-
   regionOf(obj: IdfObject): Region | undefined {
     const source = this.#source;
-    if (source === undefined) return undefined;
-    const at = obj[ORIGIN];
-    if (at === undefined) return undefined;
-    // The identity check that guards `isUntouched`, for the same reason: an object carrying an
-    // index from a file it is no longer in would otherwise be handed a range from this one.
-    if (source.anchors[at] !== obj) return undefined;
+    const at = originOf(obj, source);
+    if (source === undefined || at === undefined) return undefined;
     // The object notation records one anchor per object and no statement, so there is nothing here
     // to point at. Preservation is all-or-nothing there and a per-object range would be a fiction.
     const statement = source.layer.statements[at];
@@ -390,9 +384,7 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
     // The END is the writer's, not the statement's. A comment on the terminator's own line is that
     // statement's last field's comment and the preserving write replaces it; a range stopping at
     // the semicolon would leave it behind, on a line describing a field that had just moved.
-    // Computed once per document, since the retained source does not change after the read.
-    this.#extents ??= extentEnds(source);
-    return { start: statement.region.start, end: this.#extents[at] ?? statement.region.end };
+    return { start: statement.region.start, end: derivedOf(source).ends[at] ?? statement.region.end };
   }
 
   /**
@@ -428,19 +420,16 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    * line, and the break after it is the first character of what separates one object from the next,
    * which a preserving write leaves in place.
    */
-  renderObject(obj: IdfObject, options: Pick<WriteIdfOptions, 'fieldComments'> = {}): string | undefined {
+  renderObject(
+    obj: IdfObject,
+    options: Pick<WriteIdfOptions, 'fieldComments'> = {}
+  ): string | undefined {
     const source = this.#source;
-    if (source === undefined) return undefined;
-    const at = obj[ORIGIN];
-    if (at === undefined || source.anchors[at] !== obj) return undefined;
-    // The same defaults `writeIdf` resolves for its preserving branch, which is the only branch
-    // that can reach this text.
-    return renderStatement(source, at, {
-      comments: true,
-      commentColumn: 30,
-      indent: '    ',
-      labelBareFields: options.fieldComments === 'generate',
-    });
+    const at = originOf(obj, source);
+    if (source === undefined || at === undefined) return undefined;
+    // The options `writeIdf` resolves for its preserving branch, resolved by the same function, so
+    // the two cannot disagree about the bytes.
+    return renderStatement(source, at, preservingOptions(options));
   }
 
   /** Reference targets that no object provides. */

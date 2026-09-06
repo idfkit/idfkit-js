@@ -858,26 +858,35 @@ describe('the column the comment goes in', () => {
   });
 });
 
+/**
+ * The file the three composing accessors are exercised against.
+ *
+ * `changedObjects`, `regionOf` and `renderObject` are one capability in three names, and they are
+ * tested against one file so that a change to the fixture cannot leave two suites quietly asserting
+ * against different text while both pass. The author's unit on the terminator line is the load
+ * bearing part: it is what a rewrite used to destroy and what the range has to reach past.
+ */
+const COMPOSING = [
+  'Version, 26.1;',
+  '',
+  'Building,',
+  '  My Building,   !- Name',
+  '  0.0;           !- North Axis {deg}',
+  '',
+  'Timestep, 4;',
+  '',
+].join('\n');
+
+const composing = () => parseIdf(COMPOSING, v26, { strict: false, preserveFormatting: true }).document;
+
 describe('where an object\'s characters were', () => {
   // `changedObjects()` says WHICH objects a write will rewrite. Without saying WHERE the old ones
   // are, a consumer building the smallest possible change has to write the whole file and diff it,
   // which is the work that method exists to avoid. Found by the language server team reading the
   // branch before it merged.
-  const TEXT = [
-    'Version, 26.1;',
-    '',
-    'Building,',
-    '  My Building,   !- Name',
-    '  0.0;           !- North Axis {deg}',
-    '',
-    'Timestep, 4;',
-    '',
-  ].join('\n');
-
-  const read = () => parseIdf(TEXT, v26, { strict: false, preserveFormatting: true }).document;
 
   it('locates an object that has not changed', () => {
-    const document = read();
+    const document = composing();
     const at = document.regionOf(document.require('Building', 'My Building'))!;
 
     expect(document.rawText!.slice(at.start, at.end)).toBe(
@@ -888,7 +897,7 @@ describe('where an object\'s characters were', () => {
   it('still locates it after it changes, which is the case it is for', () => {
     // The objects worth locating are the ones being rewritten, and `SOURCE` is cleared the moment
     // one is touched because its absence is what marks it. A second record answers this.
-    const document = read();
+    const document = composing();
     const building = document.require('Building', 'My Building');
     const before = document.regionOf(building);
     building.set('north_axis', 42);
@@ -901,27 +910,27 @@ describe('where an object\'s characters were', () => {
     // Not `statement.region`, which stops at the terminator. A comment on the terminator's own line
     // is that statement's last field's comment and a preserving write rewrites it; a consumer
     // replacing the shorter range would leave it behind describing a field that had just moved.
-    const document = read();
+    const document = composing();
     const at = document.regionOf(document.require('Building', 'My Building'))!;
 
     expect(document.rawText!.slice(at.start, at.end)).toContain('!- North Axis {deg}');
   });
 
   it('answers nothing for an object added since the read', () => {
-    const document = read();
+    const document = composing();
     const added = document.addRaw('Zone', 'Late Arrival', {});
 
     expect(document.regionOf(added)).toBeUndefined();
   });
 
   it('answers nothing for a document read without preservation', () => {
-    const document = parseIdf(TEXT, v26, { strict: false }).document;
+    const document = parseIdf(COMPOSING, v26, { strict: false }).document;
 
     expect(document.regionOf(document.require('Building', 'My Building'))).toBeUndefined();
   });
 
   it('locates each object separately, in source order', () => {
-    const document = read();
+    const document = composing();
     const regions = [...document.objects()]
       .map((obj) => document.regionOf(obj))
       .filter((region) => region !== undefined);
@@ -938,21 +947,9 @@ describe('the text that belongs in that range', () => {
   // while producing the new text for ONE object has no correct form: `writeObject` called with
   // options built by hand comes back with the author's units as generated labels, because the
   // annotations a preserving write hands it are internal.
-  const TEXT = [
-    'Version, 26.1;',
-    '',
-    'Building,',
-    '  My Building,   !- Name',
-    '  0.0;           !- North Axis {deg}',
-    '',
-    'Timestep, 4;',
-    '',
-  ].join('\n');
-
-  const read = () => parseIdf(TEXT, v26, { strict: false, preserveFormatting: true }).document;
 
   it('keeps the unit that the ordinary per-object writer drops', () => {
-    const document = read();
+    const document = composing();
     const building = document.require('Building', 'My Building');
     building.set('north_axis', 42);
 
@@ -966,7 +963,7 @@ describe('the text that belongs in that range', () => {
   it('splices into its own range to give back exactly what a whole write gives back', () => {
     // The claim the three names make together, pinned as one assertion. If this ever fails, an
     // editor built on them is silently writing a different file from the one `writeIdf` writes.
-    const document = read();
+    const document = composing();
     document.require('Building', 'My Building').set('north_axis', 42);
     [...document.all('Timestep')][0]!.set('number_of_timesteps_per_hour', 6);
 
@@ -1000,17 +997,17 @@ describe('the text that belongs in that range', () => {
   });
 
   it('ends where the range ends, with no line break of its own', () => {
-    const document = read();
+    const document = composing();
 
     expect(document.renderObject(document.require('Building', 'My Building'))).not.toMatch(/\n$/);
   });
 
   it('answers nothing for an object the retained source does not hold', () => {
-    const document = read();
+    const document = composing();
 
     expect(document.renderObject(document.addRaw('Zone', 'Late Arrival', {}))).toBeUndefined();
-    expect(parseIdf(TEXT, v26, { strict: false }).document.renderObject(
-      parseIdf(TEXT, v26, { strict: false }).document.require('Building', 'My Building')
+    expect(parseIdf(COMPOSING, v26, { strict: false }).document.renderObject(
+      parseIdf(COMPOSING, v26, { strict: false }).document.require('Building', 'My Building')
     )).toBeUndefined();
   });
 });

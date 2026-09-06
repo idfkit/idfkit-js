@@ -26,7 +26,7 @@ export function writePreserved(
 ): string {
   const text = source.layer.text;
   const statements = source.layer.statements;
-  const ends = extentEnds(source);
+  const ends = derivedOf(source).ends;
   const parts: string[] = [];
 
   // Everything before the first statement, which for a file with none is the whole text: an empty
@@ -131,16 +131,17 @@ function lastNonEmpty(parts: readonly string[]): string {
 }
 
 /**
- * Where each statement's text ends for this walk: its terminator, or the comment on that same line.
+ * The two facts about each statement that are derived from the token stream, computed together.
  *
- * A comment after the semicolon with nothing but horizontal whitespace between them is the last
+ * `ends` is where a statement's text ends FOR THE WRITER, which is not always its terminator. A
+ * comment after the semicolon with nothing but horizontal whitespace between them is the last
  * field's comment. Leaving it in the gap is invisible while the statement is copied, because the
  * gap is copied too, and wrong the moment it is reformatted: the writer emits its own field comment
  * and the author's then arrives from the gap on the line below, so the output carries a line nobody
  * wrote. It is not even a duplicate, because the ordinary writer drops the unit the original
  * usually carries, so it reads as a stray fragment.
  *
- * This is not the writer guessing which comment belongs to which object. "On the same line as the
+ * That is not the writer guessing which comment belongs to which object. "On the same line as the
  * terminator" is a positional fact, and it is the one case where the owner is not in question.
  *
  * Three consequences, decided rather than discovered:
@@ -151,32 +152,68 @@ function lastNonEmpty(parts: readonly string[]): string {
  *   describing a field that no longer exists.
  * - Reformatting replaces it, which is the defect this closes.
  *
- * The tokens are in source order and so are the statements, so one cursor walks both.
+ * `firstToken` is where each statement's tokens begin. `annotations` used to start its cursor at
+ * zero and seek forward, which is a full prefix scan of the token stream per statement: quadratic
+ * in the file, and invisible to the benchmarks because they time an UNCHANGED write, where no
+ * statement is reformatted and `annotations` is never reached. On a ten thousand statement model
+ * that is the difference between milliseconds and seconds.
  *
- * Exported so that `IdfDocument.regionOf` answers with the SAME extent this walk replaces.
- * Handing a consumer `statement.region` instead would stop one character short of the
- * terminator-line comment, and an edit built on it would leave that comment behind, which is
- * the defect this function exists to close.
- *
- * @internal
+ * Both come from one pass with monotone cursors, because the statements and the tokens are both in
+ * source order. Memoised per retained source, which never changes after the read, so the walk and
+ * the two document accessors share one answer rather than each deriving it.
  */
-export function extentEnds(source: PreservedSource): number[] {
+interface Derived {
+  /** Where each statement's text ends for the writer. */
+  readonly ends: readonly number[];
+  /** The first token at or after each statement's type name, as a cursor for `annotations`. */
+  readonly firstToken: readonly number[];
+}
+
+const derived = new WeakMap<PreservedSource, Derived>();
+
+/**
+ * The derived facts for one retained source, computed once.
+ *
+ * Exported so `IdfDocument.regionOf` answers with the SAME extent this walk replaces. Handing a
+ * consumer `statement.region` instead would stop short of the terminator-line comment, and an edit
+ * built on it would leave that comment behind, which is the defect the extent exists to close.
+ */
+export function derivedOf(source: PreservedSource): Derived {
+  let found = derived.get(source);
+  if (found === undefined) {
+    found = compute(source);
+    derived.set(source, found);
+  }
+  return found;
+}
+
+function compute(source: PreservedSource): Derived {
   const { statements, tokens, text } = source.layer;
   const ends = statements.map((statement) => statement.region.end);
+  const firstToken: number[] = new Array<number>(statements.length);
 
-  let token = 0;
+  // Two cursors rather than one, because they track different points and both only move forward.
+  let atStatement = 0;
+  let atExtent = 0;
   for (let index = 0; index < statements.length; index += 1) {
+    const statement = statements[index]!;
+
+    while (atStatement < tokens.length && tokens.startAt(atStatement) < statement.typeName.end) {
+      atStatement += 1;
+    }
+    firstToken[index] = atStatement;
+
     const end = ends[index]!;
-    while (token < tokens.length && tokens.startAt(token) < end) token += 1;
-    if (token >= tokens.length || tokens.kindAt(token) !== 'comment') continue;
+    while (atExtent < tokens.length && tokens.startAt(atExtent) < end) atExtent += 1;
+    if (atExtent >= tokens.length || tokens.kindAt(atExtent) !== 'comment') continue;
 
     // Horizontal whitespace only. A line feed between the two puts the comment on its own line,
     // which makes it a comment about whatever comes next and none of this statement's business.
-    const between = text.slice(end, tokens.startAt(token));
+    const between = text.slice(end, tokens.startAt(atExtent));
     if (between.includes('\n') || between.trim() !== '') continue;
-    ends[index] = tokens.endAt(token);
+    ends[index] = tokens.endAt(atExtent);
   }
-  return ends;
+  return { ends, firstToken };
 }
 
 /**
@@ -201,15 +238,15 @@ function annotations(source: PreservedSource, index: number): FieldAnnotation[] 
   const { statements, tokens, text } = source.layer;
   const statement = statements[index]!;
   const fields = statement.fields;
-  const built: FieldAnnotation[] = fields.map(() => ({
-    before: [],
-    trailing: undefined,
-    startsLine: true,
-  }));
+  // Every entry is assigned in the loop below, so there is nothing to pre-fill: a placeholder
+  // would be a second, contradictory statement of what an entry defaults to.
+  const built: FieldAnnotation[] = new Array<FieldAnnotation>(fields.length);
 
   // One cursor over the tokens, which are in source order, as the fields are. Every comment
   // between the previous field's delimiter and this one's value stands on its own line above it.
-  let token = 0;
+  // It starts where this statement starts rather than at zero: seeking from the front of the file
+  // made a whole-document reformat quadratic in the token count.
+  let token = derivedOf(source).firstToken[index]!;
   let previousEnd = statement.typeName.end;
   for (let at = 0; at < fields.length; at += 1) {
     const field = fields[at]!;

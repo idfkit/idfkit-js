@@ -1,4 +1,4 @@
-import { SOURCE } from '../internal.js';
+import { ORIGIN, SOURCE } from '../internal.js';
 import type { IdfObject } from '../object.js';
 import type { RawObject } from '../parse/lexer.js';
 import type { SyntaxLayer } from '../syntax/layer.js';
@@ -75,6 +75,25 @@ export function isWholeDocumentUntouched(
     if (!isUntouched(obj, source)) return false;
   }
   return true;
+}
+
+/**
+ * The statement an object was read from, or `undefined` if this source did not read it.
+ *
+ * The identity check is the one `isUntouched` makes below, for the same reason: an object carrying
+ * an index from a file it is no longer in would otherwise be answered from this one. It is stated
+ * once here because `regionOf` and `renderObject` both decline exactly this set, and a rule two
+ * methods share is a rule one of them will eventually be fixed without.
+ *
+ * Reads `ORIGIN`, not `SOURCE`: the question is where the characters WERE, which stays answerable
+ * after the object changes, and changing it is what clears `SOURCE`.
+ *
+ * @internal
+ */
+export function originOf(obj: IdfObject, source: PreservedSource | undefined): number | undefined {
+  if (source === undefined) return undefined;
+  const at = obj[ORIGIN];
+  return at !== undefined && source.anchors[at] === obj ? at : undefined;
 }
 
 export function isUntouched(obj: IdfObject, source: PreservedSource | undefined): boolean {
