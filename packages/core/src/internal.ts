@@ -27,3 +27,15 @@ export const NAME = Symbol('idfkit.name');
  * which still need a unique slot in the collection.
  */
 export const KEY = Symbol('idfkit.key');
+
+/**
+ * Index into the document's `PreservedSource.anchors`, or `undefined`.
+ *
+ * The touched record. An object still carrying its statement's index, whose anchor is still this
+ * object, is written by copying those characters; anything that changes the object clears it.
+ *
+ * Maintained as changes happen rather than compared at write time. Comparing would mean holding a
+ * second copy of the model, and it is wrong in the case that matters most: a field written to a
+ * new value and back again is unchanged by comparison and touched in truth.
+ */
+export const SOURCE = Symbol('idfkit.source');

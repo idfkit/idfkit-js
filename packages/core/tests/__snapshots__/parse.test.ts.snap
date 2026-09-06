@@ -167,6 +167,22 @@ document: {
   }
 }
 
+--- no-trailing-newline
+diagnostics: []
+document: {
+  "Version": {
+    "Version 1": {
+      "version_identifier": "26.1"
+    }
+  },
+  "Zone": {
+    "Zone One": {
+      "direction_of_relative_north": 0,
+      "x_origin": 0
+    }
+  }
+}
+
 --- no-version-declared
 diagnostics: []
 document: {

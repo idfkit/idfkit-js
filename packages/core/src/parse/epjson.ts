@@ -1,7 +1,9 @@
 import type { Schema } from '@idfkit/schemas';
 
 import { IdfDocument } from '../document.js';
-import type { FieldValues } from '../object.js';
+import { SOURCE } from '../internal.js';
+import type { FieldValues, IdfObject } from '../object.js';
+import { TokenStore } from '../syntax/tokens.js';
 import type { AnyTypeMap, UntypedMap } from '../typemap.js';
 import type { ParseDiagnostic, ParseOptions, ParseResult } from './idf.js';
 import { IdfParseError } from './idf.js';
@@ -41,6 +43,11 @@ export function parseEpJson<M extends AnyTypeMap = UntypedMap>(
   }
 
   const document = new IdfDocument<M>(schema);
+  // The object notation has no statements, so there is nothing to anchor per object's TEXT. What
+  // is anchored instead is the object itself, in document order, which is all this format's
+  // all-or-nothing terms need: it has to answer whether anything at all has changed, not where.
+  const preserve = options.preserveFormatting === true && typeof source === 'string';
+  const anchors: (IdfObject | undefined)[] = [];
 
   for (const [typeName, body] of Object.entries(root)) {
     const canonical = schema.resolve(typeName);
@@ -69,7 +76,11 @@ export function parseEpJson<M extends AnyTypeMap = UntypedMap>(
         values[field] = value as FieldValues[string];
       }
       try {
-        document.addRaw(canonical, definition.anon === 1 ? null : name, values);
+        const built = document.addRaw(canonical, definition.anon === 1 ? null : name, values);
+        if (preserve) {
+          built[SOURCE] = anchors.length;
+          anchors.push(built);
+        }
       } catch (error) {
         report({
           message: error instanceof Error ? error.message : String(error),
@@ -78,6 +89,18 @@ export function parseEpJson<M extends AnyTypeMap = UntypedMap>(
         });
       }
     }
+  }
+
+  if (preserve) {
+    // No layer, because the format has no statements to scan. The text is what preservation has
+    // to work with in its entirety, which is exactly why this format's terms are all-or-nothing
+    // and the text format's are per object.
+    document.adoptSource({
+      format: 'epjson',
+      layer: { text: source as string, statements: [], tokens: new TokenStore(0) },
+      anchors,
+      countAtRead: document.size,
+    });
   }
 
   return { document, diagnostics };

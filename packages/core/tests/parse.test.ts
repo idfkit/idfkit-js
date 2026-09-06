@@ -10,7 +10,7 @@ import {
 } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
-import { schema, syntaxFixtures } from './helpers.js';
+import { schema, syntaxFixture, syntaxFixtures } from './helpers.js';
 
 let v26: Schema;
 beforeAll(async () => {
@@ -365,5 +365,64 @@ describe('reading is unchanged by positioning', () => {
         }
       }
     }
+  });
+});
+
+describe('preserveFormatting on the read', () => {
+  it('keeps ParseResult to its two keys, with the option on and off', () => {
+    // Feature 005 pinned this shape and it is why the retained source hangs off the document
+    // rather than being returned beside it. A third key here would be a breaking change made to
+    // satisfy a caller who already has the document.
+    const text = syntaxFixture('line-endings-lf');
+
+    expect(Object.keys(parseIdf(text, v26, { strict: false })).sort()).toEqual([
+      'diagnostics',
+      'document',
+    ]);
+    expect(
+      Object.keys(parseIdf(text, v26, { strict: false, preserveFormatting: true })).sort()
+    ).toEqual(['diagnostics', 'document']);
+  });
+
+  it('retains nothing when the option is off', () => {
+    // SC-004: a caller who does not ask pays neither the scan nor the retention, and the only way
+    // to be sure of that from outside is that there is nothing to reach.
+    const text = syntaxFixture('line-endings-lf');
+
+    expect(parseIdf(text, v26).document.rawText).toBeUndefined();
+  });
+
+  it('retains the text it was given, exactly', () => {
+    for (const fixture of syntaxFixtures()) {
+      let document;
+      try {
+        ({ document } = parseIdf(fixture.text, v26, {
+          strict: false,
+          preserveFormatting: true,
+        }));
+      } catch {
+        continue; // a fixture this schema cannot read at all; the write tests cover the rest
+      }
+      expect(document.rawText, fixture.name).toBe(fixture.text);
+    }
+  });
+
+  it('anchors each object to the statement it was read from, by position', () => {
+    // Positional, never by name: this file names one object twice at different casings, and the
+    // anchoring has to be indifferent to that.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Zone,',
+      '  Zone One,     !- Name',
+      '  0.0;          !- Direction of Relative North',
+      '',
+      'Timestep, 6;',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+
+    expect(document.rawText).toBe(text);
+    expect(document.require('Zone', 'Zone One').get('direction_of_relative_north')).toBe(0);
   });
 });

@@ -1,4 +1,4 @@
-import { scan } from './scan.js';
+import { scan, type ScanHandler } from './scan.js';
 
 /** A raw object as it appears in the file, before schema interpretation. */
 export interface RawObject {
@@ -77,6 +77,28 @@ export interface LexOptions {
  * for no comment and no region, so it pays for neither, and it builds no syntax layer.
  */
 export function lex(text: string, options: LexOptions = {}): RawObject[] {
+  const collector = objectCollector(text, options);
+  scan(text, collector.handler);
+  return collector.objects;
+}
+
+/**
+ * The lexer's own scan handler, and the objects it fills, separately.
+ *
+ * Split out for the same reason the layer's is: a caller that wants the raw objects AND the syntax
+ * layer from one pass composes the two handlers rather than scanning twice. The preserving read is
+ * that caller.
+ *
+ * `objects` is the live array the handler pushes into, so a caller reads it after its own scan
+ * returns. The handler is exactly what {@link lex} passes, unchanged, so nothing here decides
+ * anything the single-pass version did not.
+ *
+ * @internal
+ */
+export function objectCollector(
+  text: string,
+  options: LexOptions = {}
+): { handler: ScanHandler; objects: RawObject[] } {
   const objects: RawObject[] = [];
   const report = options.onDiagnostic;
 
@@ -96,7 +118,7 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
   let objectColumn = 0;
   let objectOffset = -1;
 
-  scan(text, {
+  const handler: ScanHandler = {
     statementStart(offset, line, column) {
       objectLine = line;
       objectColumn = column;
@@ -153,7 +175,7 @@ export function lex(text: string, options: LexOptions = {}): RawObject[] {
       }
       values = [];
     },
-  });
+  };
 
-  return objects;
+  return { handler, objects };
 }

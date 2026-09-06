@@ -1,4 +1,4 @@
-import { scan } from '../parse/scan.js';
+import { scan, type ScanHandler } from '../parse/scan.js';
 import type { Region } from './region.js';
 import { TokenStore, type TokenKind } from './tokens.js';
 
@@ -68,6 +68,29 @@ export interface SyntaxLayer {
  * record per statement.
  */
 export function scanIdf(text: string): SyntaxLayer {
+  const collector = layerCollector(text);
+  scan(text, collector.handler);
+  return collector.finish();
+}
+
+/**
+ * The layer's own scan handler, and the layer it builds, separately.
+ *
+ * Split out so that a caller which wants the layer AND something else from the same characters can
+ * have both from one pass. The preserving read is that caller: it wants the layer and the raw
+ * objects, and running the scan twice would double the cost of the one option this library asks a
+ * caller to pay for.
+ *
+ * The handler is exactly what {@link scanIdf} passes, unchanged, so the layer a composed pass
+ * builds is the layer `scanIdf` builds. Nothing here decides anything the single-pass version did
+ * not.
+ *
+ * @internal
+ */
+export function layerCollector(text: string): {
+  handler: ScanHandler;
+  finish: () => SyntaxLayer;
+} {
   const tokens = new TokenStore(initialCapacity(text.length));
   const statements: Statement[] = [];
 
@@ -100,7 +123,7 @@ export function scanIdf(text: string): SyntaxLayer {
     }
   };
 
-  scan(text, {
+  const handler: ScanHandler = {
     statementStart(offset) {
       openedAt = offset;
       fields = [];
@@ -173,13 +196,17 @@ export function scanIdf(text: string): SyntaxLayer {
         unterminated,
       });
     },
-  });
+  };
 
-  // Comments after the last terminator close no field, so nothing has flushed them. Text that is
-  // only comments reaches here having reported no statement at all.
-  flushComments(Infinity);
-
-  return { text, statements, tokens };
+  return {
+    handler,
+    finish: () => {
+      // Comments after the last terminator close no field, so nothing has flushed them. Text that
+      // is only comments reaches here having reported no statement at all.
+      flushComments(Infinity);
+      return { text, statements, tokens };
+    },
+  };
 }
 
 /**
