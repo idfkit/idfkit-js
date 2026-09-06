@@ -6,7 +6,7 @@
  * @idfkit/language is an optional peer dependency: `npm install idfkit` does not
  * install it, which is what keeps the language service off disk for the readers
  * who only read and write models (SC-015). `check-install-size.mjs` reports
- * 94.5% of the 1.75 MiB budget used with 98.3 KB free, and the service emits
+ * 94.1% of the 1.875 MiB budget used with 114 KB free, and the service emits
  * more than that, so this is arithmetic rather than taste. The cost is that this
  * subpath can be imported while the package behind it is absent, and FR-046
  * requires that failure to name the component to install rather than surface as

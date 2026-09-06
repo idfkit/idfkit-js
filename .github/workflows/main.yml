@@ -146,10 +146,12 @@ jobs:
     # workspace silently resolves packages it never installed), and measures that. Each takes one
     # to three seconds.
     #
-    #   install size      under 1.75 MB on disk, measured as apparent bytes. The gate's own header
+    #   install size      under 1.875 MB on disk, measured as apparent bytes. The gate's own header
     #                     says why apparent and not allocated, prints both, and records why the
-    #                     budget was raised from 1.5 MB on 2026-09-03. 1.33 of 1.75 MB, 76 percent,
-    #                     of which about 190 KB is already promised to the schema prose.
+    #                     budget was raised from 1.5 MB on 2026-09-03 and again to 1.875 MB on
+    #                     2026-09-06. 1.76 of 1.875 MB, 94 percent, with 114 KB of slack. The
+    #                     header also names the lever nobody has pulled: 396 KB of the install is
+    #                     source maps, which serve debugging and nothing at runtime.
     #   no index          zero stations.json bytes, the weather peer not auto-installed, no
     #                     engine. The peer's tarball is deliberately available to npm during the
     #                     install, so the absence is evidence about peerDependenciesMeta rather

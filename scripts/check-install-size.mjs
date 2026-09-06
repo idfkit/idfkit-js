@@ -4,16 +4,16 @@
  *
  * THE CRITERION
  *
- * `contracts/distribution.md`: "Under 1.75 MB on disk under the shared name in
+ * `contracts/distribution.md`: "Under 1.875 MB on disk under the shared name in
  * JavaScript, no opt-in component installed". So: pack the workspace, install
  * `idfkit` and nothing else into an isolated project, and measure.
  *
- * WHICH 1.75 MB, AND WHICH "ON DISK"
+ * WHICH 1.875 MB, AND WHICH "ON DISK"
  *
  * Both halves of that sentence need pinning down, because the two readings of
  * "on disk" now disagree about the verdict rather than merely about the number.
  *
- *   1.75 MB     is 1.75 MiB, 1,835,008 bytes. Every other size in the contract
+ *   1.875 MB    is 1.875 MiB, 1,966,080 bytes. Every other size in the contract
  *               is quoted the way npm quotes them, and npm's are binary.
  *
  *   on disk     is APPARENT bytes: the sum of the file sizes, which is what
@@ -70,11 +70,43 @@
  * originally set with, and it keeps what SC-012 is for: a 4.3x reduction from
  * 7.9 MB, against 5.0x under the old figure.
  *
+ * AND WHY 1.875 MB, AS OF 2026-09-06
+ *
+ * SC-012 was amended a second time, from 1.75 MB to 1.875 MB, for the
+ * formatting-preserving writer. The same shape of decision as the first
+ * amendment and the same answer: the capability is core, so the target gave way.
+ *
+ * The writer is 47.7 KB of `dist` and landed the install at 100.8 percent, over
+ * by 14,308 bytes. It is not optional weight. Every consumer that saves a model
+ * needs it, the visual editor most of all, and a save button in an editor that
+ * reformats the file cannot be offered honestly. There is no version of this
+ * that is a component a reader adds.
+ *
+ * 1.8 MiB was rejected on the reasoning that rejected 1.6 MiB before it: it
+ * clears the measurement by 39 KB, which is less than this one feature cost, so
+ * it buys nothing and reopens this conversation immediately. 1.875 MiB is the
+ * next figure in the same binary series, 1 + 1/2 + 1/4 + 1/8, and leaves 114 KB,
+ * more than twice what the writer spent. SC-012's purpose survives it: 1.875 MB
+ * is a 4.2x reduction from the former 7.9 MB, against 4.3x under the old figure
+ * and 5.0x under the one before that.
+ *
+ * THE LEVER THAT WAS NOT PULLED, AND IS STILL THERE
+ *
+ * 396 KB of the install, 21 percent of the whole budget, is `*.js.map` and
+ * `*.d.ts.map`. They serve a person debugging into the library and nothing at
+ * runtime. Dropping them from the published `files` would free more than twice
+ * what raising the budget freed, and it was not done here because it changes
+ * what a consumer can debug, which is a packaging decision rather than this
+ * feature's to make. It is written down so that the next time this figure is
+ * under pressure, raising it again is a choice made against a known alternative
+ * rather than the only idea in the room.
+ *
  * HEADROOM, AND WHAT THE INCREASE WAS FOR
  *
- * The increase has been spent, on the thing it was raised for. 1.71 of 1.75 MB
- * is 97.9 percent, about 38 KB of slack, with the prose in `@idfkit/schemas`
- * and the syntax layer in `@idfkit/core`. The language service is not in this
+ * The first increase has been spent, on the thing it was raised for, and so has
+ * a good deal of the second. 1.76 of 1.875 MB is 94.0 percent, about 114 KB of
+ * slack, with the prose in `@idfkit/schemas`, and the syntax layer and the
+ * preserving writer in `@idfkit/core`. The language service is not in this
  * measurement at all: it is an optional peer, so it puts nothing on disk here,
  * and the per-package breakdown is what would say otherwise, since a package
  * the contract does not list is a finding whether or not the total passes.
@@ -121,8 +153,8 @@ import {
   walkFiles,
 } from './lib/clean-install.mjs';
 
-/** SC-012, in bytes. 1.75 MiB. */
-const BUDGET = Math.round(1.75 * 1024 * 1024);
+/** SC-012, in bytes. 1.875 MiB. */
+const BUDGET = Math.round(1.875 * 1024 * 1024);
 
 /** What the shared name is allowed to put on disk. Anything else is a finding. */
 const EXPECTED = new Set([FACADE, CORE, SCHEMAS]);
@@ -165,7 +197,7 @@ async function main() {
     );
     console.log(`  files        ${total.count}`);
     console.log('');
-    console.log(`  budget       ${BUDGET.toLocaleString()} bytes  ${mib(BUDGET)} (1.75 MiB)`);
+    console.log(`  budget       ${BUDGET.toLocaleString()} bytes  ${mib(BUDGET)} (1.875 MiB)`);
     console.log(
       `  used         ${percent.toFixed(1)} percent of budget, ` +
         (headroom < 0

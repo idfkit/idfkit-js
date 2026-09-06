@@ -4,7 +4,7 @@
  * WHAT A "CLEAN INSTALL" HAS TO MEAN HERE
  *
  * Five of the criteria in `contracts/distribution.md` are statements about what
- * `npm install idfkit` puts on a stranger's disk: under 1.75 MB (SC-012), zero
+ * `npm install idfkit` puts on a stranger's disk: under 1.875 MB (SC-012), zero
  * station-index bytes (SC-016), zero type-package bytes (SC-014), no
  * post-install scripting (SC-015), and a browser bundle that pulls in none of
  * the data (SC-013). None of them can be measured against this workspace. A
@@ -300,7 +300,7 @@ export function npmInstall(dir, extraFlags = []) {
  * 4 KB on the ext4 of a GitHub runner and on the APFS of a developer's laptop.
  *
  * That gap straddled the 1.5 MB budget SC-012 carried until 2026-09-03, so the
- * choice of measure decided the verdict outright; under the amended 1.75 MB both
+ * choice of measure decided the verdict outright; under the amended 1.875 MB both
  * readings pass today, and both will not once the schema prose lands. Either way
  * this gate measures APPARENT bytes, for two reasons that do not depend on where
  * the line currently sits:
