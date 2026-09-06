@@ -877,9 +877,10 @@ const COMPOSING = [
   '',
 ].join('\n');
 
-const composing = () => parseIdf(COMPOSING, v26, { strict: false, preserveFormatting: true }).document;
+const composing = () =>
+  parseIdf(COMPOSING, v26, { strict: false, preserveFormatting: true }).document;
 
-describe('where an object\'s characters were', () => {
+describe("where an object's characters were", () => {
   // `changedObjects()` says WHICH objects a write will rewrite. Without saying WHERE the old ones
   // are, a consumer building the smallest possible change has to write the whole file and diff it,
   // which is the work that method exists to avoid. Found by the language server team reading the
@@ -955,9 +956,9 @@ describe('the text that belongs in that range', () => {
 
     expect(document.renderObject(building)).toContain('!- North Axis {deg}');
     // What a consumer would have had to reach for, and what it costs.
-    expect(writeObject(building, { comments: true, commentColumn: 30, indent: '    ' })).not.toContain(
-      '{deg}'
-    );
+    expect(
+      writeObject(building, { comments: true, commentColumn: 30, indent: '    ' })
+    ).not.toContain('{deg}');
   });
 
   it('splices into its own range to give back exactly what a whole write gives back', () => {
@@ -986,7 +987,8 @@ describe('the text that belongs in that range', () => {
     // send the document down the formatting path. Accepting any of them here would render one
     // object on terms the surrounding file was not written on.
     // A source with a field the author wrote BARE, which is what the option is about.
-    const bare = 'Version, 26.1;\n\nBuilding,\n  My Building,   !- Name\n  0.0,           !- North Axis {deg}\n  City;\n';
+    const bare =
+      'Version, 26.1;\n\nBuilding,\n  My Building,   !- Name\n  0.0,           !- North Axis {deg}\n  City;\n';
     const { document } = parseIdf(bare, v26, { strict: false, preserveFormatting: true });
     const building = document.require('Building', 'My Building');
     building.set('north_axis', 42);
@@ -1006,8 +1008,10 @@ describe('the text that belongs in that range', () => {
     const document = composing();
 
     expect(document.renderObject(document.addRaw('Zone', 'Late Arrival', {}))).toBeUndefined();
-    expect(parseIdf(COMPOSING, v26, { strict: false }).document.renderObject(
-      parseIdf(COMPOSING, v26, { strict: false }).document.require('Building', 'My Building')
-    )).toBeUndefined();
+    expect(
+      parseIdf(COMPOSING, v26, { strict: false }).document.renderObject(
+        parseIdf(COMPOSING, v26, { strict: false }).document.require('Building', 'My Building')
+      )
+    ).toBeUndefined();
   });
 });

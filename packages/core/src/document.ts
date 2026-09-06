@@ -384,7 +384,10 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
     // The END is the writer's, not the statement's. A comment on the terminator's own line is that
     // statement's last field's comment and the preserving write replaces it; a range stopping at
     // the semicolon would leave it behind, on a line describing a field that had just moved.
-    return { start: statement.region.start, end: derivedOf(source).ends[at] ?? statement.region.end };
+    return {
+      start: statement.region.start,
+      end: derivedOf(source).ends[at] ?? statement.region.end,
+    };
   }
 
   /**
