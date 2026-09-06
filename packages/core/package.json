@@ -42,8 +42,8 @@
     "node": ">=20"
   },
   "idfkit": {
-    "conformance": "conformance-2026.9",
-    "governance": "governance-2026.13"
+    "conformance": "conformance-2026.10",
+    "governance": "governance-2026.14"
   },
   "dependencies": {
     "@idfkit/schemas": "0.0.0"
