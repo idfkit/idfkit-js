@@ -10,6 +10,122 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
 
 ## [Unreleased]
 
+## [0.3.0-rc.2] - 2026-09-06
+
+This release moves to `conformance-2026.11` and `governance-2026.15`. The corpus
+level changes no case: 69 cases and 211 assertions, as `conformance-2026.10` had.
+What moved is its runners, which had been reporting a false failure on
+`preserve-edit-one-field`. `governance-2026.15` registers five names and renames
+nothing.
+
+`0.3.0-rc.1` shipped a writer that gave the file back and then rewrote more of an
+edited object than the edit asked for. This release is that gap closed, and three
+of the four items below were found by consumers reading the branch before it
+merged rather than by this repository's own tests.
+
+### Added
+
+- **`IdfDocument.changedObjects()`**, the objects a preserving write will write
+  afresh rather than reproduce. Empty for a document read with
+  `preserveFormatting` and not edited since; every object for one read without
+  it, because there is nothing to reproduce.
+
+  It is the part a consumer cannot derive: a rename clears the record on every
+  object that referred to the renamed one, so counting from your own edit log
+  reports one where the answer is nine.
+
+  **It is not "everything that will differ", and a removal is the case that
+  separates the two.** A removed object is no longer in the document to be
+  yielded, so this can return nothing for a write that changes the file. To ask
+  whether the file will differ at all, compare the write with `rawText`.
+
+- **`IdfDocument.regionOf(obj)`**, where an object's characters sit in
+  `rawText`, as an already-exported `Region`. `undefined` for an object added
+  since the read, for a document read without preservation, and for one read
+  from the object notation.
+
+  The range is where the object **was**, and stays answerable after it changes,
+  which is the case it is for. Its end is the **writer's**, not the statement's:
+  a comment on the terminator's own line is that statement's last field's
+  comment and a preserving write replaces it, so a range stopping at the
+  semicolon would leave it behind describing a field that had just moved.
+
+- **`IdfDocument.renderObject(obj, options?)`**, one object rendered exactly as a
+  preserving write would render it. The text that belongs in the range `regionOf`
+  returns, so the two compose into an edit that leaves the file byte for byte
+  where `writeIdf` would have left it.
+
+  `writeObject` is not this, which is why it exists. A preserving write hands
+  that function the author's own per-field annotations, which are internal, so
+  calling it with options built by hand comes back with the author's units and
+  notes as generated labels: `!- North Axis {deg}` becomes `!- North Axis`.
+
+  Takes `fieldComments` and nothing else, because that is the only control a
+  preserving write honours.
+
+- **`fieldComments` on `writeIdf`**, `'preserve'` by default or `'generate'` to
+  label every field. The escape hatch for a caller who wants the ordinary
+  writer's labels without losing what the author wrote around them.
+
+### Fixed
+
+- **Values the author grouped onto one line stay on one line.** A reformatted
+  object was written one value per line whatever the source said. Across the 693
+  EnergyPlus 22.1.0 example files that is 21.5% of statements, with 690 of the
+  693 containing at least one, and a full reformat would add 20.2% to the
+  corpus's line count. A four-line surface became twelve.
+
+  An object the author wrote entirely on one line comes back on one line, so
+  `Timestep,4;` stays as written. That is another 11.3% of statements and the
+  case that surprises on a file with no geometry in it.
+
+- **The author's per-field comments survive an edit.** Changing one field
+  rebuilt the comments on **every** field of the object, destroying anything the
+  schema cannot regenerate: the field's unit, and any note the author left
+  there. A field the author left bare stays bare, because absence is as much a
+  thing the author wrote as the words are.
+
+- **`!-` goes where EnergyPlus puts it.** `commentColumn` is documented as a
+  column and was applied as a 0-based index, so every comment landed one place
+  right of the files it imitates. Measured across 1,504,802 comment lines whose
+  content came back byte-identical, 91% moved by exactly one. On a preserving
+  write that is the difference that shows: a rewritten object's comments stood
+  one column clear of every untouched object around it, so each save left a
+  visible seam.
+
+- **Trailing fields the author wrote out as blanks are kept.** The writer
+  stopped at the last field that is set, so a run of commas the author wrote was
+  dropped and their field-name comments went with them. One `Sizing:System` went
+  from 38 lines to 22 on a single-field edit; corpus-wide it is 20,571 lines.
+  Only on the preserving path: a write with nothing to reproduce trims as it
+  always has.
+
+- **An object at the end of a file no longer gains a blank line on every
+  reformat.** The writer appended a fixed line break where the node's own
+  trailing newlines were the right thing to reuse.
+
+- **`comments: false` output parses again.** Restructuring the emitter left the
+  type name emitted last, which loads as nothing at all. The corpus caught it.
+
+### Changed
+
+- **Reformatting is roughly eight times faster.** The annotation walk seeked its
+  token cursor from the front of the file for each statement, which is quadratic
+  in the token count. Reformatting every object of a 6,874-statement file went
+  from 647 ms to 76 ms.
+
+  Neither performance gate covers that path: both time an **unchanged**
+  preserving write, where every statement is copied verbatim and the walk is
+  never reached.
+
+- **The `preserveFormatting` documentation states where the path stops being the
+  cheap one.** A preserving write is cheapest where it is used and **crosses
+  over** once most objects have changed, because it renders each of them and
+  walks the tiling. On a 13 MB model with every object edited it is roughly four
+  times slower than a formatting write. An edit touches a handful of objects, so
+  this is a note for whoever benchmarks rather than a reason to choose
+  differently.
+
 ## [0.3.0-rc.1] - 2026-09-06
 
 This release moves to `conformance-2026.10` and `governance-2026.14`. Those two
@@ -577,7 +693,9 @@ First published release. The API is not yet stable.
   no schema matches, because loading the wrong schema mis-maps every positional
   field instead of failing.
 
-[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.2...HEAD
+[0.3.0-rc.2]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.1...v0.3.0-rc.2
+[0.3.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.2.0...v0.3.0-rc.1
 [0.2.0]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.2...v0.2.0
 [0.2.0-rc.2]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.1...v0.2.0-rc.2
 [0.2.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.1.0...v0.2.0-rc.1
