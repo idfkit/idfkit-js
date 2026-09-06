@@ -77,6 +77,13 @@ export interface WriteIdfOptions {
    * or `comments: false`, which ask for a different output FORM the source was never going to
    * express, so producing it is honest.
    *
+   * Cheapest where it is used: a write that reproduces most of the file copies text rather than
+   * building it. It CROSSES OVER once most objects have changed, because this path renders each of
+   * them AND walks the tiling, which is more work than formatting alone. On a 13 MB model with
+   * every object edited it is roughly four times slower than a formatting write. Nothing to guard
+   * against, since an edit touches a handful of objects and a whole model rewrite is what
+   * `preserveFormatting: false` is for, but worth knowing before timing the wrong one.
+   *
    * @defaultValue undefined, meaning decide
    */
   preserveFormatting?: boolean;
