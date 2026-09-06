@@ -1,7 +1,7 @@
 import type { Schema, SlimType } from '@idfkit/schemas';
 
 import { IdfDocument } from '../document.js';
-import { SOURCE } from '../internal.js';
+import { ORIGIN, SOURCE } from '../internal.js';
 import type { ExtensibleGroup, FieldValues, IdfObject, StoredValue } from '../object.js';
 import { statementIndexes } from '../preserve/source.js';
 import { layerCollector } from '../syntax/layer.js';
@@ -143,6 +143,9 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
       if (at !== undefined) {
         anchors[at] = built;
         built[SOURCE] = at;
+        // The same number, kept past the first edit. `SOURCE` goes when the object is touched,
+        // which is what marks it for rewriting; this one answers where its characters WERE.
+        built[ORIGIN] = at;
       }
 
       // Reported after the object is built, never instead of building it: a value of the wrong

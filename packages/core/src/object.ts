@@ -1,7 +1,7 @@
 import type { SlimField, SlimType } from '@idfkit/schemas';
 
 import { ExtensibleList } from './extensible.js';
-import { DATA, KEY, NAME, OWNER, SHAPE, SOURCE } from './internal.js';
+import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
 import { shapeFor, type ObjectShape } from './shape.js';
 
 /** A scalar field value. `undefined` means the field is absent. */
@@ -56,6 +56,7 @@ export class IdfObject {
   declare [KEY]: string;
   /** Index into the document's preserved anchors, or `undefined` once anything has changed this. */
   declare [SOURCE]: number | undefined;
+  declare [ORIGIN]: number | undefined;
 
   /**
    * Objects are built through `IdfObject.create`, never `new`, because each
@@ -83,6 +84,7 @@ export class IdfObject {
     // it exists (FR-007). `clone` builds through here too, which is why a copy is touched as well:
     // it is a different object from the one the characters describe.
     Object.defineProperty(obj, SOURCE, { value: undefined, writable: true });
+    Object.defineProperty(obj, ORIGIN, { value: undefined, writable: true });
 
     for (const [field, value] of Object.entries(values)) {
       if (value === undefined || value === null) continue;
