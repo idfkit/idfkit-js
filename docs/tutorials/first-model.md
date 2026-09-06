@@ -201,14 +201,14 @@ cat office.idf
 
 ```idf
 Zone,
-    Open Plan,                !- Name
-    ,                         !- Direction of Relative North
-    ,                         !- X Origin
-    ,                         !- Y Origin
-    ,                         !- Z Origin
-    ,                         !- Type
-    1,                        !- Multiplier
-    2.7;                      !- Ceiling Height
+    Open Plan,               !- Name
+    ,                        !- Direction of Relative North
+    ,                        !- X Origin
+    ,                        !- Y Origin
+    ,                        !- Z Origin
+    ,                        !- Type
+    1,                       !- Multiplier
+    2.7;                     !- Ceiling Height
 ```
 
 Your zone is called `Open Plan`, and so is the wall's `Zone Name` further down

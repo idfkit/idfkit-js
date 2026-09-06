@@ -13,7 +13,13 @@ export interface WriteIdfOptions {
    */
   comments?: boolean;
   /**
-   * Column the field-name comments are aligned to.
+   * Column the field-name comments are aligned to, counting from 1 as an editor does.
+   *
+   * The default puts `!-` where EnergyPlus itself puts it. Its own example files write the marker
+   * at column 30 on 223 of the 231 commented lines of `1ZoneUncontrolled.idf`, and matching that
+   * is what keeps a rewritten object flush with the untouched objects around it: on a preserving
+   * write, a column of its own would leave a visible seam at every edit.
+   *
    * @defaultValue 30
    */
   commentColumn?: number;
@@ -193,6 +199,7 @@ function decidePreservation<M extends AnyTypeMap>(
 
 export interface ObjectWriteOptions {
   comments: boolean;
+  /** Where `!-` goes, counted from 1. See {@link WriteIdfOptions.commentColumn}. */
   commentColumn: number;
   indent: string;
   /** Put the whole object on one line. See `WriteIdfOptions.compressed`. */
@@ -271,7 +278,20 @@ export function writeObject(obj: IdfObject, options: ObjectWriteOptions): string
   // and a run of bare commas is noise. But IDF is positional: if extensible
   // groups follow, every fixed slot must be emitted or the groups land one
   // field early and each value is read into the wrong slot on the way back in.
-  const lastFixed = groups.length > 0 ? fixed.length - 1 : lastSetIndex(obj, fixed);
+  //
+  // The annotations are the third case, and the reason is the one that governs this whole path: a
+  // field the author WROTE OUT as a blank is as much a thing the author wrote as a field left
+  // bare of its comment. Dropping it takes the author's `!- Cooling Design Capacity Method` with
+  // it, so a single-field edit shortens one Sizing:System from 38 lines to 22. Across the 693
+  // example files that is 20,571 lines, more than any other difference a rewrite makes.
+  //
+  // Only on this path. A write with no author behind it keeps trimming, as it always has.
+  const authored = options.annotations?.length ?? 0;
+  const lastAuthored = authored - (obj.isNamed ? 1 : 0) - 1;
+  const lastFixed =
+    groups.length > 0
+      ? fixed.length - 1
+      : Math.min(fixed.length - 1, Math.max(lastSetIndex(obj, fixed), lastAuthored));
   for (let i = 0; i <= lastFixed; i += 1) {
     const field = fixed[i]!;
     cells.push({ value: formatValue(definition, field, obj.get(field)), label: humanize(field) });
@@ -317,7 +337,10 @@ export function writeObject(obj: IdfObject, options: ObjectWriteOptions): string
     if (openComment === undefined) {
       lines.push(open);
     } else {
-      const padding = ' '.repeat(Math.max(1, options.commentColumn - open.length));
+      // Minus one because the option is a COLUMN, counted from 1, and this is an offset into a
+      // string, counted from 0. Applying it as an offset put every comment one column right of
+      // where the files being imitated put it.
+      const padding = ' '.repeat(Math.max(1, options.commentColumn - 1 - open.length));
       lines.push(`${open}${padding}${openComment}`);
     }
     open = '';

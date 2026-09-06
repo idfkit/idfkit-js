@@ -803,3 +803,57 @@ describe('the line the author put a value on', () => {
     expect(writeIdf(document)).toMatch(/\n\s+42\.0;\s+!- North Axis/);
   });
 });
+
+describe('the fields the author wrote out as blanks', () => {
+  // The writer stops at the last field that is SET, so a run of explicit commas the author wrote
+  // is dropped and their field-name comments go with them. A single-field edit took one
+  // Sizing:System from 38 lines to 22; across the 693 example files it is 20,571 lines, more than
+  // any other difference a rewrite makes. A field written out as a blank is as much a thing the
+  // author wrote as a field left bare of its comment, which is the rule this path already follows.
+  const BLANKS = [
+    'Version, 26.1;',
+    '',
+    'Building,',
+    '  My Building,             !- Name',
+    '  0.0,                     !- North Axis {deg}',
+    '  ,                        !- Terrain',
+    '  ,                        !- Loads Convergence Tolerance Value',
+    '  ,                        !- Temperature Convergence Tolerance Value',
+    '  ;                        !- Solar Distribution',
+    '',
+  ].join('\n');
+
+  it('keeps them, and their comments, through an edit', () => {
+    const { document } = parseIdf(BLANKS, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    const written = writeIdf(document);
+
+    expect(written.split('\n')).toHaveLength(BLANKS.split('\n').length);
+    expect(written).toContain('!- Terrain');
+    expect(written).toContain('!- Solar Distribution');
+  });
+
+  it('still trims them where there is no author to be faithful to', () => {
+    // A document read without preservation has nothing to reproduce, so the ordinary writer's
+    // habit applies and a run of bare commas stays out of the output.
+    const { document } = parseIdf(BLANKS, v26, { strict: false });
+
+    expect(writeIdf(document)).not.toContain('!- Solar Distribution');
+  });
+});
+
+describe('the column the comment goes in', () => {
+  it('puts the marker where EnergyPlus puts it, so a rewrite leaves no seam', () => {
+    // `1ZoneUncontrolled.idf` writes `!-` at index 29 on 223 of its 231 commented lines. The
+    // option is a COLUMN, counted from 1, and was being applied as an index.
+    const text = 'Version, 26.1;\n\nBuilding,\n  My Building,\n  0.0;\n';
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    for (const line of writeIdf(document).split('\n')) {
+      const marker = line.indexOf('!-');
+      if (marker > 0) expect(marker).toBe(29);
+    }
+  });
+});
