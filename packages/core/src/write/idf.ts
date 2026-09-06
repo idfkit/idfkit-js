@@ -182,6 +182,20 @@ export interface ObjectWriteOptions {
   indent: string;
   /** Put the whole object on one line. See `WriteIdfOptions.compressed`. */
   compressed?: boolean;
+  /**
+   * The author's own comment for each field, positionally, when there is one to reuse.
+   *
+   * Supplied by the preserving writer and by nothing else. Re-rendering an object's VALUES is what
+   * an edit asks for; rebuilding its comments is not, and doing it anyway destroys anything the
+   * schema cannot regenerate — a note to a colleague, and the field's unit, which `humanize` does
+   * not emit. An entry is the whole comment as written, from its `!` onward.
+   *
+   * Positional, and shorter than the cells whenever the object gained fields, in which case the
+   * ones past the end are generated as they always were.
+   *
+   * @internal
+   */
+  fieldComments?: readonly (string | undefined)[];
 }
 
 /** Serialize one object. */
@@ -240,8 +254,10 @@ export function writeObject(obj: IdfObject, options: ObjectWriteOptions): string
       lines.push(body);
       return;
     }
+    // The author's comment where there is one, this writer's where there is not.
+    const comment = options.fieldComments?.[index] ?? `!- ${cell.label}`;
     const padding = ' '.repeat(Math.max(1, options.commentColumn - body.length));
-    lines.push(`${body}${padding}!- ${cell.label}`);
+    lines.push(`${body}${padding}${comment}`);
   });
 
   return `${lines.join('\n')}\n`;

@@ -63,7 +63,10 @@ function statementPart(
   // the object would mean holding a reference to something the document has let go.
   if (anchored[OWNER] === undefined) return '';
   if (isUntouched(anchored, source)) return verbatim;
-  return writeObject(anchored, options);
+  // Re-render the VALUES, and keep the author's comments. An edit asks for the first and never for
+  // the second, and rebuilding a comment destroys whatever the schema cannot regenerate: a note to
+  // a colleague, and the field's unit, which the ordinary label does not carry.
+  return writeObject(anchored, { ...options, fieldComments: fieldComments(source, index) });
 }
 
 /**
@@ -140,4 +143,49 @@ function extentEnds(source: PreservedSource): number[] {
     ends[index] = tokens.endAt(token);
   }
   return ends;
+}
+
+/**
+ * The author's comment for each of a statement's fields, positionally, where one exists.
+ *
+ * A field's comment is the one after its separator on the same line, which is the same positional
+ * rule {@link extentEnds} uses for the terminator and is the convention every writer of these files
+ * follows. A comment on its own line belongs to no field and is left in the gap.
+ *
+ * Positional against `Statement.fields`, which is positional against the cells `writeObject` emits:
+ * the name first for a named type, then the fixed fields in order. An object that gained fields
+ * runs past the end of this list and generates the rest, which is right, since the author never
+ * wrote a comment for a field that was not there.
+ *
+ * The last entry is the comment on the terminator's line, so this subsumes the duplicate that
+ * {@link extentEnds} exists to prevent: the comment is emitted once, by the writer, in place.
+ */
+function fieldComments(source: PreservedSource, index: number): (string | undefined)[] {
+  const { statements, tokens, text } = source.layer;
+  const fields = statements[index]!.fields;
+  const comments: (string | undefined)[] = new Array<string | undefined>(fields.length).fill(
+    undefined
+  );
+
+  // One cursor over the tokens, which are in source order, as the fields are.
+  let token = 0;
+  for (let at = 0; at < fields.length; at += 1) {
+    const end = fields[at]!.end;
+    while (token < tokens.length && tokens.startAt(token) < end) token += 1;
+    // The separator or terminator that closes the field sits between it and its comment, and is a
+    // token of its own. Step over it; a field's comment is the next thing after it.
+    while (
+      token < tokens.length &&
+      (tokens.kindAt(token) === 'separator' || tokens.kindAt(token) === 'terminator')
+    ) {
+      token += 1;
+    }
+    if (token >= tokens.length || tokens.kindAt(token) !== 'comment') continue;
+    const between = text.slice(end, tokens.startAt(token));
+    // Horizontal whitespace and the delimiter only. A line feed puts the comment on its own line,
+    // where it belongs to no field.
+    if (between.includes('\n') || between.replace(/[,;]/g, '').trim() !== '') continue;
+    comments[at] = text.slice(tokens.startAt(token), tokens.endAt(token)).trimEnd();
+  }
+  return comments;
 }

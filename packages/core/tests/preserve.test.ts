@@ -214,6 +214,43 @@ describe('one field changes and one object looks changed', () => {
     expect(written).toContain('!- Direction of Relative North');
   });
 
+  it("keeps the author's comments on an object it reformats", () => {
+    // The values are what an edit asks to re-render. The comments are not, and rebuilding them
+    // destroys whatever the schema cannot regenerate: a note to a colleague, and the field's unit,
+    // which the generated label does not carry. Both are kept, in place, exactly as written.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  My Building,             !- Name',
+      '  0,                       !- North Axis {deg}',
+      '  City;                    !- VERIFY WITH CLIENT before the Feb review',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    const written = writeIdf(document);
+
+    expect(written).toContain('!- North Axis {deg}');
+    expect(written).toContain('!- VERIFY WITH CLIENT before the Feb review');
+    // Once each, not twice: the writer emits the author's comment in place of its own, so there is
+    // nothing left in the gap to arrive on the line below (idfkit-js#47).
+    expect(written.match(/!- North Axis/g)).toHaveLength(1);
+    expect(written.match(/VERIFY WITH CLIENT/g)).toHaveLength(1);
+    // The value is the one thing that did change.
+    expect(written).toContain('42.0');
+    expect(written).not.toContain('  0,');
+  });
+
+  it('generates a comment only for a field the author never wrote one for', () => {
+    const text = ['Version, 26.1;', '', 'Building,', '  My Building;', ''].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    expect(writeIdf(document)).toContain('!- North Axis');
+  });
+
   it('does not leave the old terminator comment below a reformatted object', () => {
     // idfkit-js#47. A statement's region ends at its terminator, so a comment after the semicolon
     // on the same line used to sit in the gap. Invisible while the object is copied, because the
@@ -236,8 +273,9 @@ describe('one field changes and one object looks changed', () => {
 
     const written = writeIdf(document);
 
-    expect(written).not.toContain('{deg}');
+    // Once, in place, with the author's unit intact. It used to arrive a second time from the gap.
     expect(written.match(/!- North Axis/g)).toHaveLength(1);
+    expect(written).toContain('!- North Axis {deg}');
   });
 
   it('leaves a comment on its own line where it is', () => {
