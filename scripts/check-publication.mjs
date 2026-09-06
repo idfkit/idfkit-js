@@ -137,7 +137,7 @@ const REQUIRED_CONFORMANCE = 'conformance-2026.10';
 const DISTRIBUTION_GATES = [
   ['check-type-packages.mjs', 'type packages carry no runtime (FR-039)'],
   ['check-facade.mjs', 'the facade is the contracted surface (FR-036, FR-037, FR-070)'],
-  ['check-install-size.mjs', 'under 1.75 MB on disk (SC-012)'],
+  ['check-install-size.mjs', 'under 1.875 MB on disk (SC-012)'],
   ['check-no-index.mjs', 'zero station-index bytes, weather not auto-installed (FR-043, SC-016)'],
   ['check-ignore-scripts.mjs', 'no install-time scripting (SC-015)'],
   ['check-opt-out-typing.mjs', 'zero type-package bytes, fully functional (SC-014)'],
