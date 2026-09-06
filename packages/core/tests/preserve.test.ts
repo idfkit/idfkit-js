@@ -200,12 +200,64 @@ describe('one field changes and one object looks changed', () => {
     // The removed statement's extent goes and the gaps around it do not: the blank line that
     // separated the two zones is in a gap and belongs to no object.
     //
-    // A statement's region ends at its TERMINATOR, so a comment trailing the semicolon on the same
-    // line is in the gap too, and it survives the removal. That is a consequence of the definition
-    // of text that belongs to no object, and it is behaviour rather than a defect: the alternative
-    // is a writer that decides which comments are about which object, which is a guess.
-    expect(written).toBe(MODEL.replace('Zone,\n  Zone Two,     !- Name\n  1.0E-5;', ''));
+    // The comment on the TERMINATOR's line goes with the object (idfkit-js#47). It is the last
+    // field's comment, and the field no longer exists, so leaving it behind would strand a line
+    // describing something that is gone. A comment on its own line, or after a blank one, stays:
+    // that is where deciding which object a comment belongs to becomes a guess.
+    expect(written).toBe(
+      MODEL.replace(
+        'Zone,\n  Zone Two,     !- Name\n  1.0E-5;       !- Direction of Relative North',
+        ''
+      )
+    );
+    // Zone One still carries its own, on its own terminator line.
     expect(written).toContain('!- Direction of Relative North');
+  });
+
+  it('does not leave the old terminator comment below a reformatted object', () => {
+    // idfkit-js#47. A statement's region ends at its terminator, so a comment after the semicolon
+    // on the same line used to sit in the gap. Invisible while the object is copied, because the
+    // gap is copied too; wrong the moment it is reformatted, because the writer emits its own
+    // field comment and the author's then arrives on the line below.
+    //
+    // It is not even a duplicate: the ordinary writer drops the unit, so `!- North Axis {deg}`
+    // reads as a stray fragment under `!- North Axis`. IDFEditor writes one of these on every
+    // line of every object, so about half the statements in a typical file were affected.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  My Building,             !- Name',
+      '  0;                       !- North Axis {deg}',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    const written = writeIdf(document);
+
+    expect(written).not.toContain('{deg}');
+    expect(written.match(/!- North Axis/g)).toHaveLength(1);
+  });
+
+  it('leaves a comment on its own line where it is', () => {
+    // The boundary of the rule above. Only the terminator's own line is absorbed; a comment on the
+    // next line is about whatever follows it and is nobody's to move.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  My Building,             !- Name',
+      '  0;',
+      '! a note about what comes next',
+      '',
+      'Timestep, 6;',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    expect(writeIdf(document)).toContain('! a note about what comes next');
   });
 
   it('appends a new object at the end, formatted', () => {
