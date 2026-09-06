@@ -243,6 +243,37 @@ describe('one field changes and one object looks changed', () => {
     expect(written).not.toContain('  0,');
   });
 
+  it('adds no line to the file for an object it reformats', () => {
+    // A statement's extent ends at its terminator, or at the comment on that same line, and never
+    // includes the line break: the break is the first character of the gap. `writeObject` ends with
+    // one because it also writes whole documents, so emitting it here put the break in twice and
+    // grew the file by a blank line per reformatted object — compounding on every save.
+    //
+    // It was there before the comment work and was invisible: the misplaced terminator comment sat
+    // in the gap between the two breaks, so it read as one blank line. Fixing that exposed this.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  My Building,   !- Name',
+      '  0;             !- North Axis {deg}',
+      '',
+      'Timestep, 6;',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    const written = writeIdf(document);
+
+    expect(written.split('\n')).toHaveLength(text.split('\n').length);
+    expect(written).not.toContain('\n\n\n');
+    // And again, on the output, because the growth compounded rather than saturating.
+    const reread = parseIdf(written, v26, { strict: false, preserveFormatting: true }).document;
+    reread.require('Building', 'My Building').set('north_axis', 43);
+    expect(writeIdf(reread).split('\n')).toHaveLength(text.split('\n').length);
+  });
+
   it('generates a comment only for a field the author never wrote one for', () => {
     const text = ['Version, 26.1;', '', 'Building,', '  My Building;', ''].join('\n');
     const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });

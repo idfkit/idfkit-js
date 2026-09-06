@@ -66,7 +66,17 @@ function statementPart(
   // Re-render the VALUES, and keep the author's comments. An edit asks for the first and never for
   // the second, and rebuilding a comment destroys whatever the schema cannot regenerate: a note to
   // a colleague, and the field's unit, which the ordinary label does not carry.
-  return writeObject(anchored, { ...options, fieldComments: fieldComments(source, index) });
+  //
+  // Without its trailing newline. A statement's extent ends at its terminator, or at the comment on
+  // that same line, and in neither case does it include the line break: the break is the first
+  // character of the gap. `writeObject` ends with one because it is also used to write whole
+  // documents, so emitting it here would put the break in twice and grow the file by a blank line
+  // per reformatted object. Every object in a file, edited and saved twice, would grow it twice.
+  const written = writeObject(anchored, {
+    ...options,
+    fieldComments: fieldComments(source, index),
+  });
+  return written.endsWith('\n') ? written.slice(0, -1) : written;
 }
 
 /**
