@@ -1,6 +1,8 @@
 import type { FieldKind, SlimType } from '@idfkit/schemas';
 
 import type { IdfDocument } from '../document.js';
+import { writePreserved } from '../preserve/write.js';
+import type { PreservedSource } from '../preserve/source.js';
 import type { AnyTypeMap } from '../typemap.js';
 import type { IdfObject, StoredValue } from '../object.js';
 
@@ -57,23 +59,48 @@ export interface WriteIdfOptions {
    * @defaultValue false
    */
   compressed?: boolean;
+  /**
+   * Reproduce the text the document was read from, per object.
+   *
+   * Tri-state: absent decides from the document and the other options, `true` preserves and
+   * refuses a contradictory request, `false` formats. Asking for it on a document read without it
+   * is not an error, because nothing was promised.
+   *
+   * Refused together with `indent`, `commentColumn`, `ordering` or `versionFirst`: reproducing the
+   * original text and laying it out differently are contradictory. Not refused with `compressed`
+   * or `comments: false`, which ask for a different output FORM the source was never going to
+   * express, so producing it is honest.
+   *
+   * @defaultValue undefined, meaning decide
+   */
+  preserveFormatting?: boolean;
 }
 
 /**
  * Serialize a document to IDF text.
  *
- * One caveat worth stating plainly: this does not round-trip formatting.
- * `3.0` in the input comes back as `3`, because JavaScript has a single number
- * type and the distinction is lost the moment the value is parsed. The models
- * are semantically identical and EnergyPlus reads both, but a textual diff of
- * input against output will show those fields. Preserving the original text
- * needs a concrete syntax tree, which the Python library has and this does not
- * yet.
+ * Two behaviours, chosen by how the document was read. A document read with `preserveFormatting`
+ * is written back per object: anything unchanged is reproduced from the characters it was read
+ * from, and everything between the objects is copied. A document read without it is formatted,
+ * which is what this writer has always done and still does by default.
+ *
+ * The caveat that used to be stated here applies to the formatting path alone: `3.0` comes back as
+ * `3` for a field the schema does not declare numeric. On the preserving path nothing is
+ * re-rendered, so nothing is lost.
  */
 export function writeIdf<M extends AnyTypeMap>(
   document: IdfDocument<M>,
   options: WriteIdfOptions = {}
 ): string {
+  const preserved = decidePreservation(document, options);
+  if (preserved !== undefined) {
+    return writePreserved(document, preserved, {
+      comments: options.comments ?? true,
+      commentColumn: options.commentColumn ?? 30,
+      indent: options.indent ?? '    ',
+    });
+  }
+
   const compressed = options.compressed ?? false;
   // Compressed output has no comments by definition. Asking for both is not an error, because the
   // narrower request is unambiguous: comments cannot survive a single-line object.
@@ -107,6 +134,46 @@ export function writeIdf<M extends AnyTypeMap>(
   }
 
   return parts.join('\n');
+}
+
+/**
+ * The retained source to preserve from, or `undefined` to format.
+ *
+ * The branches below are the decision table, in order. Two are worth naming: preservation asked
+ * for on a document that has none is a quiet fallback rather than an error, and a reformatting
+ * control set WITHOUT asking for preservation is a request to format, so a control is never
+ * silently dropped in favour of the source.
+ */
+function decidePreservation<M extends AnyTypeMap>(
+  document: IdfDocument<M>,
+  options: WriteIdfOptions
+): PreservedSource | undefined {
+  if (options.preserveFormatting === false) return undefined;
+  // A different output FORM is a different artifact, so granting it is honest.
+  if (options.compressed === true || options.comments === false) return undefined;
+
+  const source = document.preservedSource;
+  const reformatting =
+    options.indent !== undefined ||
+    options.commentColumn !== undefined ||
+    options.ordering !== undefined ||
+    options.versionFirst !== undefined;
+
+  // A document read from the object notation carries JSON text and preserves on that format's
+  // all-or-nothing terms. Handing it to this walk would emit JSON under an IDF writer's name.
+  if (source === undefined || source.format !== 'idf') return undefined;
+  if (reformatting) {
+    if (options.preserveFormatting === true) {
+      // Names the CLASS of controls, not the one the caller happened to set: a caller who set two
+      // learns about both.
+      throw new TypeError(
+        'preserveFormatting reproduces the original text, so it cannot also apply indent, ' +
+          'commentColumn, ordering or versionFirst. Pass one or the other.'
+      );
+    }
+    return undefined;
+  }
+  return source;
 }
 
 export interface ObjectWriteOptions {

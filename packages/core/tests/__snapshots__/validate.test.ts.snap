@@ -107,6 +107,15 @@ exports[`validating is unchanged by positioning > produces the same findings for
   "totalIssues": 3
 }
 
+--- no-trailing-newline
+{
+  "errors": [],
+  "warnings": [],
+  "info": [],
+  "isValid": true,
+  "totalIssues": 0
+}
+
 --- no-version-declared
 {
   "errors": [],

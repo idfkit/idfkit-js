@@ -22,6 +22,7 @@ those has destroyed the fixture rather than tidied it.
 | `line-endings-lf.idf`                     | Line feed only.                                                                                                 |
 | `line-endings-crlf.idf`                   | Carriage return and line feed only, on every line.                                                              |
 | `line-endings-mixed.idf`                  | Both conventions in one file, alternating.                                                                      |
+| `no-trailing-newline.idf`                 | A last line with no line feed after it, which a write must not add.                                             |
 | `value-across-two-lines.idf`              | A field value written across two lines, so its stored region crosses a line boundary while no drawn token may.  |
 | `comment-between-separator-and-value.idf` | A comment sitting between a separator and the value that follows it.                                            |
 | `comma-inside-trailing-comment.idf`       | A comma and a semicolon inside a comment trailing a value, neither of which is a delimiter.                     |
@@ -35,3 +36,10 @@ The line-ending fixtures carry the same statements deliberately, so a test that
 finds them classifying differently has found a line-ending bug rather than a
 content difference. Their byte counts are 135, 143 and 139: identical text, four
 or eight extra carriage returns.
+
+`no-trailing-newline.idf` was added for the preserving writer (feature 006) and
+is donated onward to the conformance corpus as `preserve-no-trailing-newline`.
+It exists because the curated corpus holds no such file: its inputs were swept
+from what one engine emits, and that engine always ends a file with a line feed.
+A writer that appends one is wrong on a file that never had one, and nothing but
+a fixture like this one notices.

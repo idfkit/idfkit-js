@@ -1,10 +1,13 @@
 import type { Schema, SlimType } from '@idfkit/schemas';
 
 import { IdfDocument } from '../document.js';
-import type { ExtensibleGroup, FieldValues, StoredValue } from '../object.js';
+import { SOURCE } from '../internal.js';
+import type { ExtensibleGroup, FieldValues, IdfObject, StoredValue } from '../object.js';
+import { statementIndexes } from '../preserve/source.js';
+import { layerCollector } from '../syntax/layer.js';
 import type { AnyTypeMap, UntypedMap } from '../typemap.js';
-import { lex, type LexDiagnostic, type RawObject } from './lexer.js';
-import { scan } from './scan.js';
+import { lex, objectCollector, type LexDiagnostic, type RawObject } from './lexer.js';
+import { scan, type ScanHandler } from './scan.js';
 
 export interface ParseDiagnostic extends LexDiagnostic {
   /**
@@ -25,6 +28,22 @@ export interface ParseOptions {
   strict?: boolean;
   /** Collects diagnostics when `strict` is false. */
   onDiagnostic?: (diagnostic: ParseDiagnostic) => void;
+  /**
+   * Retain the source text and the anchoring, so a later `writeIdf` can reproduce it.
+   *
+   * Off by default, and the option gates every piece of the new work: a caller who does not ask
+   * pays neither the scan nor the retention, and reading costs exactly what it costs today.
+   *
+   * When it is on, the read makes ONE pass and builds both the objects and the syntax layer from
+   * it, so the cost is the layer's own budget rather than a second read of the text.
+   *
+   * The retained material hangs off the document, reachable as `IdfDocument.rawText`. It is not
+   * returned beside the document: `ParseResult` carries exactly two keys and a test pins that it
+   * does.
+   *
+   * @defaultValue false
+   */
+  preserveFormatting?: boolean;
 }
 
 export interface ParseResult<M extends AnyTypeMap = UntypedMap> {
@@ -70,10 +89,30 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
     options.onDiagnostic?.(diagnostic);
   };
 
-  const raw = lex(text, { onDiagnostic: report });
-  const document = new IdfDocument<M>(schema);
+  // One pass when the caller asked for preservation, two collectors composed over it; the ordinary
+  // read is untouched and still asks the scan for nothing it does not want.
+  const preserve = options.preserveFormatting === true;
+  const layerBuild = preserve ? layerCollector(text) : undefined;
+  let raw: RawObject[];
+  if (layerBuild === undefined) {
+    raw = lex(text, { onDiagnostic: report });
+  } else {
+    const objects = objectCollector(text, { onDiagnostic: report });
+    scan(text, both(layerBuild.handler, objects.handler));
+    raw = objects.objects;
+  }
+  const layer = layerBuild?.finish();
 
-  for (const object of raw) {
+  const document = new IdfDocument<M>(schema);
+  // `anchors[i]` is the object statement `i` produced, or `undefined` for one the read rejected.
+  const anchors: (IdfObject | undefined)[] =
+    layer === undefined
+      ? []
+      : new Array<IdfObject | undefined>(layer.statements.length).fill(undefined);
+  const statementOf = layer === undefined ? undefined : statementIndexes(layer, raw);
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const object = raw[index]!;
     const canonical = schema.resolve(object.typeName);
     if (canonical === undefined) {
       report({
@@ -96,7 +135,15 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
     try {
       const invalid: { field: string; index: number; value: string }[] = [];
       const { name, values } = interpret(definition, object, invalid);
-      document.addRaw(canonical, definition.anon === 1 ? null : name, values);
+      const built = document.addRaw(canonical, definition.anon === 1 ? null : name, values);
+
+      // The anchoring, built here rather than in a second walk: this is the one place that knows
+      // both which statement was read and which object it produced.
+      const at = statementOf?.[index];
+      if (at !== undefined) {
+        anchors[at] = built;
+        built[SOURCE] = at;
+      }
 
       // Reported after the object is built, never instead of building it: a value of the wrong
       // kind does not stop the parse, so a caller reading strictly gets the document they always
@@ -127,7 +174,52 @@ export function parseIdf<M extends AnyTypeMap = UntypedMap>(
     }
   }
 
+  if (layer !== undefined) {
+    document.adoptSource({ format: 'idf', layer, anchors, countAtRead: document.size });
+  }
+
   return { document, diagnostics };
+}
+
+/**
+ * Two scan handlers over one pass.
+ *
+ * Written out member by member rather than built by reflection, so that a member added to
+ * `ScanHandler` is a compile error here rather than a member one of the two collectors silently
+ * stops receiving. Neither collector ever asks the scan to stop, so a composed member returns
+ * nothing and the scan runs to the end as it does for either alone.
+ */
+function both(first: ScanHandler, second: ScanHandler): ScanHandler {
+  return {
+    statementStart(offset, line, column) {
+      first.statementStart?.(offset, line, column);
+      second.statementStart?.(offset, line, column);
+    },
+    fieldText(start, end) {
+      first.fieldText?.(start, end);
+      second.fieldText?.(start, end);
+    },
+    fieldEnd(index, start, end, line) {
+      first.fieldEnd?.(index, start, end, line);
+      second.fieldEnd?.(index, start, end, line);
+    },
+    separator(offset) {
+      first.separator?.(offset);
+      second.separator?.(offset);
+    },
+    terminator(offset) {
+      first.terminator?.(offset);
+      second.terminator?.(offset);
+    },
+    comment(start, end) {
+      first.comment?.(start, end);
+      second.comment?.(start, end);
+    },
+    statementEnd(end, unterminated) {
+      first.statementEnd?.(end, unterminated);
+      second.statementEnd?.(end, unterminated);
+    },
+  };
 }
 
 /** Map positional IDF values onto named schema fields. */

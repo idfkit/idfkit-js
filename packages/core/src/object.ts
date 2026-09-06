@@ -1,6 +1,7 @@
 import type { SlimField, SlimType } from '@idfkit/schemas';
 
-import { DATA, KEY, NAME, OWNER, SHAPE } from './internal.js';
+import { ExtensibleList } from './extensible.js';
+import { DATA, KEY, NAME, OWNER, SHAPE, SOURCE } from './internal.js';
 import { shapeFor, type ObjectShape } from './shape.js';
 
 /** A scalar field value. `undefined` means the field is absent. */
@@ -45,6 +46,8 @@ export class IdfObject {
   declare [OWNER]: ObjectOwner | undefined;
   declare [NAME]: string;
   declare [KEY]: string;
+  /** Index into the document's preserved anchors, or `undefined` once anything has changed this. */
+  declare [SOURCE]: number | undefined;
 
   /**
    * Objects are built through `IdfObject.create`, never `new`, because each
@@ -68,6 +71,10 @@ export class IdfObject {
     Object.defineProperty(obj, OWNER, { value: undefined, writable: true });
     Object.defineProperty(obj, NAME, { value: name, writable: true });
     Object.defineProperty(obj, KEY, { value: name, writable: true });
+    // Left undefined by construction, so an object built after the read is touched from the moment
+    // it exists (FR-007). `clone` builds through here too, which is why a copy is touched as well:
+    // it is a different object from the one the characters describe.
+    Object.defineProperty(obj, SOURCE, { value: undefined, writable: true });
 
     for (const [field, value] of Object.entries(values)) {
       if (value === undefined || value === null) continue;
@@ -181,16 +188,39 @@ export class IdfObject {
   /**
    * Repeat groups of the extensible section, e.g. the vertices of a surface.
    *
-   * Returns a live array: pushing to it mutates the object.
+   * Returns a live array: pushing to it mutates the object, and so does writing a field of one of
+   * its repeats. Both now tell the document, which they did not before: the array handed back was
+   * the object's own data, so a pushed vertex reached the object without passing any accessor and
+   * a preserving write discarded the edit in a file that loads.
+   *
+   * It is still an array to everything that reads it. `Array.isArray` is true, indexing and
+   * iteration are unchanged, `map` and `filter` hand back plain arrays, and a repeat spreads and
+   * compares exactly as the plain object it replaces.
+   *
+   * The wrapper is built the first time a caller asks for it and then kept, so a read costs one
+   * `instanceof` and a geometry consumer walking every vertex pays for the wrapping once per
+   * object. A parse nobody reaches into pays nothing at all, which is what keeps reading without
+   * preservation costing what it costs today.
+   *
+   * One spelling is not heard: replacing a whole repeat by index, `obj.extensible[0] = {...}`,
+   * writes through the array's own index slot, which cannot be caught without charging every
+   * vertex read. Writing the repeat's fields and `splice` both are heard. See `extensible.ts`.
    */
   get extensible(): ExtensibleGroup[] {
     const key = this[SHAPE].extensibleKey;
     if (key === undefined) return [];
-    let list = this[DATA][key];
-    if (!Array.isArray(list)) {
-      list = [];
-      this[DATA][key] = list;
-    }
+    const held = this[DATA][key];
+    if (held instanceof ExtensibleList) return held;
+
+    const list = ExtensibleList.adopt(
+      Array.isArray(held) ? held : [],
+      this[SHAPE].type.x?.fields ?? [],
+      () => {
+        this[SOURCE] = undefined;
+        this[OWNER]?.onFieldChanged(this, key, held, this[DATA][key]);
+      }
+    );
+    this[DATA][key] = list;
     return list;
   }
 
