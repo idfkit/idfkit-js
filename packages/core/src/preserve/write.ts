@@ -1,6 +1,6 @@
 import { OWNER } from '../internal.js';
 import type { IdfObject } from '../object.js';
-import { writeObject, type ObjectWriteOptions } from '../write/idf.js';
+import { writeObject, type FieldAnnotation, type ObjectWriteOptions } from '../write/idf.js';
 import { isUntouched, type PreservedSource } from './source.js';
 
 /**
@@ -74,7 +74,7 @@ function statementPart(
   // per reformatted object. Every object in a file, edited and saved twice, would grow it twice.
   const written = writeObject(anchored, {
     ...options,
-    fieldComments: fieldComments(source, index),
+    annotations: annotations(source, index),
   });
   return written.endsWith('\n') ? written.slice(0, -1) : written;
 }
@@ -156,46 +156,72 @@ function extentEnds(source: PreservedSource): number[] {
 }
 
 /**
- * The author's comment for each of a statement's fields, positionally, where one exists.
+ * What the author wrote around each of a statement's fields, positionally.
  *
- * A field's comment is the one after its separator on the same line, which is the same positional
- * rule {@link extentEnds} uses for the terminator and is the convention every writer of these files
- * follows. A comment on its own line belongs to no field and is left in the gap.
+ * Two kinds, and the second is the one nothing else carries. A field's own comment is the one after
+ * its delimiter on the same line, which is the convention every writer of these files follows and
+ * the only case where which field a comment belongs to is not a guess. A comment on its OWN line
+ * inside the statement belongs to the field below it, and it is lost the moment the object is
+ * reformatted unless it is emitted with that field: a comment between two statements is carried by
+ * the gap, and one inside a statement is not.
  *
  * Positional against `Statement.fields`, which is positional against the cells `writeObject` emits:
- * the name first for a named type, then the fixed fields in order. An object that gained fields
- * runs past the end of this list and generates the rest, which is right, since the author never
- * wrote a comment for a field that was not there.
+ * the name first for a named type, then the fixed fields in order. An object that gained a field
+ * runs past the end of this list, and a field with no entry has no author to be faithful to.
  *
- * The last entry is the comment on the terminator's line, so this subsumes the duplicate that
- * {@link extentEnds} exists to prevent: the comment is emitted once, by the writer, in place.
+ * A field the author left bare gets an entry with no `trailing`, which is how "written bare" is
+ * told apart from "not written by this author at all". Absence is as much a thing the author wrote
+ * as the words are.
  */
-function fieldComments(source: PreservedSource, index: number): (string | undefined)[] {
+function annotations(source: PreservedSource, index: number): FieldAnnotation[] {
   const { statements, tokens, text } = source.layer;
-  const fields = statements[index]!.fields;
-  const comments: (string | undefined)[] = new Array<string | undefined>(fields.length).fill(
-    undefined
-  );
+  const statement = statements[index]!;
+  const fields = statement.fields;
+  const built: FieldAnnotation[] = fields.map(() => ({ before: [], trailing: undefined }));
 
-  // One cursor over the tokens, which are in source order, as the fields are.
+  // One cursor over the tokens, which are in source order, as the fields are. Every comment
+  // between the previous field's delimiter and this one's value stands on its own line above it.
   let token = 0;
+  let previousEnd = statement.typeName.end;
   for (let at = 0; at < fields.length; at += 1) {
-    const end = fields[at]!.end;
-    while (token < tokens.length && tokens.startAt(token) < end) token += 1;
-    // The separator or terminator that closes the field sits between it and its comment, and is a
-    // token of its own. Step over it; a field's comment is the next thing after it.
+    const field = fields[at]!;
+    const before: string[] = [];
+
+    while (token < tokens.length && tokens.startAt(token) < previousEnd) token += 1;
+    while (token < tokens.length && tokens.startAt(token) < field.start) {
+      if (
+        tokens.kindAt(token) === 'comment' &&
+        !onSameLine(text, previousEnd, tokens.startAt(token))
+      ) {
+        before.push(text.slice(tokens.startAt(token), tokens.endAt(token)).trimEnd());
+      }
+      token += 1;
+    }
+
+    // Past the value now: step over the delimiter that closes it and take the comment after it.
+    while (token < tokens.length && tokens.startAt(token) < field.end) token += 1;
     while (
       token < tokens.length &&
       (tokens.kindAt(token) === 'separator' || tokens.kindAt(token) === 'terminator')
     ) {
       token += 1;
     }
-    if (token >= tokens.length || tokens.kindAt(token) !== 'comment') continue;
-    const between = text.slice(end, tokens.startAt(token));
-    // Horizontal whitespace and the delimiter only. A line feed puts the comment on its own line,
-    // where it belongs to no field.
-    if (between.includes('\n') || between.replace(/[,;]/g, '').trim() !== '') continue;
-    comments[at] = text.slice(tokens.startAt(token), tokens.endAt(token)).trimEnd();
+    let trailing: string | undefined;
+    if (
+      token < tokens.length &&
+      tokens.kindAt(token) === 'comment' &&
+      onSameLine(text, field.end, tokens.startAt(token))
+    ) {
+      trailing = text.slice(tokens.startAt(token), tokens.endAt(token)).trimEnd();
+    }
+
+    built[at] = { before, trailing };
+    previousEnd = field.end;
   }
-  return comments;
+  return built;
+}
+
+/** Whether two offsets sit on one line, which is what makes a comment a field's rather than its own. */
+function onSameLine(text: string, from: number, to: number): boolean {
+  return !text.slice(from, to).includes('\n');
 }

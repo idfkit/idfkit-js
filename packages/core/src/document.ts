@@ -3,7 +3,7 @@ import type { Schema, SlimType } from '@idfkit/schemas';
 import { IdfCollection } from './collection.js';
 import { DATA, KEY, NAME, OWNER, SHAPE, SOURCE } from './internal.js';
 import { IdfObject, type FieldValues, type ObjectOwner, type StoredValue } from './object.js';
-import type { PreservedSource } from './preserve/source.js';
+import { isUntouched, type PreservedSource } from './preserve/source.js';
 import { ReferenceGraph } from './references.js';
 import type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
 
@@ -299,6 +299,30 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
   /** Every object in the document, grouped by type in insertion order. */
   *objects(): Generator<IdfObject> {
     for (const collection of this.#collections.values()) yield* collection;
+  }
+
+  /**
+   * Every object a preserving write will write afresh rather than reproduce.
+   *
+   * Empty for a document read with `preserveFormatting` and not edited since. Every object for a
+   * document read without it, because there is nothing to reproduce.
+   *
+   * `rawText` answers whether a write will preserve at all. This answers how much of the file it
+   * will change, which is what a save button has to put to a user out loud, and it is the part a
+   * consumer cannot work out for itself: a rename clears the record on every object that referred
+   * to the renamed one, so counting from your own edit log reports one where the answer is nine.
+   *
+   * A generator, so listing what is about to be reformatted is as easy as counting it:
+   *
+   * ```ts
+   * const changed = [...document.changedObjects()];
+   * if (changed.length > 0) warn(`Saving will rewrite ${changed.length} objects.`);
+   * ```
+   */
+  *changedObjects(): Generator<IdfObject> {
+    for (const obj of this.objects()) {
+      if (!isUntouched(obj, this.#source)) yield obj;
+    }
   }
 
   /** Reference targets that no object provides. */

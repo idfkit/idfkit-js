@@ -74,6 +74,20 @@ export interface WriteIdfOptions {
    * @defaultValue undefined, meaning decide
    */
   preserveFormatting?: boolean;
+  /**
+   * What to do about a field the author deliberately left without a comment.
+   *
+   * Only meaningful on the preserving path, which is the only path that knows what the author
+   * wrote. `'preserve'` leaves a bare field bare, because absence is as much a thing the author
+   * wrote as the words are. `'generate'` labels it, for a caller who wants the file annotated.
+   *
+   * Neither setting touches the author's own comment lines. A comment between two objects is
+   * carried by the text between them, and a comment on its own line inside an object is emitted
+   * with the field below it, so asking for labels adds them and never costs a line.
+   *
+   * @defaultValue 'preserve'
+   */
+  fieldComments?: 'preserve' | 'generate';
 }
 
 /**
@@ -98,6 +112,7 @@ export function writeIdf<M extends AnyTypeMap>(
       comments: options.comments ?? true,
       commentColumn: options.commentColumn ?? 30,
       indent: options.indent ?? '    ',
+      labelBareFields: options.fieldComments === 'generate',
     });
   }
 
@@ -183,19 +198,51 @@ export interface ObjectWriteOptions {
   /** Put the whole object on one line. See `WriteIdfOptions.compressed`. */
   compressed?: boolean;
   /**
-   * The author's own comment for each field, positionally, when there is one to reuse.
+   * What the author wrote around each field, positionally.
    *
    * Supplied by the preserving writer and by nothing else. Re-rendering an object's VALUES is what
-   * an edit asks for; rebuilding its comments is not, and doing it anyway destroys anything the
-   * schema cannot regenerate — a note to a colleague, and the field's unit, which `humanize` does
-   * not emit. An entry is the whole comment as written, from its `!` onward.
+   * an edit asks for; rebuilding what surrounds them is not, and doing it anyway destroys anything
+   * the schema cannot regenerate.
    *
-   * Positional, and shorter than the cells whenever the object gained fields, in which case the
-   * ones past the end are generated as they always were.
+   * Positional, and shorter than the cells whenever the object gained fields. A field past the end
+   * has no author to be faithful to, so it is labelled as it always was.
    *
    * @internal
    */
-  fieldComments?: readonly (string | undefined)[];
+  annotations?: readonly FieldAnnotation[];
+  /**
+   * Label a field the author deliberately left bare.
+   *
+   * `false` is faithful and is what the preserving path asks for: a field written without a comment
+   * was written that way on purpose, and absence is as much a thing the author wrote as the words
+   * are. `true` restores the ordinary writer's behaviour of labelling every field, for a caller who
+   * wants the file annotated.
+   *
+   * Either way the author's own standalone comment lines are emitted, so turning this on adds
+   * labels and never costs a line.
+   *
+   * @internal
+   */
+  labelBareFields?: boolean;
+}
+
+/**
+ * What the author wrote around one field.
+ *
+ * @internal
+ */
+export interface FieldAnnotation {
+  /**
+   * Comment lines standing on their own above this field, in order, exactly as written.
+   *
+   * These live INSIDE the statement, so unlike a comment between two statements they are not
+   * carried by the gap and are lost the moment the object is reformatted unless they are emitted
+   * here. `! this value came from the 2019 survey` is the shape, and it is the author's note about
+   * the field below it.
+   */
+  readonly before: readonly string[];
+  /** The comment after this field's delimiter on the same line, if the author wrote one. */
+  readonly trailing: string | undefined;
 }
 
 /** Serialize one object. */
@@ -254,8 +301,23 @@ export function writeObject(obj: IdfObject, options: ObjectWriteOptions): string
       lines.push(body);
       return;
     }
-    // The author's comment where there is one, this writer's where there is not.
-    const comment = options.fieldComments?.[index] ?? `!- ${cell.label}`;
+    // The author's own lines above the field, which live inside the statement and are carried by
+    // nothing else.
+    const annotation = options.annotations?.[index];
+    for (const line of annotation?.before ?? []) lines.push(`${options.indent}${line}`);
+
+    // The author's comment where there is one. Where the author left the field bare, nothing,
+    // unless the caller asked for a label. Where there is no author at all, because the object
+    // gained this field, the label as always.
+    const comment =
+      annotation === undefined
+        ? `!- ${cell.label}`
+        : (annotation.trailing ??
+          (options.labelBareFields === true ? `!- ${cell.label}` : undefined));
+    if (comment === undefined) {
+      lines.push(body);
+      return;
+    }
     const padding = ' '.repeat(Math.max(1, options.commentColumn - body.length));
     lines.push(`${body}${padding}${comment}`);
   });

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { parseEpJson, parseIdf, writeEpJson, writeIdf } from '@idfkit/core';
+import { parseEpJson, parseIdf, scanIdf, writeEpJson, writeIdf } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema, syntaxFixture, syntaxFixtures } from './helpers.js';
@@ -598,5 +598,157 @@ describe('the object notation preserves on all-or-nothing terms', () => {
     const written = writeIdf(kept());
     expect(written).not.toContain('{');
     expect(written).toContain('Zone,');
+  });
+});
+
+describe('which objects a preserving write will rewrite', () => {
+  // A consumer cannot derive this from its own edit log. A rename clears the record on every object
+  // that referred to the renamed one, so an editor counting its own edits reports one where the
+  // answer is three here and nine on a real model.
+  const REFERENCED = [
+    'Version, 26.1;',
+    '',
+    'Zone, ZONE ONE;',
+    '',
+    'BuildingSurface:Detailed,',
+    '  S1, Wall, C1, ZONE ONE, , Outdoors, , SunExposed, WindExposed, , ,',
+    '  0,0,0, 1,0,0;',
+    '',
+    'BuildingSurface:Detailed,',
+    '  S2, Wall, C1, ZONE ONE, , Outdoors, , SunExposed, WindExposed, , ,',
+    '  0,0,0, 1,0,0;',
+    '',
+  ].join('\n');
+
+  const read = (preserve = true) =>
+    parseIdf(REFERENCED, v26, { strict: false, preserveFormatting: preserve }).document;
+
+  it('yields nothing for a document nobody has edited', () => {
+    expect([...read().changedObjects()]).toEqual([]);
+  });
+
+  it('yields every object a rename rewrote, not just the renamed one', () => {
+    const document = read();
+    document.rename(document.require('Zone', 'ZONE ONE'), 'RENAMED');
+
+    expect([...document.changedObjects()].map((o) => o.typeName).sort()).toEqual([
+      'BuildingSurface:Detailed',
+      'BuildingSurface:Detailed',
+      'Zone',
+    ]);
+  });
+
+  it('yields nothing after a write of the value already held', () => {
+    const document = read();
+    const zone = document.require('Zone', 'ZONE ONE');
+    zone.set('multiplier', zone.get('multiplier') ?? undefined);
+
+    expect([...document.changedObjects()]).toEqual([]);
+  });
+
+  it('yields every object for a document read without preservation', () => {
+    // There is nothing to reproduce, so a write rewrites the file entirely.
+    const document = read(false);
+
+    expect([...document.changedObjects()]).toHaveLength(document.size);
+  });
+
+  it('agrees with what the writer actually reproduces', () => {
+    // The claim is only worth making if the writer honours it. After the rename, the three objects
+    // it touched are named and the Version is not, so the Version must come back from its own
+    // characters and the other three must not.
+    const document = read();
+    document.rename(document.require('Zone', 'ZONE ONE'), 'RENAMED');
+    const written = writeIdf(document);
+    const changed = [...document.changedObjects()];
+
+    expect(changed.map((o) => o.typeName)).not.toContain('Version');
+    expect(written).toContain('Version, 26.1;');
+    // And every object it DID name was rewritten: none of them survives as its original text.
+    expect(written).not.toContain('Zone, ZONE ONE;');
+    expect(changed).toHaveLength(3);
+  });
+});
+
+describe('what survives when the writer rewrites an object', () => {
+  // An edit asks for the VALUES to be re-rendered. Everything else the author wrote is theirs, and
+  // that includes the absence of a comment on a field they left bare.
+  const SOURCE = [
+    'Version, 26.1;',
+    '',
+    '! a note between objects',
+    'Building,',
+    '  My Building,   !- Name',
+    '  ! this value came from the 2019 survey',
+    '  0,             !- North Axis {deg}',
+    '  Suburbs;',
+    '',
+    'Timestep, 6;',
+    '',
+  ].join('\n');
+
+  const edited = (options = {}) => {
+    const { document } = parseIdf(SOURCE, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+    return writeIdf(document, options);
+  };
+
+  it('keeps a units annotation the generated label would drop', () => {
+    expect(edited()).toContain('!- North Axis {deg}');
+  });
+
+  it('keeps a comment on its own line inside the object', () => {
+    // The one comment nothing else carries: it is inside the object rather than between two, so
+    // the gap does not reach it and reformatting destroyed it.
+    expect(edited()).toContain('! this value came from the 2019 survey');
+  });
+
+  it('keeps a comment between two objects', () => {
+    expect(edited()).toContain('! a note between objects');
+  });
+
+  it('leaves a field the author left bare bare', () => {
+    // Absence is as much a thing the author wrote as the words are.
+    const written = edited();
+
+    expect(written).toMatch(/Suburbs;\s*$/m);
+    expect(written).not.toContain('!- Terrain');
+  });
+
+  it('labels a bare field on request, and still costs no comment line', () => {
+    const written = edited({ fieldComments: 'generate' });
+
+    expect(written).toContain('!- Terrain');
+    expect(written).toContain('! this value came from the 2019 survey');
+    expect(written).toContain('! a note between objects');
+    expect(written).toContain('!- North Axis {deg}');
+  });
+
+  it('changes the value and nothing else', () => {
+    const written = edited();
+
+    expect(written).toContain('42.0');
+    expect(written).not.toContain('  0,');
+  });
+
+  it('attaches a comment by its delimiter, not by counting lines', () => {
+    // Several fields share a line in real files: a surface's vertices are routinely written three
+    // to a line with one comment for the triple. Counting lines mis-attaches every comment after
+    // the first such line.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  Packed, City, 0.04,   !- three fields, one comment',
+      '  0.4;                  !- and another',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'Packed').set('terrain', 'Suburbs');
+
+    const written = writeIdf(document);
+
+    expect(written).toContain('!- three fields, one comment');
+    expect(written).toContain('!- and another');
   });
 });
