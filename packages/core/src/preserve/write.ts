@@ -135,8 +135,15 @@ function lastNonEmpty(parts: readonly string[]): string {
  * - Reformatting replaces it, which is the defect this closes.
  *
  * The tokens are in source order and so are the statements, so one cursor walks both.
+ *
+ * Exported so that `IdfDocument.regionOf` answers with the SAME extent this walk replaces.
+ * Handing a consumer `statement.region` instead would stop one character short of the
+ * terminator-line comment, and an edit built on it would leave that comment behind, which is
+ * the defect this function exists to close.
+ *
+ * @internal
  */
-function extentEnds(source: PreservedSource): number[] {
+export function extentEnds(source: PreservedSource): number[] {
   const { statements, tokens, text } = source.layer;
   const ends = statements.map((statement) => statement.region.end);
 

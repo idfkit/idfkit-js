@@ -1,10 +1,12 @@
 import type { Schema, SlimType } from '@idfkit/schemas';
 
 import { IdfCollection } from './collection.js';
-import { DATA, KEY, NAME, OWNER, SHAPE, SOURCE } from './internal.js';
+import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
 import { IdfObject, type FieldValues, type ObjectOwner, type StoredValue } from './object.js';
 import { isUntouched, type PreservedSource } from './preserve/source.js';
+import { extentEnds } from './preserve/write.js';
 import { ReferenceGraph } from './references.js';
+import type { Region } from './syntax/region.js';
 import type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
 
 /**
@@ -329,6 +331,67 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
     for (const obj of this.objects()) {
       if (!isUntouched(obj, this.#source)) yield obj;
     }
+  }
+
+  /**
+   * Where an object's characters sit in {@link rawText}, or `undefined` if they sit nowhere.
+   *
+   * `undefined` for an object added since the read, for a document read without preservation, and
+   * for one read from the object notation, which has no statements to point at and preserves
+   * all-or-nothing.
+   *
+   * This is what makes {@link changedObjects} usable. Turning an edit into the smallest possible
+   * change to a file takes three things: WHICH objects will be rewritten, WHAT text each becomes,
+   * and WHERE the old one was. Without the third a consumer has to write the whole file and diff
+   * it, which is the work `changedObjects` exists to avoid.
+   *
+   * The range is where the object WAS, and stays answerable after it changes. That is the case it
+   * is for: the objects worth locating are the ones being rewritten.
+   *
+   * ```ts
+   * for (const obj of document.changedObjects()) {
+   *   const at = document.regionOf(obj);
+   *   if (at === undefined) continue; // added since the read; there is no old text to replace
+   *   edits.push({ range: at, newText: replacementFor(obj) });
+   * }
+   * ```
+   *
+   * **Where the replacement text comes from is not settled by this method, and `writeObject` is
+   * not the answer.** A preserving write hands that function the author's own per-field comments,
+   * which are internal, so calling it with options built by hand produces text that differs from
+   * what {@link writeIdf} would have produced for the same object: the author's units and notes
+   * come back as generated labels. A consumer that needs the two to agree has to take the whole
+   * file from `writeIdf`. This method locates the edit; producing its text for a single object is
+   * a gap that is open, and it is recorded rather than papered over.
+   *
+   * The end of the range is the WRITER's, which is not always the semicolon: a comment on the
+   * terminator's own line is that statement's last field's comment and a preserving write replaces
+   * it. A range that stopped at the semicolon would leave it behind, describing a field that had
+   * just moved.
+   *
+   * Offsets, not a line and column: `Region` carries the conversion, and a consumer that wants one
+   * has the text to compute it from, while going the other way costs a scan.
+   */
+  #extents: number[] | undefined;
+
+  regionOf(obj: IdfObject): Region | undefined {
+    const source = this.#source;
+    if (source === undefined) return undefined;
+    const at = obj[ORIGIN];
+    if (at === undefined) return undefined;
+    // The identity check that guards `isUntouched`, for the same reason: an object carrying an
+    // index from a file it is no longer in would otherwise be handed a range from this one.
+    if (source.anchors[at] !== obj) return undefined;
+    // The object notation records one anchor per object and no statement, so there is nothing here
+    // to point at. Preservation is all-or-nothing there and a per-object range would be a fiction.
+    const statement = source.layer.statements[at];
+    if (statement === undefined) return undefined;
+    // The END is the writer's, not the statement's. A comment on the terminator's own line is that
+    // statement's last field's comment and the preserving write replaces it; a range stopping at
+    // the semicolon would leave it behind, on a line describing a field that had just moved.
+    // Computed once per document, since the retained source does not change after the read.
+    this.#extents ??= extentEnds(source);
+    return { start: statement.region.start, end: this.#extents[at] ?? statement.region.end };
   }
 
   /** Reference targets that no object provides. */

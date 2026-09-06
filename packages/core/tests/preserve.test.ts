@@ -857,3 +857,78 @@ describe('the column the comment goes in', () => {
     }
   });
 });
+
+describe('where an object\'s characters were', () => {
+  // `changedObjects()` says WHICH objects a write will rewrite. Without saying WHERE the old ones
+  // are, a consumer building the smallest possible change has to write the whole file and diff it,
+  // which is the work that method exists to avoid. Found by the language server team reading the
+  // branch before it merged.
+  const TEXT = [
+    'Version, 26.1;',
+    '',
+    'Building,',
+    '  My Building,   !- Name',
+    '  0.0;           !- North Axis {deg}',
+    '',
+    'Timestep, 4;',
+    '',
+  ].join('\n');
+
+  const read = () => parseIdf(TEXT, v26, { strict: false, preserveFormatting: true }).document;
+
+  it('locates an object that has not changed', () => {
+    const document = read();
+    const at = document.regionOf(document.require('Building', 'My Building'))!;
+
+    expect(document.rawText!.slice(at.start, at.end)).toBe(
+      'Building,\n  My Building,   !- Name\n  0.0;           !- North Axis {deg}'
+    );
+  });
+
+  it('still locates it after it changes, which is the case it is for', () => {
+    // The objects worth locating are the ones being rewritten, and `SOURCE` is cleared the moment
+    // one is touched because its absence is what marks it. A second record answers this.
+    const document = read();
+    const building = document.require('Building', 'My Building');
+    const before = document.regionOf(building);
+    building.set('north_axis', 42);
+
+    expect(document.regionOf(building)).toEqual(before);
+    expect([...document.changedObjects()]).toContain(building);
+  });
+
+  it('reaches past the semicolon to the comment the writer replaces', () => {
+    // Not `statement.region`, which stops at the terminator. A comment on the terminator's own line
+    // is that statement's last field's comment and a preserving write rewrites it; a consumer
+    // replacing the shorter range would leave it behind describing a field that had just moved.
+    const document = read();
+    const at = document.regionOf(document.require('Building', 'My Building'))!;
+
+    expect(document.rawText!.slice(at.start, at.end)).toContain('!- North Axis {deg}');
+  });
+
+  it('answers nothing for an object added since the read', () => {
+    const document = read();
+    const added = document.addRaw('Zone', 'Late Arrival', {});
+
+    expect(document.regionOf(added)).toBeUndefined();
+  });
+
+  it('answers nothing for a document read without preservation', () => {
+    const document = parseIdf(TEXT, v26, { strict: false }).document;
+
+    expect(document.regionOf(document.require('Building', 'My Building'))).toBeUndefined();
+  });
+
+  it('locates each object separately, in source order', () => {
+    const document = read();
+    const regions = [...document.objects()]
+      .map((obj) => document.regionOf(obj))
+      .filter((region) => region !== undefined);
+
+    expect(regions).toHaveLength(3);
+    for (let i = 1; i < regions.length; i += 1) {
+      expect(regions[i]!.start).toBeGreaterThanOrEqual(regions[i - 1]!.end);
+    }
+  });
+});
