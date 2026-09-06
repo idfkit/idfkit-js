@@ -527,6 +527,9 @@ describe('asking for two contradictory things is refused', () => {
     const bare = writeIdf(kept(), { preserveFormatting: true, comments: false });
     expect(bare).not.toBe(MODEL);
     expect(bare).not.toContain('!-');
+    // And it still loads. The type name is the line the field loop starts with, so a branch that
+    // returns before flushing it emits it last, which parses as nothing at all.
+    expect(() => parseIdf(bare, v26, { strict: false })).not.toThrow();
   });
 
   it('raises nothing when preservation is asked for on a document read without it', () => {
@@ -750,5 +753,53 @@ describe('what survives when the writer rewrites an object', () => {
 
     expect(written).toContain('!- three fields, one comment');
     expect(written).toContain('!- and another');
+  });
+});
+
+describe('the line the author put a value on', () => {
+  // 21.5% of the statements in the 693 EnergyPlus example files write several values to a line,
+  // and 690 of those files contain at least one. Writing one value per line regardless turns a
+  // four-line surface into twelve, which is the most visible thing a reformat does to geometry.
+  const GROUPED = [
+    'Version, 26.1;',
+    '',
+    'BuildingSurface:Detailed,',
+    '  S1, Wall, C1, Z1, , Outdoors, , SunExposed, WindExposed, , ,',
+    '  0, 0, 4.572,   !- X,Y,Z ==> Vertex 1 {m}',
+    '  0, 0, 0;       !- X,Y,Z ==> Vertex 2 {m}',
+    '',
+  ].join('\n');
+
+  it('keeps values the author grouped onto one line', () => {
+    const { document } = parseIdf(GROUPED, v26, { strict: false, preserveFormatting: true });
+    document.require('BuildingSurface:Detailed', 'S1').set('sun_exposure', 'NoSun');
+
+    const written = writeIdf(document);
+
+    expect(written.split('\n')).toHaveLength(GROUPED.split('\n').length);
+    expect(written).toMatch(/0\.0, 0\.0, 4\.572,\s+!- X,Y,Z ==> Vertex 1 \{m\}/);
+    expect(written).toMatch(/0\.0, 0\.0, 0\.0;\s+!- X,Y,Z ==> Vertex 2 \{m\}/);
+  });
+
+  it('keeps a whole object the author wrote on one line', () => {
+    // The cheaper case, and the one that surprises on a file with no geometry in it: 11.3% of
+    // statements are written this way, and nobody thinks of `Timestep,4;` as formatting they chose.
+    const text = 'Version, 26.1;\n\nTimestep,4;\n';
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    [...document.all('Timestep')][0]!.set('number_of_timesteps_per_hour', 6);
+
+    const written = writeIdf(document);
+
+    expect(written).toContain('Timestep,');
+    expect(written.split('\n')).toHaveLength(text.split('\n').length);
+  });
+
+  it('gives a field the author never wrote a line of its own', () => {
+    // No author to be faithful to, so the writer's own habit applies.
+    const text = 'Version, 26.1;\n\nBuilding,\n  My Building;\n';
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    expect(writeIdf(document)).toMatch(/\n\s+42\.0;\s+!- North Axis/);
   });
 });

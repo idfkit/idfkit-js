@@ -177,7 +177,11 @@ function annotations(source: PreservedSource, index: number): FieldAnnotation[] 
   const { statements, tokens, text } = source.layer;
   const statement = statements[index]!;
   const fields = statement.fields;
-  const built: FieldAnnotation[] = fields.map(() => ({ before: [], trailing: undefined }));
+  const built: FieldAnnotation[] = fields.map(() => ({
+    before: [],
+    trailing: undefined,
+    startsLine: true,
+  }));
 
   // One cursor over the tokens, which are in source order, as the fields are. Every comment
   // between the previous field's delimiter and this one's value stands on its own line above it.
@@ -215,7 +219,9 @@ function annotations(source: PreservedSource, index: number): FieldAnnotation[] 
       trailing = text.slice(tokens.startAt(token), tokens.endAt(token)).trimEnd();
     }
 
-    built[at] = { before, trailing };
+    // Whether the author began a line with this field, which is what keeps a vertex written
+    // `0,0,4.572,` on one line rather than three.
+    built[at] = { before, trailing, startsLine: !onSameLine(text, previousEnd, field.start) };
     previousEnd = field.end;
   }
   return built;

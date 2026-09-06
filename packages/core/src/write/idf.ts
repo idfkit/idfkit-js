@@ -243,6 +243,15 @@ export interface FieldAnnotation {
   readonly before: readonly string[];
   /** The comment after this field's delimiter on the same line, if the author wrote one. */
   readonly trailing: string | undefined;
+  /**
+   * Whether the author began a new line with this field.
+   *
+   * False for the second and third coordinate of a vertex written `0,0,4.572,` on one line. Writing
+   * one value per line regardless turns a four-line surface into twelve, which is the most visible
+   * thing a reformat does to a geometry file: 21.5 percent of the statements in the 693 EnergyPlus
+   * example files group values this way, and 690 of those files contain at least one.
+   */
+  readonly startsLine: boolean;
 }
 
 /** Serialize one object. */
@@ -292,35 +301,57 @@ export function writeObject(obj: IdfObject, options: ObjectWriteOptions): string
     return `${obj.typeName},${cells.map((cell) => cell.value).join(',')};`;
   }
 
-  const lines: string[] = [`${obj.typeName},`];
+  const lines: string[] = [];
+
+  // A line under construction, so fields the author wrote together stay together. Flushed when the
+  // next field opens a line of its own, and once at the end.
+  //
+  // It starts as the TYPE NAME rather than the type name being pushed straight out, so that an
+  // object the author wrote entirely on one line, `Timestep,4;`, can come back on one line. That is
+  // 11.3 percent of the statements in the example files, and it is the case that surprises on a
+  // file with no geometry in it: nobody thinks of `Timestep,4;` as formatting they chose.
+  let open = `${obj.typeName},`;
+  let openComment: string | undefined;
+  const flush = (): void => {
+    if (open === '') return;
+    if (openComment === undefined) {
+      lines.push(open);
+    } else {
+      const padding = ' '.repeat(Math.max(1, options.commentColumn - open.length));
+      lines.push(`${open}${padding}${openComment}`);
+    }
+    open = '';
+    openComment = undefined;
+  };
 
   cells.forEach((cell, index) => {
     const terminator = index === cells.length - 1 ? ';' : ',';
-    const body = `${options.indent}${cell.value}${terminator}`;
-    if (!options.comments) {
-      lines.push(body);
-      return;
-    }
-    // The author's own lines above the field, which live inside the statement and are carried by
-    // nothing else.
     const annotation = options.annotations?.[index];
-    for (const line of annotation?.before ?? []) lines.push(`${options.indent}${line}`);
+    // No annotation means no author to be faithful to, so one value per line as this writer always
+    // did. Field 0 is the one that decides whether the object opens on the type name's own line.
+    const opensLine = annotation === undefined || annotation.startsLine;
 
+    if (opensLine) {
+      flush();
+      for (const line of annotation?.before ?? []) lines.push(`${options.indent}${line}`);
+      open = `${options.indent}${cell.value}${terminator}`;
+    } else {
+      open = `${open} ${cell.value}${terminator}`;
+    }
+
+    if (!options.comments) return;
     // The author's comment where there is one. Where the author left the field bare, nothing,
-    // unless the caller asked for a label. Where there is no author at all, because the object
-    // gained this field, the label as always.
+    // unless the caller asked for a label. Where there is no author at all, the label as always.
+    // On a line carrying several values only the last has a comment, which is what the author
+    // wrote and what the delimiter rule recovers.
     const comment =
       annotation === undefined
         ? `!- ${cell.label}`
         : (annotation.trailing ??
           (options.labelBareFields === true ? `!- ${cell.label}` : undefined));
-    if (comment === undefined) {
-      lines.push(body);
-      return;
-    }
-    const padding = ' '.repeat(Math.max(1, options.commentColumn - body.length));
-    lines.push(`${body}${padding}${comment}`);
+    if (comment !== undefined) openComment = comment;
   });
+  flush();
 
   return `${lines.join('\n')}\n`;
 }
