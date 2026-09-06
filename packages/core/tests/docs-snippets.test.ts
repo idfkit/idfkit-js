@@ -250,7 +250,7 @@ describe('docs/tutorials/first-model.md', () => {
     // which is what stops the vertices shifting a field early.
     const outPath = join(dir, 'office.idf');
     await saveIdf(doc, outPath);
-    expect(readFileSync(outPath, 'latin1')).toContain('Open Plan,                !- Name');
+    expect(readFileSync(outPath, 'latin1')).toContain('Open Plan,               !- Name');
 
     // Step 8: reading it back.
     const reloaded = await loadIdf<TypeMap>(outPath);

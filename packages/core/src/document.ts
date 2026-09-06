@@ -1,10 +1,13 @@
 import type { Schema, SlimType } from '@idfkit/schemas';
 
 import { IdfCollection } from './collection.js';
-import { DATA, KEY, NAME, OWNER, SHAPE, SOURCE } from './internal.js';
+import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
 import { IdfObject, type FieldValues, type ObjectOwner, type StoredValue } from './object.js';
-import type { PreservedSource } from './preserve/source.js';
+import { isUntouched, type PreservedSource } from './preserve/source.js';
+import { extentEnds, renderStatement } from './preserve/write.js';
 import { ReferenceGraph } from './references.js';
+import type { Region } from './syntax/region.js';
+import type { WriteIdfOptions } from './write/idf.js';
 import type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
 
 /**
@@ -299,6 +302,145 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
   /** Every object in the document, grouped by type in insertion order. */
   *objects(): Generator<IdfObject> {
     for (const collection of this.#collections.values()) yield* collection;
+  }
+
+  /**
+   * Every object a preserving write will write afresh rather than reproduce.
+   *
+   * Empty for a document read with `preserveFormatting` and not edited since. Every object for a
+   * document read without it, because there is nothing to reproduce.
+   *
+   * `rawText` answers whether a write will preserve at all. This answers how many objects it will
+   * REWRITE, and it is the part a consumer cannot work out for itself: a rename clears the record on
+   * every object that referred to the renamed one, so counting from your own edit log reports one
+   * where the answer is nine.
+   *
+   * **It is not "everything that will differ", and a removal is the case that separates the two.**
+   * An object removed from the document is no longer in it to be yielded, so this can return nothing
+   * for a write that changes the file. A consumer treating an empty result as "the file is
+   * unchanged" would be wrong on every removal. To ask whether the file will differ at all, compare
+   * the write with `rawText`; ask this for how much of it is being written afresh.
+   *
+   * A generator, so listing what is about to be reformatted is as easy as counting it:
+   *
+   * ```ts
+   * const changed = [...document.changedObjects()];
+   * if (changed.length > 0) warn(`Saving will rewrite ${changed.length} objects.`);
+   * ```
+   */
+  *changedObjects(): Generator<IdfObject> {
+    for (const obj of this.objects()) {
+      if (!isUntouched(obj, this.#source)) yield obj;
+    }
+  }
+
+  /**
+   * Where an object's characters sit in {@link rawText}, or `undefined` if they sit nowhere.
+   *
+   * `undefined` for an object added since the read, for a document read without preservation, and
+   * for one read from the object notation, which has no statements to point at and preserves
+   * all-or-nothing.
+   *
+   * This is what makes {@link changedObjects} usable. Turning an edit into the smallest possible
+   * change to a file takes three things: WHICH objects will be rewritten, WHAT text each becomes,
+   * and WHERE the old one was. Without the third a consumer has to write the whole file and diff
+   * it, which is the work `changedObjects` exists to avoid.
+   *
+   * The range is where the object WAS, and stays answerable after it changes. That is the case it
+   * is for: the objects worth locating are the ones being rewritten.
+   *
+   * ```ts
+   * for (const obj of document.changedObjects()) {
+   *   const at = document.regionOf(obj);
+   *   if (at === undefined) continue; // added since the read; there is no old text to replace
+   *   edits.push({ range: at, newText: replacementFor(obj) });
+   * }
+   * ```
+   *
+   * **Where the replacement text comes from is not settled by this method, and `writeObject` is
+   * not the answer.** A preserving write hands that function the author's own per-field comments,
+   * which are internal, so calling it with options built by hand produces text that differs from
+   * what {@link writeIdf} would have produced for the same object: the author's units and notes
+   * come back as generated labels. A consumer that needs the two to agree has to take the whole
+   * file from `writeIdf`. This method locates the edit; producing its text for a single object is
+   * a gap that is open, and it is recorded rather than papered over.
+   *
+   * The end of the range is the WRITER's, which is not always the semicolon: a comment on the
+   * terminator's own line is that statement's last field's comment and a preserving write replaces
+   * it. A range that stopped at the semicolon would leave it behind, describing a field that had
+   * just moved.
+   *
+   * Offsets, not a line and column: `Region` carries the conversion, and a consumer that wants one
+   * has the text to compute it from, while going the other way costs a scan.
+   */
+  #extents: number[] | undefined;
+
+  regionOf(obj: IdfObject): Region | undefined {
+    const source = this.#source;
+    if (source === undefined) return undefined;
+    const at = obj[ORIGIN];
+    if (at === undefined) return undefined;
+    // The identity check that guards `isUntouched`, for the same reason: an object carrying an
+    // index from a file it is no longer in would otherwise be handed a range from this one.
+    if (source.anchors[at] !== obj) return undefined;
+    // The object notation records one anchor per object and no statement, so there is nothing here
+    // to point at. Preservation is all-or-nothing there and a per-object range would be a fiction.
+    const statement = source.layer.statements[at];
+    if (statement === undefined) return undefined;
+    // The END is the writer's, not the statement's. A comment on the terminator's own line is that
+    // statement's last field's comment and the preserving write replaces it; a range stopping at
+    // the semicolon would leave it behind, on a line describing a field that had just moved.
+    // Computed once per document, since the retained source does not change after the read.
+    this.#extents ??= extentEnds(source);
+    return { start: statement.region.start, end: this.#extents[at] ?? statement.region.end };
+  }
+
+  /**
+   * One object, rendered exactly as a preserving write would render it.
+   *
+   * The text that belongs in the range {@link regionOf} returns, so the two compose into an edit
+   * that leaves the file byte for byte where {@link writeIdf} would have left it. `undefined` for
+   * an object the retained source does not hold, which is the same set `regionOf` declines.
+   *
+   * ```ts
+   * for (const obj of document.changedObjects()) {
+   *   const at = document.regionOf(obj);
+   *   const text = document.renderObject(obj);
+   *   if (at === undefined || text === undefined) continue; // added since the read
+   *   edits.push({ range: at, newText: text });
+   * }
+   * ```
+   *
+   * `writeObject` is not this, and that is the reason this exists. A preserving write hands that
+   * function the author's own per-field annotations, which are internal, so calling it with options
+   * built by hand comes back with the author's units and notes as generated labels: `!- North Axis
+   * {deg}` becomes `!- North Axis`. That is a unit lost from an engineering model by an editor
+   * asked to save a file, and no doc comment is a good enough guard against it.
+   *
+   * `fieldComments` is the ONLY option, because it is the only one a preserving write honours.
+   * `indent`, `commentColumn`, `ordering` and `versionFirst` are refused by {@link writeIdf}
+   * alongside `preserveFormatting`, and `comments: false` and `compressed` defeat preservation and
+   * send the whole document down the formatting path instead. Accepting any of them here would let
+   * a caller render one object on terms the surrounding file was not written on, which is the exact
+   * divergence this method exists to prevent.
+   *
+   * No trailing line break: the range this fills ends at the terminator, or at the comment on that
+   * line, and the break after it is the first character of what separates one object from the next,
+   * which a preserving write leaves in place.
+   */
+  renderObject(obj: IdfObject, options: Pick<WriteIdfOptions, 'fieldComments'> = {}): string | undefined {
+    const source = this.#source;
+    if (source === undefined) return undefined;
+    const at = obj[ORIGIN];
+    if (at === undefined || source.anchors[at] !== obj) return undefined;
+    // The same defaults `writeIdf` resolves for its preserving branch, which is the only branch
+    // that can reach this text.
+    return renderStatement(source, at, {
+      comments: true,
+      commentColumn: 30,
+      indent: '    ',
+      labelBareFields: options.fieldComments === 'generate',
+    });
   }
 
   /** Reference targets that no object provides. */

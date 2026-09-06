@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { parseEpJson, parseIdf, writeEpJson, writeIdf } from '@idfkit/core';
+import { parseEpJson, parseIdf, scanIdf, writeEpJson, writeIdf, writeObject } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema, syntaxFixture, syntaxFixtures } from './helpers.js';
@@ -200,12 +200,133 @@ describe('one field changes and one object looks changed', () => {
     // The removed statement's extent goes and the gaps around it do not: the blank line that
     // separated the two zones is in a gap and belongs to no object.
     //
-    // A statement's region ends at its TERMINATOR, so a comment trailing the semicolon on the same
-    // line is in the gap too, and it survives the removal. That is a consequence of the definition
-    // of text that belongs to no object, and it is behaviour rather than a defect: the alternative
-    // is a writer that decides which comments are about which object, which is a guess.
-    expect(written).toBe(MODEL.replace('Zone,\n  Zone Two,     !- Name\n  1.0E-5;', ''));
+    // The comment on the TERMINATOR's line goes with the object (idfkit-js#47). It is the last
+    // field's comment, and the field no longer exists, so leaving it behind would strand a line
+    // describing something that is gone. A comment on its own line, or after a blank one, stays:
+    // that is where deciding which object a comment belongs to becomes a guess.
+    expect(written).toBe(
+      MODEL.replace(
+        'Zone,\n  Zone Two,     !- Name\n  1.0E-5;       !- Direction of Relative North',
+        ''
+      )
+    );
+    // Zone One still carries its own, on its own terminator line.
     expect(written).toContain('!- Direction of Relative North');
+  });
+
+  it("keeps the author's comments on an object it reformats", () => {
+    // The values are what an edit asks to re-render. The comments are not, and rebuilding them
+    // destroys whatever the schema cannot regenerate: a note to a colleague, and the field's unit,
+    // which the generated label does not carry. Both are kept, in place, exactly as written.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  My Building,             !- Name',
+      '  0,                       !- North Axis {deg}',
+      '  City;                    !- VERIFY WITH CLIENT before the Feb review',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    const written = writeIdf(document);
+
+    expect(written).toContain('!- North Axis {deg}');
+    expect(written).toContain('!- VERIFY WITH CLIENT before the Feb review');
+    // Once each, not twice: the writer emits the author's comment in place of its own, so there is
+    // nothing left in the gap to arrive on the line below (idfkit-js#47).
+    expect(written.match(/!- North Axis/g)).toHaveLength(1);
+    expect(written.match(/VERIFY WITH CLIENT/g)).toHaveLength(1);
+    // The value is the one thing that did change.
+    expect(written).toContain('42.0');
+    expect(written).not.toContain('  0,');
+  });
+
+  it('adds no line to the file for an object it reformats', () => {
+    // A statement's extent ends at its terminator, or at the comment on that same line, and never
+    // includes the line break: the break is the first character of the gap. `writeObject` ends with
+    // one because it also writes whole documents, so emitting it here put the break in twice and
+    // grew the file by a blank line per reformatted object — compounding on every save.
+    //
+    // It was there before the comment work and was invisible: the misplaced terminator comment sat
+    // in the gap between the two breaks, so it read as one blank line. Fixing that exposed this.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  My Building,   !- Name',
+      '  0;             !- North Axis {deg}',
+      '',
+      'Timestep, 6;',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    const written = writeIdf(document);
+
+    expect(written.split('\n')).toHaveLength(text.split('\n').length);
+    expect(written).not.toContain('\n\n\n');
+    // And again, on the output, because the growth compounded rather than saturating.
+    const reread = parseIdf(written, v26, { strict: false, preserveFormatting: true }).document;
+    reread.require('Building', 'My Building').set('north_axis', 43);
+    expect(writeIdf(reread).split('\n')).toHaveLength(text.split('\n').length);
+  });
+
+  it('generates a comment only for a field the author never wrote one for', () => {
+    const text = ['Version, 26.1;', '', 'Building,', '  My Building;', ''].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    expect(writeIdf(document)).toContain('!- North Axis');
+  });
+
+  it('does not leave the old terminator comment below a reformatted object', () => {
+    // idfkit-js#47. A statement's region ends at its terminator, so a comment after the semicolon
+    // on the same line used to sit in the gap. Invisible while the object is copied, because the
+    // gap is copied too; wrong the moment it is reformatted, because the writer emits its own
+    // field comment and the author's then arrives on the line below.
+    //
+    // It is not even a duplicate: the ordinary writer drops the unit, so `!- North Axis {deg}`
+    // reads as a stray fragment under `!- North Axis`. IDFEditor writes one of these on every
+    // line of every object, so about half the statements in a typical file were affected.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  My Building,             !- Name',
+      '  0;                       !- North Axis {deg}',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    const written = writeIdf(document);
+
+    // Once, in place, with the author's unit intact. It used to arrive a second time from the gap.
+    expect(written.match(/!- North Axis/g)).toHaveLength(1);
+    expect(written).toContain('!- North Axis {deg}');
+  });
+
+  it('leaves a comment on its own line where it is', () => {
+    // The boundary of the rule above. Only the terminator's own line is absorbed; a comment on the
+    // next line is about whatever follows it and is nobody's to move.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  My Building,             !- Name',
+      '  0;',
+      '! a note about what comes next',
+      '',
+      'Timestep, 6;',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    expect(writeIdf(document)).toContain('! a note about what comes next');
   });
 
   it('appends a new object at the end, formatted', () => {
@@ -406,6 +527,9 @@ describe('asking for two contradictory things is refused', () => {
     const bare = writeIdf(kept(), { preserveFormatting: true, comments: false });
     expect(bare).not.toBe(MODEL);
     expect(bare).not.toContain('!-');
+    // And it still loads. The type name is the line the field loop starts with, so a branch that
+    // returns before flushing it emits it last, which parses as nothing at all.
+    expect(() => parseIdf(bare, v26, { strict: false })).not.toThrow();
   });
 
   it('raises nothing when preservation is asked for on a document read without it', () => {
@@ -477,5 +601,416 @@ describe('the object notation preserves on all-or-nothing terms', () => {
     const written = writeIdf(kept());
     expect(written).not.toContain('{');
     expect(written).toContain('Zone,');
+  });
+});
+
+describe('which objects a preserving write will rewrite', () => {
+  // A consumer cannot derive this from its own edit log. A rename clears the record on every object
+  // that referred to the renamed one, so an editor counting its own edits reports one where the
+  // answer is three here and nine on a real model.
+  const REFERENCED = [
+    'Version, 26.1;',
+    '',
+    'Zone, ZONE ONE;',
+    '',
+    'BuildingSurface:Detailed,',
+    '  S1, Wall, C1, ZONE ONE, , Outdoors, , SunExposed, WindExposed, , ,',
+    '  0,0,0, 1,0,0;',
+    '',
+    'BuildingSurface:Detailed,',
+    '  S2, Wall, C1, ZONE ONE, , Outdoors, , SunExposed, WindExposed, , ,',
+    '  0,0,0, 1,0,0;',
+    '',
+  ].join('\n');
+
+  const read = (preserve = true) =>
+    parseIdf(REFERENCED, v26, { strict: false, preserveFormatting: preserve }).document;
+
+  it('yields nothing for a document nobody has edited', () => {
+    expect([...read().changedObjects()]).toEqual([]);
+  });
+
+  it('yields every object a rename rewrote, not just the renamed one', () => {
+    const document = read();
+    document.rename(document.require('Zone', 'ZONE ONE'), 'RENAMED');
+
+    expect([...document.changedObjects()].map((o) => o.typeName).sort()).toEqual([
+      'BuildingSurface:Detailed',
+      'BuildingSurface:Detailed',
+      'Zone',
+    ]);
+  });
+
+  it('yields nothing after a write of the value already held', () => {
+    const document = read();
+    const zone = document.require('Zone', 'ZONE ONE');
+    zone.set('multiplier', zone.get('multiplier') ?? undefined);
+
+    expect([...document.changedObjects()]).toEqual([]);
+  });
+
+  it('yields every object for a document read without preservation', () => {
+    // There is nothing to reproduce, so a write rewrites the file entirely.
+    const document = read(false);
+
+    expect([...document.changedObjects()]).toHaveLength(document.size);
+  });
+
+  it('agrees with what the writer actually reproduces', () => {
+    // The claim is only worth making if the writer honours it. After the rename, the three objects
+    // it touched are named and the Version is not, so the Version must come back from its own
+    // characters and the other three must not.
+    const document = read();
+    document.rename(document.require('Zone', 'ZONE ONE'), 'RENAMED');
+    const written = writeIdf(document);
+    const changed = [...document.changedObjects()];
+
+    expect(changed.map((o) => o.typeName)).not.toContain('Version');
+    expect(written).toContain('Version, 26.1;');
+    // And every object it DID name was rewritten: none of them survives as its original text.
+    expect(written).not.toContain('Zone, ZONE ONE;');
+    expect(changed).toHaveLength(3);
+  });
+});
+
+describe('what survives when the writer rewrites an object', () => {
+  // An edit asks for the VALUES to be re-rendered. Everything else the author wrote is theirs, and
+  // that includes the absence of a comment on a field they left bare.
+  const SOURCE = [
+    'Version, 26.1;',
+    '',
+    '! a note between objects',
+    'Building,',
+    '  My Building,   !- Name',
+    '  ! this value came from the 2019 survey',
+    '  0,             !- North Axis {deg}',
+    '  Suburbs;',
+    '',
+    'Timestep, 6;',
+    '',
+  ].join('\n');
+
+  const edited = (options = {}) => {
+    const { document } = parseIdf(SOURCE, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+    return writeIdf(document, options);
+  };
+
+  it('keeps a units annotation the generated label would drop', () => {
+    expect(edited()).toContain('!- North Axis {deg}');
+  });
+
+  it('keeps a comment on its own line inside the object', () => {
+    // The one comment nothing else carries: it is inside the object rather than between two, so
+    // the gap does not reach it and reformatting destroyed it.
+    expect(edited()).toContain('! this value came from the 2019 survey');
+  });
+
+  it('keeps a comment between two objects', () => {
+    expect(edited()).toContain('! a note between objects');
+  });
+
+  it('leaves a field the author left bare bare', () => {
+    // Absence is as much a thing the author wrote as the words are.
+    const written = edited();
+
+    expect(written).toMatch(/Suburbs;\s*$/m);
+    expect(written).not.toContain('!- Terrain');
+  });
+
+  it('labels a bare field on request, and still costs no comment line', () => {
+    const written = edited({ fieldComments: 'generate' });
+
+    expect(written).toContain('!- Terrain');
+    expect(written).toContain('! this value came from the 2019 survey');
+    expect(written).toContain('! a note between objects');
+    expect(written).toContain('!- North Axis {deg}');
+  });
+
+  it('changes the value and nothing else', () => {
+    const written = edited();
+
+    expect(written).toContain('42.0');
+    expect(written).not.toContain('  0,');
+  });
+
+  it('attaches a comment by its delimiter, not by counting lines', () => {
+    // Several fields share a line in real files: a surface's vertices are routinely written three
+    // to a line with one comment for the triple. Counting lines mis-attaches every comment after
+    // the first such line.
+    const text = [
+      'Version, 26.1;',
+      '',
+      'Building,',
+      '  Packed, City, 0.04,   !- three fields, one comment',
+      '  0.4;                  !- and another',
+      '',
+    ].join('\n');
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'Packed').set('terrain', 'Suburbs');
+
+    const written = writeIdf(document);
+
+    expect(written).toContain('!- three fields, one comment');
+    expect(written).toContain('!- and another');
+  });
+});
+
+describe('the line the author put a value on', () => {
+  // 21.5% of the statements in the 693 EnergyPlus example files write several values to a line,
+  // and 690 of those files contain at least one. Writing one value per line regardless turns a
+  // four-line surface into twelve, which is the most visible thing a reformat does to geometry.
+  const GROUPED = [
+    'Version, 26.1;',
+    '',
+    'BuildingSurface:Detailed,',
+    '  S1, Wall, C1, Z1, , Outdoors, , SunExposed, WindExposed, , ,',
+    '  0, 0, 4.572,   !- X,Y,Z ==> Vertex 1 {m}',
+    '  0, 0, 0;       !- X,Y,Z ==> Vertex 2 {m}',
+    '',
+  ].join('\n');
+
+  it('keeps values the author grouped onto one line', () => {
+    const { document } = parseIdf(GROUPED, v26, { strict: false, preserveFormatting: true });
+    document.require('BuildingSurface:Detailed', 'S1').set('sun_exposure', 'NoSun');
+
+    const written = writeIdf(document);
+
+    expect(written.split('\n')).toHaveLength(GROUPED.split('\n').length);
+    expect(written).toMatch(/0\.0, 0\.0, 4\.572,\s+!- X,Y,Z ==> Vertex 1 \{m\}/);
+    expect(written).toMatch(/0\.0, 0\.0, 0\.0;\s+!- X,Y,Z ==> Vertex 2 \{m\}/);
+  });
+
+  it('keeps a whole object the author wrote on one line', () => {
+    // The cheaper case, and the one that surprises on a file with no geometry in it: 11.3% of
+    // statements are written this way, and nobody thinks of `Timestep,4;` as formatting they chose.
+    const text = 'Version, 26.1;\n\nTimestep,4;\n';
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    [...document.all('Timestep')][0]!.set('number_of_timesteps_per_hour', 6);
+
+    const written = writeIdf(document);
+
+    expect(written).toContain('Timestep,');
+    expect(written.split('\n')).toHaveLength(text.split('\n').length);
+  });
+
+  it('gives a field the author never wrote a line of its own', () => {
+    // No author to be faithful to, so the writer's own habit applies.
+    const text = 'Version, 26.1;\n\nBuilding,\n  My Building;\n';
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    expect(writeIdf(document)).toMatch(/\n\s+42\.0;\s+!- North Axis/);
+  });
+});
+
+describe('the fields the author wrote out as blanks', () => {
+  // The writer stops at the last field that is SET, so a run of explicit commas the author wrote
+  // is dropped and their field-name comments go with them. A single-field edit took one
+  // Sizing:System from 38 lines to 22; across the 693 example files it is 20,571 lines, more than
+  // any other difference a rewrite makes. A field written out as a blank is as much a thing the
+  // author wrote as a field left bare of its comment, which is the rule this path already follows.
+  const BLANKS = [
+    'Version, 26.1;',
+    '',
+    'Building,',
+    '  My Building,             !- Name',
+    '  0.0,                     !- North Axis {deg}',
+    '  ,                        !- Terrain',
+    '  ,                        !- Loads Convergence Tolerance Value',
+    '  ,                        !- Temperature Convergence Tolerance Value',
+    '  ;                        !- Solar Distribution',
+    '',
+  ].join('\n');
+
+  it('keeps them, and their comments, through an edit', () => {
+    const { document } = parseIdf(BLANKS, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    const written = writeIdf(document);
+
+    expect(written.split('\n')).toHaveLength(BLANKS.split('\n').length);
+    expect(written).toContain('!- Terrain');
+    expect(written).toContain('!- Solar Distribution');
+  });
+
+  it('still trims them where there is no author to be faithful to', () => {
+    // A document read without preservation has nothing to reproduce, so the ordinary writer's
+    // habit applies and a run of bare commas stays out of the output.
+    const { document } = parseIdf(BLANKS, v26, { strict: false });
+
+    expect(writeIdf(document)).not.toContain('!- Solar Distribution');
+  });
+});
+
+describe('the column the comment goes in', () => {
+  it('puts the marker where EnergyPlus puts it, so a rewrite leaves no seam', () => {
+    // `1ZoneUncontrolled.idf` writes `!-` at index 29 on 223 of its 231 commented lines. The
+    // option is a COLUMN, counted from 1, and was being applied as an index.
+    const text = 'Version, 26.1;\n\nBuilding,\n  My Building,\n  0.0;\n';
+    const { document } = parseIdf(text, v26, { strict: false, preserveFormatting: true });
+    document.require('Building', 'My Building').set('north_axis', 42);
+
+    for (const line of writeIdf(document).split('\n')) {
+      const marker = line.indexOf('!-');
+      if (marker > 0) expect(marker).toBe(29);
+    }
+  });
+});
+
+describe('where an object\'s characters were', () => {
+  // `changedObjects()` says WHICH objects a write will rewrite. Without saying WHERE the old ones
+  // are, a consumer building the smallest possible change has to write the whole file and diff it,
+  // which is the work that method exists to avoid. Found by the language server team reading the
+  // branch before it merged.
+  const TEXT = [
+    'Version, 26.1;',
+    '',
+    'Building,',
+    '  My Building,   !- Name',
+    '  0.0;           !- North Axis {deg}',
+    '',
+    'Timestep, 4;',
+    '',
+  ].join('\n');
+
+  const read = () => parseIdf(TEXT, v26, { strict: false, preserveFormatting: true }).document;
+
+  it('locates an object that has not changed', () => {
+    const document = read();
+    const at = document.regionOf(document.require('Building', 'My Building'))!;
+
+    expect(document.rawText!.slice(at.start, at.end)).toBe(
+      'Building,\n  My Building,   !- Name\n  0.0;           !- North Axis {deg}'
+    );
+  });
+
+  it('still locates it after it changes, which is the case it is for', () => {
+    // The objects worth locating are the ones being rewritten, and `SOURCE` is cleared the moment
+    // one is touched because its absence is what marks it. A second record answers this.
+    const document = read();
+    const building = document.require('Building', 'My Building');
+    const before = document.regionOf(building);
+    building.set('north_axis', 42);
+
+    expect(document.regionOf(building)).toEqual(before);
+    expect([...document.changedObjects()]).toContain(building);
+  });
+
+  it('reaches past the semicolon to the comment the writer replaces', () => {
+    // Not `statement.region`, which stops at the terminator. A comment on the terminator's own line
+    // is that statement's last field's comment and a preserving write rewrites it; a consumer
+    // replacing the shorter range would leave it behind describing a field that had just moved.
+    const document = read();
+    const at = document.regionOf(document.require('Building', 'My Building'))!;
+
+    expect(document.rawText!.slice(at.start, at.end)).toContain('!- North Axis {deg}');
+  });
+
+  it('answers nothing for an object added since the read', () => {
+    const document = read();
+    const added = document.addRaw('Zone', 'Late Arrival', {});
+
+    expect(document.regionOf(added)).toBeUndefined();
+  });
+
+  it('answers nothing for a document read without preservation', () => {
+    const document = parseIdf(TEXT, v26, { strict: false }).document;
+
+    expect(document.regionOf(document.require('Building', 'My Building'))).toBeUndefined();
+  });
+
+  it('locates each object separately, in source order', () => {
+    const document = read();
+    const regions = [...document.objects()]
+      .map((obj) => document.regionOf(obj))
+      .filter((region) => region !== undefined);
+
+    expect(regions).toHaveLength(3);
+    for (let i = 1; i < regions.length; i += 1) {
+      expect(regions[i]!.start).toBeGreaterThanOrEqual(regions[i - 1]!.end);
+    }
+  });
+});
+
+describe('the text that belongs in that range', () => {
+  // The third leg. Knowing WHICH objects change and WHERE the old text is buys a consumer nothing
+  // while producing the new text for ONE object has no correct form: `writeObject` called with
+  // options built by hand comes back with the author's units as generated labels, because the
+  // annotations a preserving write hands it are internal.
+  const TEXT = [
+    'Version, 26.1;',
+    '',
+    'Building,',
+    '  My Building,   !- Name',
+    '  0.0;           !- North Axis {deg}',
+    '',
+    'Timestep, 4;',
+    '',
+  ].join('\n');
+
+  const read = () => parseIdf(TEXT, v26, { strict: false, preserveFormatting: true }).document;
+
+  it('keeps the unit that the ordinary per-object writer drops', () => {
+    const document = read();
+    const building = document.require('Building', 'My Building');
+    building.set('north_axis', 42);
+
+    expect(document.renderObject(building)).toContain('!- North Axis {deg}');
+    // What a consumer would have had to reach for, and what it costs.
+    expect(writeObject(building, { comments: true, commentColumn: 30, indent: '    ' })).not.toContain(
+      '{deg}'
+    );
+  });
+
+  it('splices into its own range to give back exactly what a whole write gives back', () => {
+    // The claim the three names make together, pinned as one assertion. If this ever fails, an
+    // editor built on them is silently writing a different file from the one `writeIdf` writes.
+    const document = read();
+    document.require('Building', 'My Building').set('north_axis', 42);
+    [...document.all('Timestep')][0]!.set('number_of_timesteps_per_hour', 6);
+
+    let spliced = document.rawText!;
+    // Back to front, so an earlier edit does not move a later range.
+    const changed = [...document.changedObjects()]
+      .map((obj) => ({ at: document.regionOf(obj)!, text: document.renderObject(obj)! }))
+      .sort((a, b) => b.at.start - a.at.start);
+    expect(changed).toHaveLength(2);
+    for (const { at, text } of changed) {
+      spliced = spliced.slice(0, at.start) + text + spliced.slice(at.end);
+    }
+
+    expect(spliced).toBe(writeIdf(document));
+  });
+
+  it('takes the one option a preserving write honours, and no others', () => {
+    // `indent`, `commentColumn`, `ordering` and `versionFirst` are refused by `writeIdf` alongside
+    // `preserveFormatting`; `comments: false` and `compressed` defeat preservation entirely and
+    // send the document down the formatting path. Accepting any of them here would render one
+    // object on terms the surrounding file was not written on.
+    // A source with a field the author wrote BARE, which is what the option is about.
+    const bare = 'Version, 26.1;\n\nBuilding,\n  My Building,   !- Name\n  0.0,           !- North Axis {deg}\n  City;\n';
+    const { document } = parseIdf(bare, v26, { strict: false, preserveFormatting: true });
+    const building = document.require('Building', 'My Building');
+    building.set('north_axis', 42);
+
+    // Bare stays bare, and asking for labels is the one thing that changes.
+    expect(document.renderObject(building)).not.toContain('!- Terrain');
+    expect(document.renderObject(building, { fieldComments: 'generate' })).toContain('!- Terrain');
+  });
+
+  it('ends where the range ends, with no line break of its own', () => {
+    const document = read();
+
+    expect(document.renderObject(document.require('Building', 'My Building'))).not.toMatch(/\n$/);
+  });
+
+  it('answers nothing for an object the retained source does not hold', () => {
+    const document = read();
+
+    expect(document.renderObject(document.addRaw('Zone', 'Late Arrival', {}))).toBeUndefined();
+    expect(parseIdf(TEXT, v26, { strict: false }).document.renderObject(
+      parseIdf(TEXT, v26, { strict: false }).document.require('Building', 'My Building')
+    )).toBeUndefined();
   });
 });

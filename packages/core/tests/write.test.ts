@@ -142,7 +142,12 @@ describe('writer defaults are pinned (FR-017)', () => {
     expect(fieldLines.every((l) => l.startsWith('    ') && !l.startsWith('     '))).toBe(true);
   });
 
-  it('puts the comment at column 30', () => {
+  it('puts the comment at column 30, which is index 29', () => {
+    // Where EnergyPlus itself writes it: `1ZoneUncontrolled.idf` puts `!-` at index 29 on 223 of
+    // its 231 commented lines. The default used to be applied as an INDEX, which put every line
+    // this writer produced one place right of the files it imitates. On a preserving write that
+    // is the difference that shows, because a rewritten object's comments then stand one column
+    // clear of every untouched object around it and each save leaves a visible seam.
     const text = writeIdf(model(v26));
 
     let checked = 0;
@@ -151,8 +156,8 @@ describe('writer defaults are pinned (FR-017)', () => {
       if (marker <= 0) continue;
       // Only lines the padding actually reached: a value longer than the column pushes the comment
       // right, and that overflow behaviour is itself one of the seven differences.
-      if (line.slice(0, marker).trimEnd().length < 30) {
-        expect(marker).toBe(30);
+      if (line.slice(0, marker).trimEnd().length < 29) {
+        expect(marker).toBe(29);
         checked += 1;
       }
     }

@@ -39,3 +39,14 @@ export const KEY = Symbol('idfkit.key');
  * new value and back again is unchanged by comparison and touched in truth.
  */
 export const SOURCE = Symbol('idfkit.source');
+/**
+ * Which statement an object was READ from, kept whether or not it has since changed.
+ *
+ * `SOURCE` is cleared the moment an object is touched, because its absence is what marks the
+ * object as needing to be rewritten. That makes it useless for saying where the old characters
+ * were, which is exactly the question a consumer building a minimal edit has to ask about a
+ * CHANGED object. This is the same number, recorded once and never cleared.
+ *
+ * @internal
+ */
+export const ORIGIN = Symbol('idfkit.origin');
