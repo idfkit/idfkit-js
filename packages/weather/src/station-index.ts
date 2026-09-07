@@ -111,6 +111,97 @@ export interface FilterOptions {
   state?: string;
   /** WMO region number, inferred from `wmo_region_{n}` in the download URL. */
   wmoRegion?: number;
+  /**
+   * ASHRAE climate zone code, e.g. `"5A"`. Case-insensitive.
+   *
+   * Matched against the code parsed out of {@link WeatherStation.ashraeClimateZone},
+   * never against that label's text. The label is not a code: 2,162 records in the
+   * shipped index read `7A - ASHRAE Climate Zone could not be determined` or
+   * `8A - ...`, and neither 7A nor 8A is an ASHRAE zone, since zones 7 and 8 carry
+   * no suffix. Matching the first token would invent two zones holding 3.1% of the
+   * index, so those records match no zone. Ask for them with
+   * {@link FilterOptions.climateZoneDetermined}. An empty string is no constraint,
+   * matching `country` and `state`.
+   */
+  climateZone?: string;
+  /**
+   * Whether the station's ASHRAE zone was determined upstream.
+   *
+   * `false` selects the records whose label reports that it could not be, which no
+   * `climateZone` value returns. A separate key rather than a reserved `climateZone`
+   * value, because that key's domain is already strings and a magic one could not be
+   * told from a real code.
+   */
+  climateZoneDetermined?: boolean;
+}
+
+/**
+ * The nineteen zones ASHRAE 169 defines. A parsed code outside this set is neither a
+ * zone nor undetermined: upstream failing to determine a zone and this library failing
+ * to recognise one upstream did determine are different facts about a station, and
+ * filing the second under the first reports something upstream never said.
+ *
+ * The set is not defensive. `station-index.test.ts` asserts the shipped index carries
+ * exactly these nineteen, so a twentieth arriving upstream fails a build rather than
+ * quietly changing what a filter returns.
+ */
+const ASHRAE_ZONES: ReadonlySet<string> = new Set([
+  '0A',
+  '0B',
+  '1A',
+  '1B',
+  '2A',
+  '2B',
+  '3A',
+  '3B',
+  '3C',
+  '4A',
+  '4B',
+  '4C',
+  '5A',
+  '5B',
+  '5C',
+  '6A',
+  '6B',
+  '7',
+  '8',
+]);
+
+/**
+ * Hoisted rather than written inline, so one pattern is compiled for the process
+ * instead of one per label over a 69,638-record index. No `g` flag, so `test` keeps
+ * no `lastIndex` between calls.
+ *
+ * Anchored on the subject, not on the bare phrase. Upstream writes exactly `ASHRAE
+ * Climate Zone could not be determined`, and matching only `could not be determined`
+ * would also swallow a label reporting that something ELSE about the station was
+ * undetermined, filing a station whose zone upstream did state under the one bucket
+ * that means upstream did not state it. The `ASHRAE ` prefix is deliberately not
+ * required, so a label that drops it still reads as undetermined rather than yielding
+ * a zone.
+ */
+const UNDETERMINED_RE = /climate zone could not be determined/i;
+
+/** Whether the label reports that upstream could not determine the zone. */
+function zoneIsUndetermined(label: string): boolean {
+  return UNDETERMINED_RE.test(label);
+}
+
+/**
+ * The ASHRAE zone code in a label, or `null` when there is none to have.
+ *
+ * `null` covers two different situations on purpose, and callers that need to tell
+ * them apart use {@link zoneIsUndetermined}: upstream could not determine the zone, or
+ * it determined one this library does not recognise.
+ *
+ * **The suffix is `[ABC]`, not `[AB]`.** Dropping C loses 3C, 4C and 5C, which is 1,653
+ * marine-zone stations, leaves sixteen zones where there are nineteen, and throws
+ * nothing.
+ */
+function zoneCodeOf(label: string): string | null {
+  if (zoneIsUndetermined(label)) return null;
+  const code = (label.split('-')[0] ?? '').trim().toUpperCase();
+  return ASHRAE_ZONES.has(code) ? code : null;
 }
 
 export class StationIndex {
@@ -259,12 +350,31 @@ export class StationIndex {
 
   /** Filter stations by metadata. All given criteria must match (logical AND). */
   filter(options: FilterOptions = {}): WeatherStation[] {
-    const { country, state, wmoRegion } = options;
+    const { country, state, wmoRegion, climateZone, climateZoneDetermined } = options;
+    // `climateZone: ''` means no constraint, as `country` and `state` already do
+    // below. A UI binding an empty select to this would otherwise get zero stations
+    // from one key and every station from the next two.
+    const wantedZone = climateZone ? climateZone.toUpperCase() : undefined;
     return this.#stations.filter((s) => {
       if (country && s.country.toUpperCase() !== country.toUpperCase()) return false;
       if (state && s.state.toUpperCase() !== state.toUpperCase()) return false;
       if (wmoRegion !== undefined && !s.url.toLowerCase().includes(`wmo_region_${wmoRegion}`)) {
         return false;
+      }
+      if (wantedZone !== undefined || climateZoneDetermined !== undefined) {
+        // Parsed once per station: both keys ask about the same label, and the
+        // shipped index is 69,638 records.
+        const zoneCode = zoneCodeOf(s.ashraeClimateZone);
+        if (wantedZone !== undefined && zoneCode !== wantedZone) return false;
+        if (climateZoneDetermined !== undefined) {
+          // Deliberately not `zoneCode === null`: that is also true of an unrecognised
+          // code, which is not the same thing as upstream reporting it could not
+          // determine one.
+          const matched = climateZoneDetermined
+            ? zoneCode !== null
+            : zoneIsUndetermined(s.ashraeClimateZone);
+          if (!matched) return false;
+        }
       }
       return true;
     });

@@ -10,6 +10,26 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
 
 ## [Unreleased]
 
+### Added
+
+- **Two climate zone keys on `StationIndex.filter()`'s options**, in
+  `@idfkit/weather`. `climateZone` selects stations by ASHRAE zone code,
+  matched against the code parsed out of `WeatherStation.ashraeClimateZone`
+  rather than against that label's text. The label is not a code: 2,162 of the
+  69,638 shipped records read `7A - ASHRAE Climate Zone could not be determined`
+  or `8A - ...`, and neither 7A nor 8A is an ASHRAE zone, since zones 7 and 8
+  carry no suffix. Keying on the label's first token would invent two zones
+  holding 3.1% of the index, so those records match no zone.
+
+  `climateZoneDetermined` is what keeps them reachable. `false` returns exactly
+  those 2,162 records and `true` returns the rest, so every station is reachable
+  through one of the two. It is a separate key rather than a reserved
+  `climateZone` value, because that key's domain is already strings and a magic
+  one could not be told from a real code.
+
+  Both keys land in the same change as the Python library's `climate_zone` and
+  `climate_zone_determined`, which the naming register records as aligned.
+
 ## [0.3.0-rc.2] - 2026-09-06
 
 This release moves to `conformance-2026.11` and `governance-2026.15`. The corpus
