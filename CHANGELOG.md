@@ -12,6 +12,20 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
 
 ### Added
 
+- **A reader for the EPW text this package already downloads.** `parseEpw(text)`
+  returns the header records and the hourly table as named columns; `loadEpw(path)`
+  in `@idfkit/weather/node` reads one off disk. It is on the portable surface, so it
+  runs in a browser.
+
+  A measurement the file says was not taken reads as `NaN` rather than as the value
+  the format reserves for it, per field and per value: ceiling height's 77777 is an
+  unlimited ceiling and stays a number where its 99999 does not.
+
+  `monthlyMeans(file, field)` returns twelve means that exclude absent hours from the
+  sum and from the divisor alike, each carrying the count of hours it used.
+
+  ([#55](https://github.com/idfkit/idfkit-js/pull/55))
+
 - **Two climate zone keys on `StationIndex.filter()`'s options**, in
   `@idfkit/weather`. `climateZone` selects stations by ASHRAE zone code,
   matched against the code parsed out of `WeatherStation.ashraeClimateZone`
