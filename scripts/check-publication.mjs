@@ -109,19 +109,29 @@ class CannotRun extends Error {}
  * asserted by the run in that repository and is not observable from here. So the level is written
  * down by someone who checked both, and moving it is the act of re-attesting.
  *
- * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.11, the level
- * whose runners stop reporting a false failure on preserve-edit-one-field, and the evidence for it,
- * taken rather than recalled:
+ * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.12, the level
+ * that opens `checks/` with `weather-monthly`, and the evidence for it, taken rather than recalled:
  *
- *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.11
- *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.11
+ *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.12
+ *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.12
  *   idfkit-js    npm run check:release                             green at that level
  *   idfkit       uv run python scripts/check_release_conformance.py green at that level
  *
  * Both were run against the corpus checked out AT THE TAG on the day this moved, rather than read
  * off a CI badge, because the two levels that preceded 2026.10 were cut hours apart and a badge
- * would have been reporting the older of them. 2026.11 changes no case: 69 cases and 211
- * assertions, as 2026.10 had, so the precondition is met on the same evidence it was.
+ * would have been reporting the older of them.
+ *
+ * 2026.12 changes no case: 69 cases and 211 assertions, as 2026.11 had. What it adds is the first
+ * member of `checks/`, which is a claim about behaviour rather than about a document and runs from
+ * its own entry point. That check was run in both languages at this level as well, and each
+ * reports the same 293 comparisons:
+ *
+ *   node runners/weather-check.mjs   --library <idfkit-js>   PASS: 293 comparisons
+ *   python runners/weather_check.py  --library <idfkit>      PASS: 293 comparisons
+ *
+ * It is recorded here rather than left implied because `check:release` above runs `run.mjs` and
+ * therefore cannot see a check: a level that added only a check would attest green on this
+ * constant's evidence while nothing had exercised the thing the level exists for.
  *
  * Each level since 2026.6 contains all of it and adds cases, so the precondition is met more
  * strongly rather than less.
@@ -132,7 +142,7 @@ class CannotRun extends Error {}
  * the pin on every run, so the next time the two part company it fails a cheap gate on the change
  * that caused it rather than a release months later.
  */
-const REQUIRED_CONFORMANCE = 'conformance-2026.11';
+const REQUIRED_CONFORMANCE = 'conformance-2026.12';
 
 /** The distribution gates, precondition 4. Order is cheapest first. */
 const DISTRIBUTION_GATES = [
