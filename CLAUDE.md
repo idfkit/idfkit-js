@@ -158,3 +158,33 @@ conformance suite (fixture IDFs plus expected canonical epJSON and diagnostics,
 run by both CI pipelines) is the mitigation and does not exist yet. If you are
 adding a feature that also exists in the Python library, check its behaviour
 rather than inventing one.
+
+## Releases
+
+**Do not bump a version anywhere in this repository.** Every `package.json` here
+carries a `0.0.0` placeholder on purpose, and that placeholder is what makes the
+workspace links resolve during development. `.github/workflows/publish.yml` runs
+`npm version "$VERSION" --workspaces` from the git tag at publish time and then
+stamps the cross-package specs that `npm version` does not touch: the pin from
+`@idfkit/core` to `@idfkit/schemas`, the caret ranges the `idfkit` facade depends
+on, and the lower bounds in the type packages' peer ranges. Hand-editing any of
+them publishes a package that asks the registry for a version nobody has ever
+published.
+
+**This is the opposite of the rule in `idfkit`,** where `pyproject.toml`'s
+`version` IS bumped in the release commit. The asymmetry is real and is worth
+knowing before working across the two: the Python line has a second publish path
+that builds from its manifest, and this line has none.
+
+**The four packages version and release together**, so `@idfkit/weather` takes the
+same version as the rest of the line whether or not it changed.
+
+Before cutting a release, promote the `[Unreleased]` section in `CHANGELOG.md` to
+the new version heading and add the compare-link definition at the bottom. The
+release commit touches that file and nothing else.
+
+To cut a release (after confirming the version with the user):
+
+```bash
+gh release create vX.Y.Z --target main --title "vX.Y.Z" --generate-notes
+```
