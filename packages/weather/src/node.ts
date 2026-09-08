@@ -2,9 +2,9 @@
  * Node-only conveniences for `@idfkit/weather`.
  *
  * The async edge that touches disk. The portable surface fetches over the
- * network and returns text; this adds the two things a browser cannot do —
- * load the index shipped inside the package without any network call, and
- * write downloaded weather files to disk.
+ * network and returns text; this adds the things a browser cannot do — load the
+ * index shipped inside the package without any network call, write downloaded
+ * weather files to disk, and read an EPW off a path.
  */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 
 import type { WeatherFiles } from './download.js';
+import { parseEpw, type WeatherFile } from './epw.js';
 import { indexFromData, type IndexData } from './load.js';
 import { StationIndex } from './station-index.js';
 
@@ -76,4 +77,23 @@ export async function saveWeatherFiles(
   }
 
   return { epw: epwPath, ddy: ddyPath, stat: statPath };
+}
+
+/**
+ * Read an EPW weather file from a path.
+ *
+ * A convenience over {@link parseEpw} and nothing more: it reads the bytes,
+ * decodes them Latin-1, which is how the weather formats are written and how
+ * `saveWeatherFiles` above writes them, and hands the text on. Every rule about
+ * what is read, what is absent and what fails belongs to `parseEpw`.
+ *
+ * It lives here rather than on the portable surface because it is the only part
+ * that touches a disk. The reader itself does not, which is why a browser can
+ * use it.
+ *
+ * @param path - The `.epw` file to read.
+ */
+export async function loadEpw(path: string): Promise<WeatherFile> {
+  const bytes = await readFile(path);
+  return parseEpw(new TextDecoder('latin1').decode(bytes));
 }

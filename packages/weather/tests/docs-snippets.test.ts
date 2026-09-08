@@ -10,9 +10,12 @@ import {
   fetchWeatherFiles,
   geocode,
   loadStationIndex,
+  monthlyMeans,
+  parseEpw,
   type FetchLike,
 } from '@idfkit/weather';
 
+import { buildEpw } from './epw-fixtures.js';
 import { buildZip } from './helpers.js';
 
 /**
@@ -125,5 +128,50 @@ describe('README weather quickstart', () => {
       rewriteUrl: toLocal,
     });
     expect(epw).toContain('LOCATION');
+  });
+});
+
+// Named for the page on the unified site rather than one here, for the same reason
+// as the block above: `docs/snippets/js/` is vendored from this repository at a
+// pinned docs level, so the TypeScript half of that page is authored here.
+describe('developers.idfkit.com weather/reading.md', () => {
+  it('reads a weather file and reaches its columns by name', () => {
+    const epw = parseEpw(buildEpw());
+
+    expect(epw.location.city).toBe('Chicago Ohare Intl Ap');
+    expect(epw.hours.rowCount).toBe(8760);
+
+    const temperature = epw.hours.dryBulbTemperature;
+    expect(temperature).toHaveLength(8760);
+    expect(temperature[0]).toBeCloseTo(2.8);
+
+    // The hour convention the page states, executed rather than asserted in prose.
+    expect(epw.hours.hour[23]).toBe(24);
+    expect(epw.hours.day[23]).toBe(1);
+  });
+
+  it('reports an absent measurement as absent, and says how many hours it had', () => {
+    // A year whose albedo the file never measured, written as the value the format
+    // reserves for it.
+    const text = buildEpw({
+      row: (_index, _month, _day, fields) => [
+        ...fields.slice(0, 32),
+        '999.000',
+        ...fields.slice(33),
+      ],
+    });
+    const epw = parseEpw(text);
+
+    expect(Number.isNaN(epw.hours.albedo[0]!)).toBe(true);
+    expect(epw.hours.presentCount.albedo).toBe(0);
+
+    const january = monthlyMeans(epw, 'dryBulbTemperature')[0]!;
+    expect(january.count).toBe(31 * 24);
+
+    // And the same month of the column that is wholly absent, which is the pair the
+    // page shows: a mean of nothing is absent, with a count of zero beside it.
+    const absent = monthlyMeans(epw, 'albedo')[0]!;
+    expect(Number.isNaN(absent.mean)).toBe(true);
+    expect(absent.count).toBe(0);
   });
 });
