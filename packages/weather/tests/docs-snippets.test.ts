@@ -92,6 +92,32 @@ describe('how-to/fetch-weather-files.md', () => {
   });
 });
 
+// Named for the page on the unified site rather than one here, because this
+// snippet has no page in this repository: it is authored here because
+// `docs/snippets/js/` is vendored from this repo at a pinned docs level, and
+// published on developers.idfkit.com. The other weather block above names an
+// idfkit-js page because that page exists.
+describe('developers.idfkit.com weather/station-search.md', () => {
+  it('filters by climate zone, alone and combined, and reaches the undetermined records', async () => {
+    const index = await loadStationIndex(`${base}/stations.json.gz`);
+
+    const zone4a = index.filter({ climateZone: '4A' });
+    const seattleArea = index.filter({ climateZone: '4C', country: 'USA', state: 'WA' });
+    const undetermined = index.filter({ climateZoneDetermined: false });
+
+    expect(zone4a).toHaveLength(7952);
+    expect(seattleArea).toHaveLength(115);
+    expect(undetermined).toHaveLength(2162);
+
+    // The claim the page's comment makes, executed rather than asserted in prose:
+    // asking for 7A finds nothing, because 7A is not a zone.
+    expect(index.filter({ climateZone: '7A' })).toHaveLength(0);
+    for (const s of undetermined) {
+      expect(s.ashraeClimateZone).toMatch(/climate zone could not be determined/i);
+    }
+  });
+});
+
 describe('README weather quickstart', () => {
   it('loads the index and fetches the top hit', async () => {
     const index = await loadStationIndex(`${base}/stations.json.gz`);

@@ -133,3 +133,183 @@ describe('StationIndex.filter', () => {
     expect(index.filter({ wmoRegion: 4 }).length).toBe(3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Climate zone filtering
+// ---------------------------------------------------------------------------
+//
+// THESE READ THE REAL SHIPPED INDEX, NOT FIXTURES, AND THAT IS THE POINT.
+//
+// A fixture carrying only A and B zones passes while the marine zones are silently
+// dropped. That is not hypothetical: matching the code as `[0-9][AB]?` loses 3C, 4C and
+// 5C, which is 1,653 stations, leaves sixteen zones where there are nineteen, throws
+// nothing and looks correct. Two authors made that exact slip on this exact data before
+// these tests existed.
+
+describe('climate zone filtering, over the shipped index', () => {
+  // Counts drawn from the shipped index at its current build, per FR-019b and SC-006.
+  // They are the assertion T018 asks for: a change that moves stations between two
+  // zones while preserving the total passes every other test in this block.
+  const ZONE_COUNTS: Record<string, number> = {
+    '0A': 6223,
+    '0B': 926,
+    '1A': 5122,
+    '1B': 746,
+    '2A': 6050,
+    '2B': 1230,
+    '3A': 9048,
+    '3B': 1352,
+    '3C': 739,
+    '4A': 7952,
+    '4B': 658,
+    '4C': 462,
+    '5A': 8641,
+    '5B': 740,
+    '5C': 452,
+    '6A': 6296,
+    '6B': 574,
+    '7': 6847,
+    '8': 3418,
+  };
+
+  const ASHRAE_ZONES = Object.keys(ZONE_COUNTS);
+
+  const UNDETERMINED = 2162;
+
+  // Loaded once for the whole suite. The bundled index is 1.7 MB gzipped, and reading,
+  // gunzipping and parsing it per test was the bulk of this file's runtime.
+  let shipped: Promise<StationIndex> | undefined;
+
+  function shippedIndex(): Promise<StationIndex> {
+    shipped ??= import('@idfkit/weather/node').then((m) => m.loadBundledIndex());
+    return shipped;
+  }
+
+  it('carries exactly the nineteen ASHRAE zones', async () => {
+    const index = await shippedIndex();
+    const found = new Set(
+      index
+        .filter({ climateZoneDetermined: true })
+        .map((s) => s.ashraeClimateZone.split('-')[0]?.trim())
+    );
+    // A twentieth code is an upstream change, and this is where it surfaces. It must
+    // fail a build rather than quietly alter what a filter returns.
+    expect([...found].sort()).toEqual([...ASHRAE_ZONES].sort());
+  });
+
+  it('has no station carrying a code outside the nineteen', async () => {
+    // The assertion that NAMES an upstream change rather than merely detecting one.
+    //
+    // The nineteen-zone test above does not catch this: a twentieth code is neither a
+    // zone nor undetermined, so it drops out of both filters and leaves nineteen
+    // standing. The reachability test below does catch it, as a total that no longer
+    // adds up, but reports `expected 69638, got 69588`, which points at the wrong fact.
+    const index = await shippedIndex();
+    const outside = new Map<string, number>();
+    for (const s of index.stations) {
+      if (/could not be determined/i.test(s.ashraeClimateZone)) continue;
+      const code = (s.ashraeClimateZone.split('-')[0] ?? '').trim().toUpperCase();
+      if (!ASHRAE_ZONES.includes(code)) {
+        outside.set(code, (outside.get(code) ?? 0) + 1);
+      }
+    }
+    expect([...outside]).toEqual([]);
+  });
+
+  it('returns the expected count for every zone', async () => {
+    // Counted, not merely non-empty. A change that moves stations between two zones
+    // while preserving the total, such as a label parse mapping some 5B labels to 5A,
+    // passes a non-emptiness check, passes the prefix check for whatever survives, and
+    // passes the partition check below.
+    const index = await shippedIndex();
+    const counted: Record<string, number> = {};
+    for (const zone of ASHRAE_ZONES) counted[zone] = index.filter({ climateZone: zone }).length;
+    expect(counted).toEqual(ZONE_COUNTS);
+  });
+
+  it('returns only stations of the requested zone, for every zone', async () => {
+    const index = await shippedIndex();
+    let total = 0;
+    for (const zone of ASHRAE_ZONES) {
+      const hits = index.filter({ climateZone: zone });
+      expect(hits.length).toBeGreaterThan(0);
+      for (const s of hits) expect(s.ashraeClimateZone.startsWith(zone)).toBe(true);
+      total += hits.length;
+    }
+    // Every determined station is in exactly one zone, so the zones partition them.
+    expect(total).toBe(index.filter({ climateZoneDetermined: true }).length);
+    expect(total + UNDETERMINED).toBe(index.size);
+  });
+
+  it('never returns an undetermined station under any zone', async () => {
+    const index = await shippedIndex();
+    const undetermined = index.filter({ climateZoneDetermined: false });
+    expect(undetermined.length).toBe(UNDETERMINED);
+    for (const zone of ASHRAE_ZONES) {
+      for (const s of index.filter({ climateZone: zone })) {
+        expect(s.ashraeClimateZone).not.toMatch(/could not be determined/i);
+      }
+    }
+    // The label's first token looks like a code and is not one. Asking for 7A or 8A as
+    // zones must find nothing rather than finding these.
+    expect(index.filter({ climateZone: '7A' })).toHaveLength(0);
+    expect(index.filter({ climateZone: '8A' })).toHaveLength(0);
+  });
+
+  it('keeps the undetermined stations reachable rather than omitting them', async () => {
+    const index = await shippedIndex();
+    const determined = index.filter({ climateZoneDetermined: true }).length;
+    const undetermined = index.filter({ climateZoneDetermined: false }).length;
+    // Every station is reachable through one of the two, which is what stops the
+    // undetermined ones becoming a hole nobody can query.
+    expect(determined + undetermined).toBe(index.size);
+  });
+
+  it('ignores case and combines with the other keys', async () => {
+    const index = await shippedIndex();
+    expect(index.filter({ climateZone: '5a' }).length).toBe(
+      index.filter({ climateZone: '5A' }).length
+    );
+    const combined = index.filter({ climateZone: '5A', country: 'USA' });
+    for (const s of combined) {
+      expect(s.country).toBe('USA');
+      expect(s.ashraeClimateZone.startsWith('5A')).toBe(true);
+    }
+    expect(combined.length).toBeLessThan(index.filter({ climateZone: '5A' }).length);
+    // With state too, which is the combination a station picker actually issues. The
+    // marine zones are the ones a wrong suffix pattern loses, so 3C is the case chosen.
+    expect(index.filter({ climateZone: '3C', country: 'USA', state: 'CA' })).toHaveLength(238);
+    expect(index.filter({ climateZone: '4C', country: 'USA', state: 'WA' })).toHaveLength(115);
+  });
+
+  it('treats an empty zone as no constraint, as country and state already are', async () => {
+    // An empty select is no filter, not a filter matching nothing. A UI binding a blank
+    // dropdown to this key would otherwise get zero stations from it and every station
+    // from `country` and `state` given the same blank value.
+    const index = await shippedIndex();
+    expect(index.filter({ climateZone: '' })).toHaveLength(index.size);
+    expect(index.filter({ country: '' })).toHaveLength(index.size);
+    expect(index.filter({ state: '' })).toHaveLength(index.size);
+  });
+
+  it('reads the zone sentence as undetermined, not any other absence', async () => {
+    // The guard is anchored on the subject, so it cannot swallow a different absence.
+    // A label reporting that something else about the station was undetermined must
+    // keep its zone: filing it under undetermined would report that upstream did not
+    // state a zone it did state.
+    const constructed = StationIndex.fromStations([
+      makeStation({
+        city: 'Stated',
+        ashraeClimateZone: '5A - Cool - Humid (elevation could not be determined)',
+      }),
+      makeStation({
+        city: 'Unstated',
+        ashraeClimateZone: '7A - ASHRAE Climate Zone could not be determined',
+      }),
+    ]);
+    expect(constructed.filter({ climateZone: '5A' }).map((s) => s.city)).toEqual(['Stated']);
+    expect(constructed.filter({ climateZoneDetermined: false }).map((s) => s.city)).toEqual([
+      'Unstated',
+    ]);
+  });
+});
