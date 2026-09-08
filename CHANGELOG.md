@@ -10,6 +10,20 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
 
 ## [Unreleased]
 
+## [0.3.0-rc.3] - 2026-09-08
+
+This release moves to `conformance-2026.12` and `governance-2026.17`. The corpus
+level changes no case: 69 cases and 211 assertions, as `conformance-2026.11` had.
+What it adds is the first member of `checks/`, a directory the corpus contract has
+reserved since the corpus landed: `weather-monthly` holds each library's monthly
+figures against the summary the EnergyPlus Weather Converter produced from the same
+archive. `governance-2026.17` adds one capability row and renames nothing.
+
+The reader below is the first capability in the unification whose cross-language
+claim had no `ConvertInputFormat` expectation available. It ships in both languages
+on one date, so the parity ledger records it complete on both sides and never passes
+through a state where one has it and the other does not.
+
 ### Added
 
 - **A reader for the EPW text this package already downloads.** `parseEpw(text)`
@@ -729,7 +743,8 @@ First published release. The API is not yet stable.
   no schema matches, because loading the wrong schema mis-maps every positional
   field instead of failing.
 
-[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.2...HEAD
+[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.3...HEAD
+[0.3.0-rc.3]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.2...v0.3.0-rc.3
 [0.3.0-rc.2]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.1...v0.3.0-rc.2
 [0.3.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.2.0...v0.3.0-rc.1
 [0.2.0]: https://github.com/idfkit/idfkit-js/compare/v0.2.0-rc.2...v0.2.0
