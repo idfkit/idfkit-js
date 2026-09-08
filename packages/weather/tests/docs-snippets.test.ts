@@ -92,7 +92,12 @@ describe('how-to/fetch-weather-files.md', () => {
   });
 });
 
-describe('how-to/search-for-weather-stations.md', () => {
+// Named for the page on the unified site rather than one here, because this
+// snippet has no page in this repository: it is authored here because
+// `docs/snippets/js/` is vendored from this repo at a pinned docs level, and
+// published on developers.idfkit.com. The other weather block above names an
+// idfkit-js page because that page exists.
+describe('developers.idfkit.com weather/station-search.md', () => {
   it('filters by climate zone, alone and combined, and reaches the undetermined records', async () => {
     const index = await loadStationIndex(`${base}/stations.json.gz`);
 
