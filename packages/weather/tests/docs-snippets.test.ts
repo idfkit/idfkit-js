@@ -92,6 +92,27 @@ describe('how-to/fetch-weather-files.md', () => {
   });
 });
 
+describe('how-to/search-for-weather-stations.md', () => {
+  it('filters by climate zone, alone and combined, and reaches the undetermined records', async () => {
+    const index = await loadStationIndex(`${base}/stations.json.gz`);
+
+    const zone4a = index.filter({ climateZone: '4A' });
+    const seattleArea = index.filter({ climateZone: '4C', country: 'USA', state: 'WA' });
+    const undetermined = index.filter({ climateZoneDetermined: false });
+
+    expect(zone4a).toHaveLength(7952);
+    expect(seattleArea).toHaveLength(115);
+    expect(undetermined).toHaveLength(2162);
+
+    // The claim the page's comment makes, executed rather than asserted in prose:
+    // asking for 7A finds nothing, because 7A is not a zone.
+    expect(index.filter({ climateZone: '7A' })).toHaveLength(0);
+    for (const s of undetermined) {
+      expect(s.ashraeClimateZone).toMatch(/climate zone could not be determined/i);
+    }
+  });
+});
+
 describe('README weather quickstart', () => {
   it('loads the index and fetches the top hit', async () => {
     const index = await loadStationIndex(`${base}/stations.json.gz`);
