@@ -303,14 +303,56 @@ function remainder(line: string): string {
   return comma === -1 ? '' : line.slice(comma + 1);
 }
 
+/**
+ * The grammar of a number in this format, shared with the Python reader verbatim.
+ *
+ * Neither language's built-in conversion is used on its own, because the two disagree about what
+ * text is a number and the disagreement is silent. `Number` accepts `0x10` as sixteen and
+ * `Infinity` as infinity; Python's `float` rejects both and accepts `nan`, `inf` and `1_0`. A
+ * file carrying `nan` in dry bulb would raise here and read as one absent hour there, and no
+ * fixture in the corpus carries one to catch it. Both readers therefore match this grammar first
+ * and convert second.
+ */
+const NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+/**
+ * The same, for a field that counts rather than measures. `1.5` records per hour is a corrupt
+ * declaration, not a rounding problem, and this reader refuses what it cannot represent.
+ */
+const INTEGER = /^[+-]?\d+$/;
+
+/** The number `raw` spells, or `null` when it spells none. */
+function toNumber(raw: string): number | null {
+  const text = raw.trim();
+  return NUMBER.test(text) ? Number(text) : null;
+}
+
+/** The whole number `raw` spells, or `null` when it spells none. */
+function toInteger(raw: string): number | null {
+  const text = raw.trim();
+  return INTEGER.test(text) ? Number(text) : null;
+}
+
 function numberAt(parts: readonly string[], index: number, what: string): number {
   const raw = parts[index];
   if (raw === undefined || raw === '') {
     throw new Error(`EPW header: ${what} is missing from the ${parts[0] ?? 'header'} record`);
   }
-  const value = Number(raw);
-  if (Number.isNaN(value)) {
+  const value = toNumber(raw);
+  if (value === null) {
     throw new Error(`EPW header: ${what} is "${raw}", which is not a number`);
+  }
+  return value;
+}
+
+function integerAt(parts: readonly string[], index: number, what: string): number {
+  const raw = parts[index];
+  if (raw === undefined || raw === '') {
+    throw new Error(`EPW header: ${what} is missing from the ${parts[0] ?? 'header'} record`);
+  }
+  const value = toInteger(raw);
+  if (value === null) {
+    throw new Error(`EPW header: ${what} is "${raw}", which is not a whole number`);
   }
   return value;
 }
@@ -318,8 +360,7 @@ function numberAt(parts: readonly string[], index: number, what: string): number
 function optionalNumberAt(parts: readonly string[], index: number): number | null {
   const raw = parts[index];
   if (raw === undefined || raw === '') return null;
-  const value = Number(raw);
-  return Number.isNaN(value) ? null : value;
+  return toNumber(raw);
 }
 
 function parseLocation(line: string): EpwLocation {
@@ -342,7 +383,9 @@ function parseLocation(line: string): EpwLocation {
 
 function parseTypicalPeriods(line: string): EpwPeriod[] {
   const parts = fields(line);
-  const declared = optionalNumberAt(parts, 1) ?? 0;
+  // Truncated, as the Python reader's int() truncates: a fractional count would otherwise run
+  // this loop one more time here than there.
+  const declared = Math.trunc(optionalNumberAt(parts, 1) ?? 0);
   const periods: EpwPeriod[] = [];
   for (let i = 0; i < declared; i += 1) {
     const at = 2 + i * 4;
@@ -363,7 +406,7 @@ function parseTypicalPeriods(line: string): EpwPeriod[] {
 
 function parseGroundTemperatures(line: string): EpwGroundTemperatures[] {
   const parts = fields(line);
-  const declared = optionalNumberAt(parts, 1) ?? 0;
+  const declared = Math.trunc(optionalNumberAt(parts, 1) ?? 0);
   const sets: EpwGroundTemperatures[] = [];
   let at = 2;
   for (let i = 0; i < declared; i += 1) {
@@ -388,7 +431,7 @@ function parseGroundTemperatures(line: string): EpwGroundTemperatures[] {
 
 function parseHolidays(line: string): EpwHolidays {
   const parts = fields(line);
-  const declared = optionalNumberAt(parts, 4) ?? 0;
+  const declared = Math.trunc(optionalNumberAt(parts, 4) ?? 0);
   const specialDays: EpwSpecialDay[] = [];
   for (let i = 0; i < declared; i += 1) {
     const at = 5 + i * 4;
@@ -397,7 +440,7 @@ function parseHolidays(line: string): EpwHolidays {
       name: parts[at] ?? '',
       kind: parts[at + 1] ?? '',
       start: parts[at + 2] ?? '',
-      duration: optionalNumberAt(parts, at + 3) ?? 0,
+      duration: Math.trunc(optionalNumberAt(parts, at + 3) ?? 0),
     });
   }
   return {
@@ -415,7 +458,7 @@ function parseDataPeriod(line: string): EpwDataPeriod {
       `EPW header: the DATA PERIODS record has ${parts.length - 1} fields, expected at least 6`
     );
   }
-  const periodCount = numberAt(parts, 1, 'the number of data periods');
+  const periodCount = integerAt(parts, 1, 'the number of data periods');
   if (periodCount !== 1) {
     throw new Error(
       `EPW header: DATA PERIODS declares ${periodCount} periods. This reader reads a single-period file, ` +
@@ -424,7 +467,7 @@ function parseDataPeriod(line: string): EpwDataPeriod {
   }
   return {
     periodCount,
-    recordsPerHour: numberAt(parts, 2, 'records per hour'),
+    recordsPerHour: integerAt(parts, 2, 'records per hour'),
     name: parts[3] ?? '',
     startDayOfWeek: parts[4] ?? '',
     startDate: parts[5] ?? '',
@@ -441,9 +484,9 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
 /** `1/ 1`, ` 1/1`, `1/1/2016`. The year, where one is written, is ignored: the calendar comes from the leap flag. */
 function parseMonthDay(text: string, what: string): { month: number; day: number } {
   const parts = text.split('/').map((part) => part.trim());
-  const month = Number(parts[0]);
-  const day = Number(parts[1]);
-  if (!Number.isInteger(month) || !Number.isInteger(day) || month < 1 || month > 12 || day < 1) {
+  const month = parts[0] === undefined ? null : toInteger(parts[0]);
+  const day = parts[1] === undefined ? null : toInteger(parts[1]);
+  if (month === null || day === null || month < 1 || month > 12 || day < 1) {
     throw new Error(
       `EPW header: the data period's ${what} is "${text}", which is not a month/day date`
     );
@@ -476,7 +519,7 @@ function declaredRowCount(period: EpwDataPeriod, leapYearObserved: boolean): num
   const yearLength = leapYearObserved ? 366 : 365;
   // A period may wrap the end of the year, which the format permits.
   const days = last >= first ? last - first + 1 : yearLength - first + 1 + last;
-  if (!Number.isInteger(period.recordsPerHour) || period.recordsPerHour < 1) {
+  if (period.recordsPerHour < 1) {
     throw new Error(
       `EPW header: the data period declares ${period.recordsPerHour} records per hour, which is not a count`
     );
@@ -569,11 +612,16 @@ function readTable(lines: readonly string[], offset: number, rowCount: number): 
   const sourceAndUncertaintyFlags: string[] = new Array<string>(rowCount);
   const presentWeatherCodes: string[] = new Array<string>(rowCount);
 
-  const columns: (Float64Array | string[])[] = COLUMN_NAMES.map((name, position) => {
-    if (position === 5) return sourceAndUncertaintyFlags;
-    if (position === 27) return presentWeatherCodes;
-    return numeric.get(name as NumericColumnName)!;
-  });
+  // Positions come from TEXT_POSITIONS rather than being written out again, so the file order and
+  // the two text columns stay one fact. Writing 5 and 27 here as well would let a reordered
+  // COLUMN_NAMES put a string array where a Float64Array belongs.
+  const textColumns: Record<string, string[]> = {
+    sourceAndUncertaintyFlags,
+    presentWeatherCodes,
+  };
+  const columns: (Float64Array | string[])[] = COLUMN_NAMES.map((name, position) =>
+    TEXT_POSITIONS.has(position) ? textColumns[name]! : numeric.get(name as NumericColumnName)!
+  );
 
   for (let row = 0; row < rowCount; row += 1) {
     const line = lines[offset + row] ?? '';
@@ -591,8 +639,8 @@ function readTable(lines: readonly string[], offset: number, rowCount: number): 
         (column as string[])[row] = raw;
         continue;
       }
-      const value = Number(raw);
-      if (Number.isNaN(value) || raw.trim() === '') {
+      const value = toNumber(raw);
+      if (value === null) {
         throw new Error(
           `EPW: line ${offset + row + 1}, which is row ${row + 1} of the hourly table, holds "${raw}" at ` +
             `field ${position + 1} (${COLUMN_NAMES[position]}), which is not a number`
@@ -669,8 +717,12 @@ interface MonthlyMean {
  * look like numbers.
  *
  * @param file - A weather file, as {@link parseEpw} returned it.
- * @param field - Which numeric column to aggregate.
+ * @param field - Which numeric column to aggregate, by its name on the hourly table.
  * @returns Twelve entries, January first.
+ * @throws If `field` is not a numeric column. The type says so, and the check is still made:
+ *   this function is reachable from plain JavaScript through the `idfkit` facade, where a text
+ *   column would otherwise be coerced hour by hour and yield twelve plausible-looking numbers
+ *   over the nine-digit weather codes rather than an error.
  *
  * @example
  * ```ts
@@ -680,6 +732,10 @@ interface MonthlyMean {
  * ```
  */
 export function monthlyMeans(file: WeatherFile, field: NumericColumnName): MonthlyMean[] {
+  // `presentCount` holds exactly the numeric columns, so this also rejects the two text ones.
+  if (!Object.hasOwn(file.hours.presentCount, field)) {
+    throw new Error(`${JSON.stringify(field)} is not a numeric column of the hourly table`);
+  }
   const values = file.hours[field];
   const months = file.hours.month;
   const sums = new Float64Array(12);

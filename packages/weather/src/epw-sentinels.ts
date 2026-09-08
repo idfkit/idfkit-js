@@ -1,7 +1,7 @@
 // GENERATED FILE. Do not edit.
 //
 // Emitted by scripts/emit-sentinels.mjs from checks/weather-monthly/sentinels.toml in idfkit-conformance
-// at HEAD. Run `npm run codegen:sentinels` to regenerate;
+// at governance-2026.16. Run `npm run codegen:sentinels` to regenerate;
 // `npm run check:sentinels` fails when this file and the corpus disagree.
 //
 // Source document: EnergyPlus Weather File (EPW) Data Dictionary, Auxiliary Programs
@@ -81,4 +81,4 @@ export const MISSING_VALUES: ReadonlyArray<readonly [number, readonly number[]]>
 ];
 
 /** The conformance level this table was generated from. @internal */
-export const SENTINEL_LEVEL = 'HEAD';
+export const SENTINEL_LEVEL = 'governance-2026.16';
