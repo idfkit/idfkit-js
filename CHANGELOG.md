@@ -30,6 +30,8 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
   Both keys land in the same change as the Python library's `climate_zone` and
   `climate_zone_determined`, which the naming register records as aligned.
 
+  ([#54](https://github.com/idfkit/idfkit-js/pull/54))
+
 ## [0.3.0-rc.2] - 2026-09-06
 
 This release moves to `conformance-2026.11` and `governance-2026.15`. The corpus
