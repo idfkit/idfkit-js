@@ -48,6 +48,9 @@ export {
 } from './download.js';
 export type { FetchWeatherOptions, WeatherFiles } from './download.js';
 
+export { monthlyMeans, parseEpw } from './epw.js';
+export type { WeatherFile } from './epw.js';
+
 export { unzip } from './unzip.js';
 
 export { detectLocation, geocode, GeocodingError, RateLimiter } from './geocode.js';

@@ -11,6 +11,7 @@
   "scripts": {
     "build:schemas": "node packages/schemas/scripts/build.mjs",
     "codegen": "node scripts/emit-types.mjs",
+    "codegen:sentinels": "node scripts/emit-sentinels.mjs",
     "typecheck": "tsc --build",
     "typecheck:docs": "tsc -p tsconfig.docs.json",
     "test": "vitest run",
@@ -22,6 +23,7 @@
     "check:bench": "node bench/budget.mjs",
     "check:bundle-purity": "node scripts/check-bundle-purity.mjs",
     "check:conformance-level": "node scripts/emit-conformance.mjs --check",
+    "check:sentinels": "node scripts/emit-sentinels.mjs --check",
     "check:facade": "node scripts/check-facade.mjs",
     "check:ignore-scripts": "node scripts/check-ignore-scripts.mjs",
     "check:install-size": "node scripts/check-install-size.mjs",
