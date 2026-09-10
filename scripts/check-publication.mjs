@@ -109,11 +109,12 @@ class CannotRun extends Error {}
  * asserted by the run in that repository and is not observable from here. So the level is written
  * down by someone who checked both, and moving it is the act of re-attesting.
  *
- * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.12, the level
- * that opens `checks/` with `weather-monthly`, and the evidence for it, taken rather than recalled:
+ * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.13, the level
+ * that drops the typescript exception on types-choice-field-casing, and the evidence for it, taken
+ * rather than recalled:
  *
- *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.12
- *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.12
+ *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.13
+ *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.13
  *   idfkit-js    npm run check:release                             green at that level
  *   idfkit       uv run python scripts/check_release_conformance.py green at that level
  *
@@ -121,10 +122,15 @@ class CannotRun extends Error {}
  * off a CI badge, because the two levels that preceded 2026.10 were cut hours apart and a badge
  * would have been reporting the older of them.
  *
- * 2026.12 changes no case: 69 cases and 211 assertions, as 2026.11 had. What it adds is the first
- * member of `checks/`, which is a claim about behaviour rather than about a document and runs from
- * its own entry point. That check was run in both languages at this level as well, and each
- * reports the same 293 comparisons:
+ * 2026.13 changes no case: 69 cases and 211 assertions, as 2026.12 had. What it changes is the
+ * register. This library now canonicalises a choice value to the casing the schema declares, so
+ * types-choice-field-casing passes here, and a passing case whose exception still stands is a
+ * failure the runner reports rather than a pass: the entry went with the fix. The python entry on
+ * the same case stays, because idfkit#180 is unfixed, which is why this level is reachable by one
+ * library before the other has fixed the same bug.
+ *
+ * The `checks/` member that 2026.12 opened is unchanged and was run again in both languages at
+ * this level, each reporting the same 293 comparisons:
  *
  *   node runners/weather-check.mjs   --library <idfkit-js>   PASS: 293 comparisons
  *   python runners/weather_check.py  --library <idfkit>      PASS: 293 comparisons
@@ -142,7 +148,7 @@ class CannotRun extends Error {}
  * the pin on every run, so the next time the two part company it fails a cheap gate on the change
  * that caused it rather than a release months later.
  */
-const REQUIRED_CONFORMANCE = 'conformance-2026.12';
+const REQUIRED_CONFORMANCE = 'conformance-2026.13';
 
 /** The distribution gates, precondition 4. Order is cheapest first. */
 const DISTRIBUTION_GATES = [
