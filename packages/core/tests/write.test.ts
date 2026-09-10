@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { IdfDocument, parseIdf, writeEpJson, writeIdf } from '@idfkit/core';
+import { IdfDocument, parseEpJson, parseIdf, writeEpJson, writeIdf } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema } from './helpers.js';
@@ -108,6 +108,129 @@ describe('writeEpJson', () => {
   it('omits types with no objects', () => {
     doc.all('Zone'); // touching a type creates an empty collection
     expect(JSON.parse(writeEpJson(doc))).toEqual({});
+  });
+});
+
+/**
+ * The epJSON reader matches the schema's `enum` exactly; the IDF reader matches a choice
+ * case-insensitively. So the same three objects that run as IDF fatal as epJSON if the writer
+ * echoes the file's casing, and `validateDocument` cannot catch it: what it checks is what IDF
+ * accepts, and by that rule the document is clean.
+ *
+ * The rule these pin is `ConvertInputFormat`'s, which is `IdfParser::parse_value`: match the
+ * written token against the field's choice list case-insensitively and emit the member it
+ * matched. Pinned in the conformance corpus as `types-choice-field-casing`.
+ */
+describe('choice values are canonicalised to the schema casing (issue #10)', () => {
+  const miscased = [
+    'Version,26.1;',
+    'GlobalGeometryRules,UpperLeftCorner,CounterClockWise,World;',
+    'ScheduleTypeLimits,Any Number Limits,,,CONTINUOUS;',
+    'Output:Variable,*,Site Outdoor Air Drybulb Temperature,hourly;',
+  ].join('\n');
+
+  it('emits the schema spelling for a value written in any casing', () => {
+    const { document } = parseIdf(miscased, v26, { strict: false });
+    const json = JSON.parse(writeEpJson(document)) as Record<
+      string,
+      Record<string, Record<string, unknown>>
+    >;
+
+    // Not title case and not any rule derivable from the token: the schema declares
+    // "Counterclockwise" with one capital, so the enum member is the only correct source.
+    expect(json['GlobalGeometryRules']?.['GlobalGeometryRules 1']?.['vertex_entry_direction']).toBe(
+      'Counterclockwise'
+    );
+    expect(json['ScheduleTypeLimits']?.['Any Number Limits']?.['numeric_type']).toBe('Continuous');
+    expect(json['Output:Variable']?.['Output:Variable 1']?.['reporting_frequency']).toBe('Hourly');
+  });
+
+  it('leaves the IDF writer echoing the casing the author wrote', () => {
+    // The two formats want different answers, which is why this happens at the epJSON boundary
+    // and not at parse. IDF matches a choice case-insensitively, so the author's spelling runs;
+    // rewriting it would be this library editing a file it was only asked to read back.
+    const { document } = parseIdf(miscased, v26, { strict: false });
+    const idf = writeIdf(document);
+
+    expect(idf).toContain('CounterClockWise');
+    expect(idf).toContain('CONTINUOUS');
+    expect(idf).toContain('hourly');
+  });
+
+  it('canonicalises a value set through the API, not only one that was parsed', () => {
+    doc.add('ScheduleTypeLimits', 'Fraction', { numeric_type: 'continuous' });
+
+    expect(doc.toJSON()['ScheduleTypeLimits']?.['Fraction']?.['numeric_type']).toBe('Continuous');
+  });
+
+  it('canonicalises a choice inside an extensible group', () => {
+    // 48 of the choice fields in 26.1.0 live inside a repeat group rather than in the positional
+    // field list, and a type name written as the file felt like it is exactly the hazard here.
+    const { document } = parseIdf(
+      'Version,26.1;\nOutput:Diagnostics,DISPLAYEXTRAWARNINGS,displayunusedschedules;',
+      v26,
+      { strict: false }
+    );
+    const body = document.toJSON()['Output:Diagnostics']?.['Output:Diagnostics 1'];
+
+    expect(body?.['diagnostics']).toEqual([
+      { key: 'DisplayExtraWarnings' },
+      { key: 'DisplayUnusedSchedules' },
+    ]);
+  });
+
+  it('canonicalises a choice on a field the schema marks retaincase', () => {
+    // `retaincase` (SlimField.rc) does not exempt a choice field, and a reader who expects it to
+    // should look at IdfParser::parse_value: the enum branch there consults nothing else. Seven
+    // fields across the bundled versions carry both, and Output:PreprocessorMessage is one.
+    doc.add('Output:PreprocessorMessage', null, {
+      preprocessor_name: 'EPMacro',
+      error_severity: 'FATAL',
+    });
+
+    expect(
+      doc.toJSON()['Output:PreprocessorMessage']?.['Output:PreprocessorMessage 1']
+    ).toMatchObject({ error_severity: 'Fatal' });
+  });
+
+  it('leaves a value that matches no choice exactly as it is', () => {
+    // Canonicalising is not validating. Repairing a value nobody declared would hide the fault
+    // from validateDocument, which is the one thing that reports it.
+    doc.add('ScheduleTypeLimits', 'Odd', { numeric_type: 'Sometimes' });
+
+    expect(doc.toJSON()['ScheduleTypeLimits']?.['Odd']?.['numeric_type']).toBe('Sometimes');
+  });
+
+  it('canonicalises epJSON input too, once preservation no longer applies', () => {
+    // A document read from the object notation and written back untouched is reproduced byte for
+    // byte, its own casing included: that path reproduces an input rather than producing output.
+    // Any change at all falls the whole document back to the writer, and the writer canonicalises.
+    const text = JSON.stringify(
+      {
+        Version: { 'Version 1': { version_identifier: '26.1' } },
+        ScheduleTypeLimits: { 'On/Off': { numeric_type: 'DISCRETE' } },
+      },
+      null,
+      4
+    );
+    const kept = (): IdfDocument =>
+      parseEpJson(text, v26, { strict: false, preserveFormatting: true }).document;
+
+    expect(writeEpJson(kept())).toBe(text);
+
+    const edited = kept();
+    edited.add('Zone', 'Z1');
+    expect(JSON.parse(writeEpJson(edited))['ScheduleTypeLimits']['On/Off']['numeric_type']).toBe(
+      'Discrete'
+    );
+  });
+
+  it('leaves a blank on a choice field blank', () => {
+    // The blank is filtered out of `e` and carried by `eb`, so it matches no member here and is
+    // emitted as it stands, which is what the schema's own enum accepts.
+    doc.add('Building', 'B', { terrain: '' });
+
+    expect(doc.toJSON()['Building']?.['B']?.['terrain']).toBe('');
   });
 });
 

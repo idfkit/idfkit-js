@@ -94,6 +94,17 @@ alternative for a reason that is not visible from the code alone.
 5. **epJSON field names verbatim.** `zone_name`, not a converted form. There is
    no name-conversion layer, deliberately.
 
+6. **Choice casing is canonicalised at the epJSON boundary, not at parse**
+   (`IdfObject.toJSON`, tables in `shape.ts`). The IDF reader matches a choice
+   case-insensitively and the epJSON reader matches the schema's `enum` exactly,
+   so `writeIdf` keeps the author's `CounterClockWise` and `writeEpJson` must
+   emit `Counterclockwise` or produce a file EnergyPlus refuses to load.
+   Canonicalising on the way in would collapse the two and regress `writeIdf`.
+   The rule is `ConvertInputFormat`'s (`IdfParser::parse_value`): match the
+   token against the choice list case-insensitively, emit the member matched,
+   leave anything that matches nothing alone for validation to report. `rc`
+   (`retaincase`) does not exempt a choice field.
+
 ### Positional format hazards
 
 IDF is positional, and two rules exist because violating them corrupts models

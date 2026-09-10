@@ -30,7 +30,18 @@ export interface WriteEpJsonOptions {
   preserveFormatting?: boolean;
 }
 
-/** Serialize a document to epJSON text. */
+/**
+ * Serialize a document to epJSON text.
+ *
+ * Choice values are emitted in the casing the schema declares, whatever casing the field was
+ * written or set in, because the epJSON reader matches the schema's `enum` exactly and fatals on
+ * anything else. `IdfObject.toJSON` carries the rule and the reasoning; `writeIdf` keeps the
+ * author's casing, which is right for a format that reads a choice case-insensitively.
+ *
+ * The preserving path below is the one exception, and it is the ordinary meaning of preserving:
+ * text reproduced from an epJSON source comes back as it was read, a value the schema spells
+ * differently included.
+ */
 export function writeEpJson<M extends AnyTypeMap>(
   document: IdfDocument<M>,
   options: WriteEpJsonOptions = {}
@@ -52,7 +63,12 @@ export function writeEpJson<M extends AnyTypeMap>(
   return JSON.stringify(document.toJSON(), null, indent);
 }
 
-/** Serialize a document to a plain epJSON object. */
+/**
+ * Serialize a document to a plain epJSON object.
+ *
+ * Canonicalises choice values exactly as `writeEpJson` does: the two differ in what they hand
+ * back, never in what they say.
+ */
 export function toEpJson<M extends AnyTypeMap>(document: IdfDocument<M>): EpJson {
   return document.toJSON();
 }

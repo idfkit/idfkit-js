@@ -48,6 +48,7 @@ nav:
       - Content-addressed schemas: explanation/content-addressed-schemas.md
       - Why epJSON field names are used verbatim: explanation/epjson-field-names.md
       - The hazards of a positional format: explanation/positional-format-hazards.md
+      - Why a choice value is written twice differently: explanation/choice-casing.md
       - How conformance is established: explanation/conformance.md
       - Parity with the Python library: explanation/parity.md
 
