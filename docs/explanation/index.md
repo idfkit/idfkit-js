@@ -18,10 +18,12 @@ for a reason that is not visible from the code alone:
 - [Why epJSON field names are used verbatim](epjson-field-names.md) — why it is
   `zone_name` and not a converted form.
 
-Two more topics are about the format rather than the library:
+Three more topics are about the format rather than the library:
 
 - [The hazards of a positional format](positional-format-hazards.md) — the two
   rules that exist because breaking them corrupts a model silently.
+- [Why a choice value is written twice differently](choice-casing.md) — why
+  `writeIdf` keeps the author's casing and `writeEpJson` does not.
 - [How conformance is established](conformance.md) — why the EnergyPlus example
   set, and not hand-written fixtures, is the test suite that matters.
 

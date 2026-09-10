@@ -2,7 +2,13 @@ import type { SlimField, SlimType } from '@idfkit/schemas';
 
 import { ExtensibleList } from './extensible.js';
 import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
-import { shapeFor, type ObjectShape } from './shape.js';
+import {
+  choiceSpellingsFor,
+  shapeFor,
+  spellChoice,
+  type ChoiceSpellings,
+  type ObjectShape,
+} from './shape.js';
 
 /** A scalar field value. `undefined` means the field is absent. */
 export type FieldValue = string | number | undefined;
@@ -305,17 +311,42 @@ export class IdfObject {
     return copy;
   }
 
-  /** Plain epJSON body: field values only, without the name. */
+  /**
+   * Plain epJSON body: field values only, without the name.
+   *
+   * Choice values are emitted in the casing the schema declares, whatever casing the field was
+   * written or set in. This is the one place the two formats want different answers and the
+   * reason canonicalisation lives here rather than at parse: IDF matches a choice
+   * case-insensitively, so `writeIdf` keeps the author's `CounterClockWise` and the file still
+   * runs, while the epJSON reader matches the JSON Schema `enum` exactly and fatals on anything
+   * else. Canonicalising on the way in would repair the object notation by rewriting the text
+   * format's output, which is not this library's to rewrite.
+   *
+   * The rule is `ConvertInputFormat`'s own, taken from `IdfParser::parse_value`: a value is
+   * matched against the field's choice list case-insensitively and replaced by the member it
+   * matched. Note what that code does NOT consult, since a reader will look for it here: the
+   * schema's `retaincase` (`SlimField.rc`) does not exempt a choice field, and the seven fields
+   * across the bundled versions that carry both are canonicalised like any other. `retaincase`
+   * governs the values EnergyPlus's own reader would otherwise upper-case, and this library
+   * upper-cases nothing.
+   */
   toJSON(): Record<string, StoredValue> {
+    const { fields: choices, extensible } = choiceSpellingsFor(this[SHAPE].type);
     const out: Record<string, StoredValue> = {};
     for (const field of this[SHAPE].fields) {
       const value = this[DATA][field];
-      if (value !== undefined) out[field] = value;
+      if (value === undefined) continue;
+      out[field] = typeof value === 'string' ? spellChoice(value, choices.get(field)) : value;
     }
     const key = this[SHAPE].extensibleKey;
     if (key !== undefined) {
       const list = this[DATA][key];
-      if (Array.isArray(list) && list.length > 0) out[key] = list.map((g) => ({ ...g }));
+      if (Array.isArray(list) && list.length > 0) {
+        out[key] =
+          extensible.size === 0
+            ? list.map((g) => ({ ...g }))
+            : list.map((g) => spellGroup(g, extensible));
+      }
     }
     return out;
   }
@@ -323,4 +354,22 @@ export class IdfObject {
   toString(): string {
     return `${this.typeName}(${this[NAME]})`;
   }
+}
+
+/**
+ * One extensible repeat, with its choice values spelled as the schema declares them.
+ *
+ * Driven from the schema's choice fields rather than from the repeat's own keys, because a
+ * repeat carries few of either and the tables are the shorter list. A field the repeat does not
+ * hold reads as `undefined` and is skipped, which is what keeps an absent field absent: the
+ * copy an armed group spreads into carries only the fields that were actually written, and
+ * adding one here would write a value the model never declared.
+ */
+function spellGroup(group: ExtensibleGroup, spellings: ChoiceSpellings): ExtensibleGroup {
+  const out: ExtensibleGroup = { ...group };
+  for (const [field, table] of spellings) {
+    const value = out[field];
+    if (typeof value === 'string') out[field] = spellChoice(value, table);
+  }
+  return out;
 }

@@ -71,6 +71,13 @@ that says which slot a value belongs to.
 graph](../explanation/index.md) is built from: `ref` says a name enters a list,
 `ol` says a field reads from one.
 
+`rc` is the schema's `retaincase`, and it is narrower than its wording sounds. It
+marks values EnergyPlus's own reader would otherwise upper-case; it does not
+exempt a choice field from being written to epJSON in the casing `e` declares.
+Seven fields across the bundled versions carry both, and `ConvertInputFormat`
+canonicalises those like any other choice. See [why a choice value is written
+twice differently](../explanation/choice-casing.md).
+
 ### `auto` and `se`, the two branches of an `anyOf`
 
 13060 fields across the 17 bundled versions are declared `anyOf: [{number},

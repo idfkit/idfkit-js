@@ -1,4 +1,4 @@
-import type { SlimType } from '@idfkit/schemas';
+import type { SlimField, SlimType } from '@idfkit/schemas';
 
 import { DATA, OWNER, SHAPE } from './internal.js';
 import type { IdfObject, StoredValue } from './object.js';
@@ -122,4 +122,90 @@ export function shapeFor(typeName: string, type: SlimType, base: object): Object
 /** Number of distinct shapes built, for tests and diagnostics. */
 export function shapeOf(obj: IdfObject): ObjectShape {
   return obj[SHAPE];
+}
+
+// ---------------------------------------------------------------------------
+// Choice spellings
+// ---------------------------------------------------------------------------
+
+/**
+ * Schema spellings of a choice field's values, folded for lookup.
+ *
+ * `Map<field name, Map<folded value, the spelling the schema declares>>`. A field with no
+ * string choices is absent rather than present and empty, so a lookup that misses costs
+ * nothing.
+ */
+export type ChoiceSpellings = ReadonlyMap<string, ReadonlyMap<string, string>>;
+
+/** The two field lists a type has: its positional fields, and one repeat of its extensible group. */
+export interface TypeChoiceSpellings {
+  /** By positional field name. */
+  readonly fields: ChoiceSpellings;
+  /** By field name inside one extensible repeat, e.g. `Branch`'s `component_object_type`. */
+  readonly extensible: ChoiceSpellings;
+}
+
+const EMPTY: ChoiceSpellings = new Map();
+const NONE: TypeChoiceSpellings = { fields: EMPTY, extensible: EMPTY };
+
+const choiceCache = new WeakMap<SlimType, TypeChoiceSpellings>();
+
+/**
+ * Get (or build) the choice spellings for an object type.
+ *
+ * Keyed by the definition rather than by the type name, for the reason the shape cache is:
+ * definitions are content-addressed, so `Zone` in 9.4.0 and in 26.1.0 are one frozen object
+ * and share one table.
+ *
+ * Built on demand and not in `ObjectShape`'s constructor, because only the epJSON writer asks:
+ * a parse, an edit, and an IDF write never touch a table this would have folded 5,713 enums
+ * into.
+ */
+export function choiceSpellingsFor(type: SlimType): TypeChoiceSpellings {
+  let spellings = choiceCache.get(type);
+  if (spellings === undefined) {
+    const fields = fold(type.p);
+    const extensible = type.x === undefined ? EMPTY : fold(type.x.p);
+    spellings = fields.size === 0 && extensible.size === 0 ? NONE : { fields, extensible };
+    choiceCache.set(type, spellings);
+  }
+  return spellings;
+}
+
+/**
+ * The choice spelling a value stands for, or the value unchanged.
+ *
+ * A value that matches no choice is returned as it came, which is what leaves an invalid value
+ * for `validateDocument` to report: canonicalising is not validating, and a writer that
+ * silently repaired a value nobody declared would hide the fault rather than fix it.
+ */
+export function spellChoice(
+  value: string,
+  spellings: ReadonlyMap<string, string> | undefined
+): string {
+  return spellings?.get(value.toLowerCase()) ?? value;
+}
+
+/**
+ * Fold one field list's string choices.
+ *
+ * Folding to lower case is well defined here because no enum in any bundled version holds two
+ * members that differ only in case; `bundle.test.ts` asserts it, so a schema that ever did
+ * would fail there rather than quietly make this lookup pick one.
+ *
+ * Numeric choices (`e: [1, 3]` on `Site:GroundDomain:Slab.phase`) are skipped: they compare by
+ * value, and a number has no casing to canonicalise.
+ */
+function fold(fields: Record<string, SlimField>): ChoiceSpellings {
+  const out = new Map<string, ReadonlyMap<string, string>>();
+  for (const [name, field] of Object.entries(fields)) {
+    if (field.e === undefined) continue;
+    let table: Map<string, string> | undefined;
+    for (const choice of field.e) {
+      if (typeof choice !== 'string') continue;
+      (table ??= new Map()).set(choice.toLowerCase(), choice);
+    }
+    if (table !== undefined) out.set(name, table);
+  }
+  return out;
 }

@@ -330,6 +330,45 @@ describe('field order and accepted values in the bundle', () => {
     // `e` is what validate() checks against and this feature does not move that.
     expect(flagged.every((f) => !(f.e ?? []).includes(''))).toBe(true);
   });
+
+  it('holds no enum whose members differ only in case', async () => {
+    // What makes a case-folded lookup over `e` well defined, and it is not a nicety: the
+    // epJSON writer folds every choice list to a Map keyed by the lower-cased member so it can
+    // emit the schema's own spelling for whatever casing a file wrote (idfkit-js#10). Two
+    // members folding together would silently make one of them unreachable, and this is the
+    // only place that would notice. Extensible inner fields included: 48 choice fields in
+    // 26.1.0 live in a repeat group and the writer folds those too.
+    const store = (await nodeSource().read('types.json')) as Record<
+      string,
+      {
+        p?: Record<string, { e?: unknown[] }>;
+        x?: { p?: Record<string, { e?: unknown[] }> };
+      }
+    >;
+
+    const collisions: string[] = [];
+    let checked = 0;
+    for (const [hash, type] of Object.entries(store)) {
+      const fields = [...Object.entries(type.p ?? {}), ...Object.entries(type.x?.p ?? {})];
+      for (const [name, field] of fields) {
+        if (field.e === undefined) continue;
+        checked += 1;
+        const seen = new Map<string, string>();
+        for (const choice of field.e) {
+          if (typeof choice !== 'string') continue;
+          const folded = choice.toLowerCase();
+          const first = seen.get(folded);
+          if (first !== undefined && first !== choice) {
+            collisions.push(`${hash}.${name}: ${JSON.stringify([first, choice])}`);
+          }
+          seen.set(folded, choice);
+        }
+      }
+    }
+
+    expect(collisions).toEqual([]);
+    expect(checked).toBeGreaterThan(5000);
+  });
 });
 
 /**

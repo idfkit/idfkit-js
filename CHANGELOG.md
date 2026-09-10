@@ -10,6 +10,35 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
 
 ## [Unreleased]
 
+### Fixed
+
+- **A choice value is written to epJSON in the casing the schema declares.** The
+  writer echoed the casing the file used, so `parseIdf` followed by `writeEpJson`
+  turned a model EnergyPlus runs into one it refuses to load: the epJSON reader
+  matches the schema's `enum` exactly, and `"CounterClockWise"`, `"CONTINUOUS"`
+  and `"hourly"` each draw a severe and then a fatal. `validateDocument` reported
+  the same document clean, correctly — it checks what the text format accepts,
+  and the text format matches a choice case-insensitively.
+
+  The rule is `ConvertInputFormat`'s own, from `IdfParser::parse_value`: match the
+  written token against the field's choice list case-insensitively and emit the
+  member it matched. `retaincase` does not exempt a choice field, and the seven
+  fields across the bundled versions that carry both are canonicalised like the
+  rest. A value matching no member is left exactly as it stands, so validation
+  still reports it rather than finding it quietly repaired.
+
+  `writeIdf` is deliberately unchanged and still writes the casing the author
+  used. The two formats want different answers here, which is why this happens
+  at the epJSON boundary rather than at parse: canonicalising on the way in
+  would rewrite the text format's output to repair the object notation's.
+
+  Not a formatting nicety, and not confined to files somebody authored badly:
+  the bootstrap sweep found 54,468 occurrences across 749 of the EnergyPlus
+  example files, and a `WetBulb` arriving in a design day from a downloaded DDY
+  is invisible under IDF and a boot fatal under epJSON.
+
+  ([#10](https://github.com/idfkit/idfkit-js/issues/10))
+
 ## [0.3.0-rc.3] - 2026-09-08
 
 This release moves to `conformance-2026.12` and `governance-2026.17`. The corpus
