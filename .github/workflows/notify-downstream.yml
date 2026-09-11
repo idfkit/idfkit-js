@@ -1,0 +1,156 @@
+name: Notify downstream idfkit-js users
+
+# Offer a newly published second-language release to every project that consumes it, in the order
+# the consumer register gives, and say exactly where that stopped (feature 004, T066).
+#
+# THE HALF THAT DID NOT EXIST. The first language has dispatched a bump into its consumers on every
+# release for months. This language dispatched nothing, so the web editor, the browser tool and the
+# language server's model server learned about a release only if somebody remembered to look. This
+# workflow is that half, in the same shape as idfkit's notify-downstream.yml.
+#
+# CALLED BY publish.yml, with `needs: publish`, and only when a version was actually published. A
+# packing-only run announces nothing. `workflow_dispatch` stays for re-running one by hand.
+#
+# THE ROSTER IS THE CONSUMER REGISTER, `governance/consumers.toml` in idfkit-conformance, read at the
+# governance tag this library already pins in `idfkit.governance` in packages/core/package.json and
+# never at a branch. Dispatch is in waves from the register's `depends_on`, a dispatch that does not
+# land fails the job, and the adoption report (uploaded, and in the run summary) says where the
+# sequence stopped. The wave logic is idfkit-conformance's tools/dispatch_waves.py, at the same tag.
+#
+# ONE RELEASE, BOTH DOORS. Every consumer is offered one version, and its bump moves every governed
+# package it depends on, the shared name and the scoped packages alike, to that version in one
+# change (FR-039). A consumer on the scoped packages stays on them: its door is supported, and
+# nothing here migrates it (FR-044).
+#
+# IT NEVER WAITS ON idfkit. The two libraries release independently and lockstep between them is
+# prohibited (FR-021), so this consults no first-language state at all.
+#
+# A PREREQUISITE THAT IS NOT MET YET. Dispatching into other repositories needs the same GitHub App
+# idfkit uses, through APP_ID and APP_PRIVATE_KEY secrets on this repository. They are declared
+# optional below on purpose: a required secret that is missing would make publish.yml itself
+# invalid, and a release would fail to publish over a notification. Missing, they fail THIS job,
+# loudly, after the release is already out.
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+    secrets:
+      APP_ID:
+        required: false
+      APP_PRIVATE_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The published version to announce, with or without a leading v.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    # Each wave waits up to an hour for its bump workflows to conclude.
+    timeout-minutes: 150
+    env:
+      RAW_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Normalize version (strip v prefix)
+        id: ver
+        run: |
+          set -euo pipefail
+          version="${RAW_VERSION#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Normalized version: $version"
+
+      - name: Refuse to dispatch without the app
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APP_ID" ] || [ -z "$APP_PRIVATE_KEY" ]; then
+            echo "::error title=No app credentials::APP_ID and APP_PRIVATE_KEY are not set on this repository, so no consumer can be told about this release. Nothing was dispatched. Add the secrets idfkit uses and re-run this workflow by hand."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Wait until the registry actually serves the version
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        # `needs: publish` fixes the ORDER; this fixes the LAG. `npm publish` returning means the
+        # tarball was accepted, not that the registry is serving it, and every consumer's `npm
+        # install` resolves against what the registry serves.
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if npm view "@idfkit/core@$VERSION" version >/dev/null 2>&1; then
+              echo "npm serves @idfkit/core@$VERSION (attempt $attempt)."
+              exit 0
+            fi
+            echo "Attempt $attempt: not served yet, waiting 10s."
+            sleep 10
+          done
+          echo "::error::@idfkit/core@$VERSION is still not served after five minutes. Downstream bumps would fail, so this stops rather than dispatching them."
+          exit 1
+
+      - name: Check out this repository for its governance pin
+        uses: actions/checkout@v4
+        with:
+          path: library
+          sparse-checkout: packages/core/package.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Read the pinned governance level
+        id: pin
+        run: |
+          set -euo pipefail
+          level=$(node -p 'require("./library/packages/core/package.json").idfkit.governance')
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+          echo "Reading the consumer register at $level."
+
+      - name: Read the consumer register at that tag
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: refs/tags/${{ steps.pin.outputs.level }}
+          path: conformance
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Mint app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Dispatch in waves
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: >-
+          python conformance/tools/dispatch_waves.py
+          --register conformance/governance/consumers.toml
+          --library javascript
+          --level "$VERSION"
+          --report adoption-report.json
+
+      - name: Keep the adoption report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adoption-report
+          path: adoption-report.json
+          if-no-files-found: ignore

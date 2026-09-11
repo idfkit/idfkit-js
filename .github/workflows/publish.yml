@@ -37,6 +37,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # The version this run published, or empty when it only packed. notify-downstream reads it, so
+    # consumers are told about a release only when there is one.
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -90,6 +94,7 @@ jobs:
         run: npm run check:release -- --corpus conformance
 
       - name: Resolve the version to publish
+        id: resolve
         # A release publishes its own tag. A manual run publishes only when
         # given an explicit version, and otherwise just packs.
         run: |
@@ -100,6 +105,7 @@ jobs:
           fi
           if [ -n "$VERSION" ]; then
             echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "PUBLISH=true" >> "$GITHUB_ENV"
             echo "Publishing $VERSION"
           else
@@ -283,3 +289,16 @@ jobs:
           else
             npm publish -w idfkit --access public --tag "$NPM_TAG"
           fi
+
+  # Only after `publish` has returned, and only when it published something. Feature 004 gave the
+  # second language the downstream half it never had: without this job, the web editor, the browser
+  # tool and the language server's model server heard about a release only if somebody looked. It
+  # is a separate job rather than a step so that a notification that fails can never mark the
+  # release itself as failed; the packages are already on the registry by the time it starts.
+  notify-downstream:
+    needs: publish
+    if: needs.publish.outputs.version != ''
+    uses: ./.github/workflows/notify-downstream.yml
+    with:
+      version: ${{ needs.publish.outputs.version }}
+    secrets: inherit
