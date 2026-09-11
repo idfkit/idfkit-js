@@ -1,0 +1,88 @@
+name: Rehearse a candidate against every consumer
+
+# Ask what an unpublished build of idfkit-js does to every project that consumes it, in one action,
+# before it is published (feature 004, User Story 2, T049).
+#
+# It dispatches `rehearse-candidate.yml` in each consumer the register lists with a javascript
+# rehearsal of its own. Each builds the candidate from this repository at `candidate_ref` with the
+# same `npm ci`, `npx tsc --build` and `npm pack --workspaces` that publish.yml runs when it is not
+# publishing, installs the tarballs into a scratch copy with `--no-save`, and runs its type check
+# and then its tests. Consumers whose rehearsal is `through-provider` are skipped.
+#
+# The results are in each consumer's own run, linked from this run's summary. A failure there is a
+# finding against this library and cannot block any consumer's unrelated work, because rehearsals
+# run on demand and never on a consumer's pull requests (FR-013).
+#
+# A dispatch that does not land fails this run. It needs the same APP_ID and APP_PRIVATE_KEY secrets
+# as notify-downstream.yml, and fails loudly without them.
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: The commit, branch or tag of idfkit-js to rehearse. Defaults to the commit this runs on.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Refuse to dispatch without the app
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APP_ID" ] || [ -z "$APP_PRIVATE_KEY" ]; then
+            echo "::error title=No app credentials::APP_ID and APP_PRIVATE_KEY are not set on this repository, so no consumer can be asked to rehearse. Nothing was dispatched."
+            exit 1
+          fi
+
+      - name: Check out this repository for its governance pin
+        uses: actions/checkout@v4
+        with:
+          path: library
+          sparse-checkout: packages/core/package.json
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Read the pinned governance level
+        id: pin
+        run: |
+          set -euo pipefail
+          level=$(node -p 'require("./library/packages/core/package.json").idfkit.governance')
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+
+      - name: Read the consumer register at that tag
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: refs/tags/${{ steps.pin.outputs.level }}
+          path: conformance
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Mint app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Dispatch every rehearsal
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CANDIDATE_REF: ${{ inputs.candidate_ref || github.sha }}
+        run: >-
+          python conformance/tools/dispatch_waves.py
+          --register conformance/governance/consumers.toml
+          --library javascript
+          --rehearse-ref "$CANDIDATE_REF"
+          --report rehearsal-dispatch.json
