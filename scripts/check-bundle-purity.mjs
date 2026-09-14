@@ -121,7 +121,7 @@ const VERSION = '26.1.0';
  * claim SC-013 makes about the browser path.
  */
 const PAGE = `
-import { SchemaBundle, httpSource, parseIdf, writeIdf } from 'idfkit';
+import { SchemaBundle, httpSource, parseIdf, writeIdf } from '@idfkit/idfkit';
 
 const bundle = new SchemaBundle(httpSource('https://schemas.invalid/data/'));
 const schema = await bundle.load(${JSON.stringify(VERSION)});

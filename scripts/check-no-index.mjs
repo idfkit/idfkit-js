@@ -46,7 +46,7 @@
  * AND THE ABSENCE IS ASSERTED, NOT INFERRED
  *
  * "npm did not print it" is not evidence. The gate asks NODE to resolve
- * `@idfkit/weather` and `idfkit/weather` from inside the fixture and requires
+ * `@idfkit/weather` and `@idfkit/idfkit/weather` from inside the fixture and requires
  * both to fail, walks the whole tree for any file whose name contains
  * `stations.json`, and separately requires the library to still work. FR-043 is
  * two claims and the second one, "fully functional without it", is the one a
@@ -95,8 +95,8 @@ const INDEX = /stations\.json/;
 
 /** The library still works with no weather installed. FR-043's second half. */
 const SMOKE = `
-import { parseIdf, writeIdf, getIdfVersion } from 'idfkit';
-import { schemas } from 'idfkit/node';
+import { parseIdf, writeIdf, getIdfVersion } from '@idfkit/idfkit';
+import { schemas } from '@idfkit/idfkit/node';
 
 const source = 'Version,26.1;\\n\\nBuilding,\\n  Tower;\\n';
 if (getIdfVersion(source) === undefined) {
@@ -161,7 +161,7 @@ async function main() {
       );
     }
 
-    // The subpath itself, reported rather than asserted on. `idfkit/weather`
+    // The subpath itself, reported rather than asserted on. `@idfkit/idfkit/weather`
     // RESOLVES with the peer absent, because weather.js is a real file that
     // ships in the facade: what fails is evaluating it, with the named-install
     // error FR-074 requires. That behaviour belongs to

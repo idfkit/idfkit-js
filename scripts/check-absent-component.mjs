@@ -4,18 +4,18 @@
  *
  * THE CRITERION
  *
- * `contracts/distribution.md`: "Importing `idfkit/weather` without the peer
+ * `contracts/distribution.md`: "Importing `@idfkit/idfkit/weather` without the peer
  * names the install; a project that never imports it type-checks clean", in
  * "two fixture projects". Clause 4 of the same contract adds the third thing
- * that has to be true: "`idfkit/weather` stays in the export map and resolves
+ * that has to be true: "`@idfkit/idfkit/weather` stays in the export map and resolves
  * once the peer is installed."
  *
  * So three claims, not two. The two the task names establish the failure and
  * the non-failure; the third is the control that stops both of them from being
  * satisfied by a subpath that is simply broken. A gate with only the first two
- * passes if `idfkit/weather` never works at all, which is not the design.
+ * passes if `@idfkit/idfkit/weather` never works at all, which is not the design.
  *
- * FR-046 makes the same three claims about `idfkit/language`, in the same
+ * FR-046 makes the same three claims about `@idfkit/idfkit/language`, in the same
  * words, because `@idfkit/language` is an optional peer for the same reason:
  * "Reaching the service through the shared name MUST work once its component is
  * installed, and MUST fail with a message naming the component to install when
@@ -25,17 +25,17 @@
  * Hence the component table below, rather than a second copy of this file. Two
  * components, three claims each, five fixtures:
  *
- *   weather-absent    installs `idfkit` alone, imports `idfkit/weather`, and
+ *   weather-absent    installs `@idfkit/idfkit` alone, imports `@idfkit/idfkit/weather`, and
  *                     requires the failure to NAME `npm install @idfkit/weather`
- *   language-absent   the same, for `idfkit/language`
- *   core-only         installs `idfkit` alone, imports `idfkit` and
- *                     `idfkit/node` and NEITHER opt-in subpath, and requires
+ *   language-absent   the same, for `@idfkit/idfkit/language`
+ *   core-only         installs `@idfkit/idfkit` alone, imports `@idfkit/idfkit` and
+ *                     `@idfkit/idfkit/node` and NEITHER opt-in subpath, and requires
  *                     `tsc --noEmit` to report nothing and the program to run.
  *                     It reaches no scoped name at all, which is the other
  *                     half of what the facade is for (FR-036)
- *   weather-present   installs `idfkit` and the peer, imports `idfkit/weather`,
+ *   weather-present   installs `@idfkit/idfkit` and the peer, imports `@idfkit/idfkit/weather`,
  *                     and requires it to work
- *   language-present  the same, for `idfkit/language`
+ *   language-present  the same, for `@idfkit/idfkit/language`
  *
  * Five fixtures and not six, because the middle claim is one claim. It is about
  * a project that imports NEITHER subpath, and `core-only` is already that
@@ -50,7 +50,7 @@
  * cannot produce a named failure. Static re-exports are resolved and linked
  * before any module in the graph is evaluated, so no code in the shim ever
  * runs and Node reports a bare `ERR_MODULE_NOT_FOUND` naming a file path inside
- * `node_modules/idfkit`. A reader seeing that has been handed the internals of
+ * `node_modules/@idfkit/idfkit`. A reader seeing that has been handed the internals of
  * a package they did not install and no instruction. `weather.js` and
  * `language.js` therefore use a caught dynamic import, and this gate is what
  * keeps them that way: FAILING IS NOT ENOUGH, and the gate rejects a bare
@@ -63,7 +63,7 @@
  * on whether TypeScript reads the file, which depends on the module resolution
  * mode and on nothing being configured to pull the whole package's types in.
  * Under `nodenext` it reads only the subpath that is imported, so a project
- * importing `idfkit` alone never sees either. That is SC-031 and the last
+ * importing `@idfkit/idfkit` alone never sees either. That is SC-031 and the last
  * sentence of FR-046, and it is a property of a TypeScript version and a
  * tsconfig rather than of anything in this repository, which is exactly why it
  * is checked by running `tsc` rather than by reasoning about it. Two
@@ -198,13 +198,13 @@ const COMPONENTS = [
  * is on.
  *
  * No `console` and no `process`: the fixture declares `types: []`, because a
- * project that had to install @types/node to type-check against `idfkit` would
+ * project that had to install @types/node to type-check against `@idfkit/idfkit` would
  * be a different claim from the one SC-031 makes. Anything the check needs to
  * observe is observed from the .mjs twin below instead.
  */
 const CORE_ONLY_TS = `
-import { SchemaBundle, parseIdf, writeIdf, type IdfDocument } from 'idfkit';
-import { schemas } from 'idfkit/node';
+import { SchemaBundle, parseIdf, writeIdf, type IdfDocument } from '@idfkit/idfkit';
+import { schemas } from '@idfkit/idfkit/node';
 
 export async function roundTrip(source: string): Promise<string> {
   const bundle: SchemaBundle = schemas();
@@ -221,8 +221,8 @@ export const SOURCE: string = 'Version,26.1;\\n\\nBuilding,\\n  Tower;\\n';
 
 /** The same program, as JavaScript, so "builds" can be distinguished from "runs". */
 const CORE_ONLY_JS = `
-import { parseIdf, writeIdf } from 'idfkit';
-import { schemas } from 'idfkit/node';
+import { parseIdf, writeIdf } from '@idfkit/idfkit';
+import { schemas } from '@idfkit/idfkit/node';
 
 const schema = await schemas().load('26.1.0');
 const parsed = parseIdf('Version,26.1;\\n\\nBuilding,\\n  Tower;\\n', schema);

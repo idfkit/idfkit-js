@@ -206,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # BLOCKING, but on a narrow question. `scripts/check-publication.mjs` is the gate that stands
-    # between the four FR-044 preconditions and `npm publish idfkit`, and it lives in
+    # between the four FR-044 preconditions and `npm publish @idfkit/idfkit`, and it lives in
     # publish.yml, where a refusal stops the release. FR-088 is why it exists at all: publication
     # under the shared name is irreversible, so its preconditions have to be verified by a check
     # rather than by somebody saying they landed, and a claim later found untrue is corrected by a

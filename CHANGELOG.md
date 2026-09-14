@@ -10,6 +10,17 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
 
 ## [Unreleased]
 
+### Changed
+
+- **The facade publishes as `@idfkit/idfkit`, not `idfkit`.** npm refused the
+  unscoped name on 2026-09-14: its similarity filter blocks `idfkit` as too close
+  to `pdfkit`, and npm support cannot grant an exception for one account. The
+  facade keeps its subpaths under the new name (`@idfkit/idfkit/node`,
+  `@idfkit/idfkit/schemas`, `@idfkit/idfkit/weather`, `@idfkit/idfkit/language`),
+  and the error an absent optional component raises names the new subpath. It has
+  never been published, so no installed project changes; the entries below that
+  say `npm install idfkit` describe the name as it was planned.
+
 ### Fixed
 
 - **A choice value is written to epJSON in the casing the schema declares.** The

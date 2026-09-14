@@ -10,7 +10,7 @@
   // not the example. The library itself still builds without DOM, so nothing here can smuggle a
   // browser global into a published package.
   //
-  // No `paths`. The examples resolve `@idfkit/core` and `idfkit` through node_modules, which is
+  // No `paths`. The examples resolve `@idfkit/core` and `@idfkit/idfkit` through node_modules, which is
   // how a reader resolves them, so what is checked is the published surface rather than the
   // sources behind it. That means `tsc --build` has to run first, and CI runs it first.
   //

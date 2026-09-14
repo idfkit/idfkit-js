@@ -3,8 +3,8 @@
 declare const text: string;
 
 // --8<-- [start:example]
-import { getIdfVersion, parseIdf } from 'idfkit';
-import { schemaFor } from 'idfkit/node';
+import { getIdfVersion, parseIdf } from '@idfkit/idfkit';
+import { schemaFor } from '@idfkit/idfkit/node';
 
 const schema = await schemaFor(getIdfVersion(text));
 const { document } = parseIdf(text, schema);

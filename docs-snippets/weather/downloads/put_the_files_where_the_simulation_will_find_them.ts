@@ -4,7 +4,7 @@ import type { WeatherStation } from '@idfkit/weather';
 declare const station: WeatherStation;
 
 // --8<-- [start:example]
-import { fetchWeatherFiles } from 'idfkit/weather';
+import { fetchWeatherFiles } from '@idfkit/idfkit/weather';
 import { saveWeatherFiles } from '@idfkit/weather/node';
 
 const files = await fetchWeatherFiles(station);

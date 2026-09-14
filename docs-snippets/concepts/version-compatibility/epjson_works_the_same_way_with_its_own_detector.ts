@@ -3,8 +3,8 @@
 declare const text: string;
 
 // --8<-- [start:example]
-import { getEpJsonVersion, parseEpJson } from 'idfkit';
-import { loadEpJson, schemaFor } from 'idfkit/node';
+import { getEpJsonVersion, parseEpJson } from '@idfkit/idfkit';
+import { loadEpJson, schemaFor } from '@idfkit/idfkit/node';
 
 const doc = await loadEpJson('whatever.epJSON');
 

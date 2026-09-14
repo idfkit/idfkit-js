@@ -82,10 +82,11 @@
  *
  * A NOTE ON THE NAME
  *
- * `idfkit` cannot currently be registered on npm: the registry's similarity
- * filter rejects it and an appeal is pending. This check neither publishes nor
- * asks the registry anything, so it runs and is correct today, and the day the
- * name is available nothing about it has to change.
+ * The facade publishes as `@idfkit/idfkit`. npm refused the unscoped `idfkit`
+ * on 2026-09-14: its similarity filter blocks the name and support cannot grant
+ * an exception, so the facade lives inside the `@idfkit` scope beside the
+ * packages it re-exports. This check neither publishes nor asks the registry
+ * anything, so the name changes nothing about it.
  *
  * Exit codes: 0 publish, 1 do not publish, 2 could not decide.
  */

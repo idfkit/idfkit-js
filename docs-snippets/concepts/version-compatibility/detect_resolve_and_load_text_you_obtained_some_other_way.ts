@@ -3,7 +3,7 @@
 declare const text: string;
 
 // --8<-- [start:example]
-import { getIdfVersion, parseIdf, resolveVersion, SchemaBundle, httpSource } from 'idfkit';
+import { getIdfVersion, parseIdf, resolveVersion, SchemaBundle, httpSource } from '@idfkit/idfkit';
 
 const bundle = new SchemaBundle(httpSource('/schemas/'));
 

@@ -1,26 +1,26 @@
-# idfkit
+# @idfkit/idfkit
 
 The shared install name. One package, four subpaths, no implementation of its
 own: everything here re-exports a scoped package that stays published under its
 own name and remains the real library (FR-036, FR-037).
 
 ```bash
-npm install idfkit
+npm install @idfkit/idfkit
 ```
 
 ```ts
-import { parseIdf } from 'idfkit';
-import { loadIdf } from 'idfkit/node';
+import { parseIdf } from '@idfkit/idfkit';
+import { loadIdf } from '@idfkit/idfkit/node';
 ```
 
 ## The subpaths
 
-| Subpath          | Re-exports          | Installed with `idfkit` | Browser-safe                       |
-| ---------------- | ------------------- | ----------------------- | ---------------------------------- |
-| `idfkit`         | `@idfkit/core`      | yes                     | yes: synchronous, pure, no I/O     |
-| `idfkit/node`    | `@idfkit/core/node` | yes                     | no: async, filesystem              |
-| `idfkit/schemas` | `@idfkit/schemas`   | yes                     | runtime yes; data loaded on demand |
-| `idfkit/weather` | `@idfkit/weather`   | **no, opt-in**          | runtime yes; ships its own index   |
+| Subpath                  | Re-exports          | Installed with `@idfkit/idfkit` | Browser-safe                       |
+| ------------------------ | ------------------- | ------------------------------- | ---------------------------------- |
+| `@idfkit/idfkit`         | `@idfkit/core`      | yes                             | yes: synchronous, pure, no I/O     |
+| `@idfkit/idfkit/node`    | `@idfkit/core/node` | yes                             | no: async, filesystem              |
+| `@idfkit/idfkit/schemas` | `@idfkit/schemas`   | yes                             | runtime yes; data loaded on demand |
+| `@idfkit/idfkit/weather` | `@idfkit/weather`   | **no, opt-in**                  | runtime yes; ships its own index   |
 
 Four subpaths rather than one flat entry point, so a browser bundle that reads
 and writes a model pulls in no schema data, no station index, and no generated
@@ -28,7 +28,7 @@ types (FR-038, SC-013).
 
 ## Weather is opt-in
 
-`@idfkit/weather` is an **optional peer dependency**. `npm install idfkit` does
+`@idfkit/weather` is an **optional peer dependency**. `npm install @idfkit/idfkit` does
 not install it, which is what keeps its 1.6 MB station index off disk for
 everyone who never asks for weather (FR-043, SC-016). Add it by name:
 
@@ -36,11 +36,11 @@ everyone who never asks for weather (FR-043, SC-016). Add it by name:
 npm install @idfkit/weather
 ```
 
-Importing `idfkit/weather` without it fails with a message naming that command
+Importing `@idfkit/idfkit/weather` without it fails with a message naming that command
 (FR-074). A project that never imports the subpath type-checks clean with the
 peer absent (SC-031).
 
-### If you publish a package that depends on `idfkit`
+### If you publish a package that depends on `@idfkit/idfkit`
 
 Declare the opt-in components your package imports, in your own dependencies
 (FR-089):
@@ -48,13 +48,13 @@ Declare the opt-in components your package imports, in your own dependencies
 ```jsonc
 {
   "dependencies": {
-    "idfkit": "^1.0.0",
-    "@idfkit/weather": "^1.0.0", // because this package imports idfkit/weather
+    "@idfkit/idfkit": "^1.0.0",
+    "@idfkit/weather": "^1.0.0", // because this package imports @idfkit/idfkit/weather
   },
 }
 ```
 
-Depending on `idfkit` alone does not bring weather with it, for your package any
+Depending on `@idfkit/idfkit` alone does not bring weather with it, for your package any
 more than for anyone else. Leave it undeclared and nothing fails at install
 time: the failure arrives at whoever installed _your_ package, at run time, as
 the message above naming `npm install @idfkit/weather`. That message is correct
