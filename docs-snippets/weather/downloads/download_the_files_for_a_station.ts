@@ -1,6 +1,6 @@
 // --8<-- [start:example]
 import { loadBundledIndex } from '@idfkit/weather/node';
-import { fetchWeatherFiles } from 'idfkit/weather';
+import { fetchWeatherFiles } from '@idfkit/idfkit/weather';
 
 const index = await loadBundledIndex();
 const [best] = index.search('chicago ohare');

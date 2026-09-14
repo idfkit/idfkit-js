@@ -177,7 +177,7 @@ carries a `0.0.0` placeholder on purpose, and that placeholder is what makes the
 workspace links resolve during development. `.github/workflows/publish.yml` runs
 `npm version "$VERSION" --workspaces` from the git tag at publish time and then
 stamps the cross-package specs that `npm version` does not touch: the pin from
-`@idfkit/core` to `@idfkit/schemas`, the caret ranges the `idfkit` facade depends
+`@idfkit/core` to `@idfkit/schemas`, the caret ranges the `@idfkit/idfkit` facade depends
 on, and the lower bounds in the type packages' peer ranges. Hand-editing any of
 them publishes a package that asks the registry for a version nobody has ever
 published.

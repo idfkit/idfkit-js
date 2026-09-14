@@ -96,7 +96,7 @@ jobs:
     name: The shared install name is the contracted surface
     runs-on: ubuntu-latest
 
-    # BLOCKING. `idfkit` is the name a reader installs without ever learning the scoped names,
+    # BLOCKING. `@idfkit/idfkit` is the name a reader installs without ever learning the scoped names,
     # and it contains no implementation, so its entire content is its published surface. Four
     # one-word edits break it silently and none of them fail a test:
     #
@@ -108,7 +108,7 @@ jobs:
     #   @idfkit/engine added anywhere   drags in 51 MB of WebAssembly and pins every facade user
     #                                   to one EnergyPlus release (FR-070);
     #   a name added to weather         exists under @idfkit/weather and not under
-    #                                   idfkit/weather, with the types insisting otherwise,
+    #                                   @idfkit/idfkit/weather, with the types insisting otherwise,
     #                                   because weather.js cannot use `export *` (FR-074).
     #
     # The shape of what gets installed under a name is what that name means, and changing it
@@ -133,7 +133,7 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
 
-    # BLOCKING, all six. These are the criteria that say what `npm install idfkit` puts on a
+    # BLOCKING, all six. These are the criteria that say what `npm install @idfkit/idfkit` puts on a
     # stranger's disk and in their browser bundle, and they are the only ones in this feature that
     # cannot be corrected after the fact: the shape of what gets installed under a name IS what
     # that name means, and changing it later breaks everyone who installed it.
@@ -162,7 +162,7 @@ jobs:
     #                     project working without a map, and a control proving one still attaches.
     #   bundle purity     an esbuild metafile for a minimal read-and-write page, with zero inputs
     #                     matching schema data, stations.json or types-v.
-    #   absent component  importing idfkit/weather without the peer names `npm install
+    #   absent component  importing @idfkit/idfkit/weather without the peer names `npm install
     #                     @idfkit/weather` rather than raising a bare ERR_MODULE_NOT_FOUND, a
     #                     project that never imports it type-checks clean, and the subpath works
     #                     once the peer is added.

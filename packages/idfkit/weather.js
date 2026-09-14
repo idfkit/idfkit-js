@@ -1,9 +1,9 @@
 /**
- * `idfkit/weather`, which is `@idfkit/weather` behind a named-install guard.
+ * `@idfkit/idfkit/weather`, which is `@idfkit/weather` behind a named-install guard.
  *
  * WHY THIS FILE IS NOT `export * from '@idfkit/weather'`
  *
- * @idfkit/weather is an optional peer dependency: `npm install idfkit` does not
+ * @idfkit/weather is an optional peer dependency: `npm install @idfkit/idfkit` does not
  * install it, which is what keeps its 1.6 MB station index off disk for the
  * readers who never ask for weather (FR-043, SC-016). The cost is that this
  * subpath can be imported while the package behind it is absent, and FR-074
@@ -15,7 +15,7 @@
  * is no point at which this file's own code runs first: Node fails the link with
  *
  *     ERR_MODULE_NOT_FOUND: Cannot find package '@idfkit/weather' imported from
- *     .../node_modules/idfkit/weather.js
+ *     .../node_modules/@idfkit/idfkit/weather.js
  *
  * and nothing here is ever reached. The `imports` fallback array
  * (`"#weather": ["@idfkit/weather", "./weather-missing.js"]`) looks like the
@@ -30,7 +30,7 @@
  * API asynchronous: every name below is an ordinary synchronous binding, and
  * importing code is unchanged from a plain re-export.
  *
- *     import { StationIndex } from 'idfkit/weather';
+ *     import { StationIndex } from '@idfkit/idfkit/weather';
  *     const index = await StationIndex.load();   // exactly as with @idfkit/weather
  *
  * The awaited module graph is the whole price. Concretely: `require()` of this
@@ -66,11 +66,11 @@ try {
   const absent = NOT_FOUND.has(error?.code) && String(error?.message).includes('@idfkit/weather');
   if (!absent) throw error;
   throw new Error(
-    "idfkit/weather requires the optional component '@idfkit/weather', which is not installed.\n" +
+    "@idfkit/idfkit/weather requires the optional component '@idfkit/weather', which is not installed.\n" +
       '\n' +
       '    npm install @idfkit/weather\n' +
       '\n' +
-      'It is an optional peer dependency, so installing idfkit deliberately leaves it out: ' +
+      'It is an optional peer dependency, so installing @idfkit/idfkit deliberately leaves it out: ' +
       'the weather code and its 1.6 MB station index stay off disk for everyone who does not ' +
       'ask for them. Everything else in idfkit works without it.',
     { cause: error }

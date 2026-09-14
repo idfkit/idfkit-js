@@ -77,8 +77,8 @@ const LIFECYCLE = [
 
 /** Proof the library works, run against both trees. */
 const SMOKE = `
-import { SchemaBundle, parseIdf, writeIdf } from 'idfkit';
-import { schemas } from 'idfkit/node';
+import { SchemaBundle, parseIdf, writeIdf } from '@idfkit/idfkit';
+import { schemas } from '@idfkit/idfkit/node';
 
 const schema = await schemas().load('26.1.0');
 const parsed = parseIdf('Version,26.1;\\n\\nBuilding,\\n  Tower;\\n', schema);

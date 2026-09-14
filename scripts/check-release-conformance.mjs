@@ -9,7 +9,7 @@
  *
  * NOT THE SAME CHECK AS `check:publication`
  *
- * `check-publication.mjs` gates the one-time publication of the `idfkit` facade against all four
+ * `check-publication.mjs` gates the one-time publication of the `@idfkit/idfkit` facade against all four
  * FR-044 preconditions, and pins the level it requires in a constant of its own. This runs on
  * every release, asserts one thing, and restates nothing: the level comes from
  * `idfkit.conformance` in `packages/core/package.json`, which is also what `CONFORMANCE_LEVEL`

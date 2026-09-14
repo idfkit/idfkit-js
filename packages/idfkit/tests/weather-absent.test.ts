@@ -1,7 +1,7 @@
 /**
- * `idfkit/weather` with the optional peer absent (T091, T091a; FR-074, FR-089).
+ * `@idfkit/idfkit/weather` with the optional peer absent (T091, T091a; FR-074, FR-089).
  *
- * @idfkit/weather is an optional peer dependency, so `npm install idfkit` does
+ * @idfkit/weather is an optional peer dependency, so `npm install @idfkit/idfkit` does
  * not install it and this subpath can always be imported with nothing behind
  * it. FR-074 says that failure must name the component to install rather than
  * surface as a bare unresolved-module error.
@@ -56,7 +56,7 @@ beforeAll(() => {
   // @idfkit/weather is installed here.
   root = mkdtempSync(join(tmpdir(), 'idfkit-facade-'));
 
-  const installed = join(root, 'node_modules', 'idfkit');
+  const installed = join(root, 'node_modules', '@idfkit', 'idfkit');
   mkdirSync(installed, { recursive: true });
   for (const file of ['package.json', 'weather.js', 'weather.d.ts']) {
     cpSync(join(FACADE, file), join(installed, file));
@@ -73,12 +73,12 @@ beforeAll(() => {
       version: '1.0.0',
       type: 'module',
       exports: './index.js',
-      dependencies: { idfkit: '0.0.0' },
+      dependencies: { '@idfkit/idfkit': '0.0.0' },
     })
   );
   writeFileSync(
     join(intermediary, 'index.js'),
-    "export { indexFromData } from 'idfkit/weather';\n"
+    "export { indexFromData } from '@idfkit/idfkit/weather';\n"
   );
 });
 
@@ -86,9 +86,9 @@ afterAll(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-describe('idfkit/weather without the optional peer', () => {
+describe('@idfkit/idfkit/weather without the optional peer', () => {
   it('names the install rather than failing to resolve a module (FR-074)', () => {
-    const { status, output } = run("import 'idfkit/weather';\n");
+    const { status, output } = run("import '@idfkit/idfkit/weather';\n");
 
     expect(status).not.toBe(0);
     expect(output).toContain(INSTALL);
@@ -97,12 +97,14 @@ describe('idfkit/weather without the optional peer', () => {
     // The thrown error is ours, not the resolver's. The resolver's is kept as
     // the `cause`, which is why it still appears further down the output.
     const thrown = output.slice(output.indexOf('Error:'));
-    expect(thrown.startsWith('Error: idfkit/weather requires the optional component')).toBe(true);
+    expect(thrown.startsWith('Error: @idfkit/idfkit/weather requires the optional component')).toBe(
+      true
+    );
   });
 
   it('names the install through a dynamic import too', () => {
     const { status, output } = run(
-      "await import('idfkit/weather').catch((error) => { console.log(error.message); process.exit(3); });\n"
+      "await import('@idfkit/idfkit/weather').catch((error) => { console.log(error.message); process.exit(3); });\n"
     );
 
     expect(status).toBe(3);
@@ -140,7 +142,7 @@ describe('idfkit/weather without the optional peer', () => {
     );
 
     const { status, output } = run(
-      "import { StationIndex } from 'idfkit/weather';\n" +
+      "import { StationIndex } from '@idfkit/idfkit/weather';\n" +
         "import { indexFromData } from 'weather-report';\n" +
         'console.log(StationIndex, indexFromData());\n'
     );

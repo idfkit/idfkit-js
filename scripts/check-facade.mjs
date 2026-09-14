@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * The facade gate for `idfkit`, the shared install name (tasks T090 to T095).
+ * The facade gate for `@idfkit/idfkit`, the shared install name (tasks T090 to T095).
  *
  * WHAT THE FACADE IS
  *
  * `packages/idfkit/` contains no implementation. It is a manifest and ten
- * one-line-ish re-export files, so that `npm install idfkit` gives a working
+ * one-line-ish re-export files, so that `npm install @idfkit/idfkit` gives a working
  * library without the reader ever learning the scoped names, while the scoped
  * packages stay published and stay the real implementations (FR-036, FR-037).
  * Its whole content is therefore its published *surface*, and a surface is
@@ -44,7 +44,7 @@
  *      missing-peer failure and name the install, and a static re-export is
  *      linked before any code in them runs. So they write the names out. A name
  *      added to `@idfkit/weather` then exists under `@idfkit/weather` and not
- *      under `idfkit/weather`, with the types insisting otherwise, and nothing
+ *      under `@idfkit/idfkit/weather`, with the types insisting otherwise, and nothing
  *      says so. This gate reads both surfaces and fails on any difference.
  *
  * WHAT IT READS

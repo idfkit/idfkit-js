@@ -17,10 +17,10 @@ npm install @idfkit/language
 
 ## Reaching it from the shared name
 
-A project that installs `idfkit` reaches this package through a subpath:
+A project that installs `@idfkit/idfkit` reaches this package through a subpath:
 
 ```ts
-import { completionsAt } from 'idfkit/language';
+import { completionsAt } from '@idfkit/idfkit/language';
 ```
 
 The subpath stays in the export map whether or not this package is installed.

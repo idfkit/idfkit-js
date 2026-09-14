@@ -4,7 +4,7 @@
  * WHAT A "CLEAN INSTALL" HAS TO MEAN HERE
  *
  * Five of the criteria in `contracts/distribution.md` are statements about what
- * `npm install idfkit` puts on a stranger's disk: under 1.875 MB (SC-012), zero
+ * `npm install @idfkit/idfkit` puts on a stranger's disk: under 1.875 MB (SC-012), zero
  * station-index bytes (SC-016), zero type-package bytes (SC-014), no
  * post-install scripting (SC-015), and a browser bundle that pulls in none of
  * the data (SC-013). None of them can be measured against this workspace. A
@@ -15,8 +15,8 @@
  * So each gate builds a real install, and there are only three ways to get one:
  *
  *   from the registry     impossible: nothing is published under these names,
- *                         and `idfkit` cannot currently be registered at all
- *                         (npm's similarity filter; an appeal is pending);
+ *                         and `@idfkit/idfkit` has never been published at all
+ *                         (it publishes only by a deliberate act, FR-088);
  *   from the workspace    wrong: `file:` links to `packages/*` are symlinks,
  *                         and measuring a symlink measures nothing;
  *   from `npm pack`       right: the tarball is byte-for-byte what the registry
@@ -452,7 +452,7 @@ export function runInFixture(dir, filename, source, args = []) {
 // The one install four of the gates measure
 // ---------------------------------------------------------------------------
 
-export const FACADE = 'idfkit';
+export const FACADE = '@idfkit/idfkit';
 export const CORE = '@idfkit/core';
 export const SCHEMAS = '@idfkit/schemas';
 export const WEATHER = '@idfkit/weather';
@@ -461,7 +461,7 @@ export const TYPE_PACKAGES = ['@idfkit/types-v26-1', '@idfkit/types-v9-4'];
 export const ENGINE = ['@idfkit/engine', '@idfkit/engine-assets'];
 
 /**
- * A project that types `npm install idfkit` and nothing else.
+ * A project that types `npm install @idfkit/idfkit` and nothing else.
  *
  * `also` adds further top-level dependencies by name, which is how the opt-in
  * halves of these gates are built: adding `@idfkit/weather` is exactly the

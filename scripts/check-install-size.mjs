@@ -6,7 +6,7 @@
  *
  * `contracts/distribution.md`: "Under 1.875 MB on disk under the shared name in
  * JavaScript, no opt-in component installed". So: pack the workspace, install
- * `idfkit` and nothing else into an isolated project, and measure.
+ * `@idfkit/idfkit` and nothing else into an isolated project, and measure.
  *
  * WHICH 1.875 MB, AND WHICH "ON DISK"
  *

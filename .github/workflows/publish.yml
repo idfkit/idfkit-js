@@ -14,14 +14,13 @@ on:
         required: false
       publish_facade:
         description: >
-          Also publish `idfkit`, the shared install name, after the scoped
+          Also publish `@idfkit/idfkit`, the shared install name, after the scoped
           packages. Off by default, and deliberately not automatic on a
           release. Two reasons. Publication under the shared name is
           irreversible (FR-088), so it is a decision somebody makes rather than
-          a side effect of tagging. And the name is not registrable on npm
-          today: the registry's similarity filter rejected it and an appeal is
-          pending, so an automatic attempt would fail every release for a
-          reason unrelated to the release. The publish-facade job refuses
+          a side effect of tagging. It publishes as `@idfkit/idfkit` because npm
+          refused the unscoped `idfkit` on 2026-09-14 (similarity filter, no
+          exception possible). The publish-facade job refuses
           unless all four FR-044 preconditions verify first.
         type: boolean
         required: false
@@ -154,7 +153,7 @@ jobs:
           # This sits beside, and does not contradict, the facade's caret on core a few lines
           # below, which contracts/distribution.md requires so that a patch of core reaches a
           # consumer without a facade release. npm resolves peers as part of building the tree,
-          # so `idfkit`'s "^X.Y.Z" and this "X.Y.Z" are satisfied together by X.Y.Z, and the
+          # so `@idfkit/idfkit`'s "^X.Y.Z" and this "X.Y.Z" are satisfied together by X.Y.Z, and the
           # narrow case where they cannot be is one where some other dependency has already
           # forced core above the version this service was built against. Refusing to resolve is
           # the right answer there: it is the pairing the exact range exists to reject, and a
@@ -165,15 +164,15 @@ jobs:
           # the "version" field of each workspace and nothing else. In the repository they read
           # "0.0.0", which is what makes the workspace link resolve. Published unchanged, they
           # would ask the registry for @idfkit/core@0.0.0 and @idfkit/schemas@0.0.0, versions
-          # that have never existed, and `npm install idfkit` would fail with ETARGET for
+          # that have never existed, and `npm install @idfkit/idfkit` would fail with ETARGET for
           # everyone. Caret ranges here rather than exact pins, matching
           # contracts/distribution.md: the facade re-exports the scoped packages and carries no
           # implementation, so a patch of core is a patch of idfkit and should reach a consumer
           # without a facade release.
-          npm pkg set "dependencies.@idfkit/core=^$VERSION" -w idfkit
-          npm pkg set "dependencies.@idfkit/schemas=^$VERSION" -w idfkit
-          npm pkg set "peerDependencies.@idfkit/weather=^$VERSION" -w idfkit
-          npm pkg set "peerDependencies.@idfkit/language=^$VERSION" -w idfkit
+          npm pkg set "dependencies.@idfkit/core=^$VERSION" -w @idfkit/idfkit
+          npm pkg set "dependencies.@idfkit/schemas=^$VERSION" -w @idfkit/idfkit
+          npm pkg set "peerDependencies.@idfkit/weather=^$VERSION" -w @idfkit/idfkit
+          npm pkg set "peerDependencies.@idfkit/language=^$VERSION" -w @idfkit/idfkit
 
       - name: Publish
         if: env.PUBLISH == 'true'
@@ -264,14 +263,14 @@ jobs:
         # weaken it to `|| true` to get a release out. There is no taking the version back.
         run: npm run check:publication -- --corpus conformance
 
-      - name: Publish idfkit
+      - name: Publish @idfkit/idfkit
         run: |
           VERSION="${{ inputs.version }}"
           npm version "$VERSION" --workspaces --no-git-tag-version --allow-same-version --workspaces-update=false
-          npm pkg set "dependencies.@idfkit/core=^$VERSION" -w idfkit
-          npm pkg set "dependencies.@idfkit/schemas=^$VERSION" -w idfkit
-          npm pkg set "peerDependencies.@idfkit/weather=^$VERSION" -w idfkit
-          npm pkg set "peerDependencies.@idfkit/language=^$VERSION" -w idfkit
+          npm pkg set "dependencies.@idfkit/core=^$VERSION" -w @idfkit/idfkit
+          npm pkg set "dependencies.@idfkit/schemas=^$VERSION" -w @idfkit/idfkit
+          npm pkg set "peerDependencies.@idfkit/weather=^$VERSION" -w @idfkit/idfkit
+          npm pkg set "peerDependencies.@idfkit/language=^$VERSION" -w @idfkit/idfkit
           # npm applies the `latest` dist-tag on every publish unless told otherwise, and it
           # does so for a semver prerelease exactly as for a stable version: nothing about the
           # `-rc.1` in a version reaches the registry's idea of what `npm install <pkg>` should
@@ -284,10 +283,10 @@ jobs:
           esac
           echo "Publishing $VERSION under the '$NPM_TAG' dist-tag."
 
-          if npm view "idfkit@$VERSION" version >/dev/null 2>&1; then
-            echo "idfkit@$VERSION is already published; nothing to do."
+          if npm view "@idfkit/idfkit@$VERSION" version >/dev/null 2>&1; then
+            echo "@idfkit/idfkit@$VERSION is already published; nothing to do."
           else
-            npm publish -w idfkit --access public --tag "$NPM_TAG"
+            npm publish -w @idfkit/idfkit --access public --tag "$NPM_TAG"
           fi
 
   # Only after `publish` has returned, and only when it published something. Feature 004 gave the

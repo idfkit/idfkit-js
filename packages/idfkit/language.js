@@ -1,9 +1,9 @@
 /**
- * `idfkit/language`, which is `@idfkit/language` behind a named-install guard.
+ * `@idfkit/idfkit/language`, which is `@idfkit/language` behind a named-install guard.
  *
  * WHY THIS FILE IS NOT `export * from '@idfkit/language'`
  *
- * @idfkit/language is an optional peer dependency: `npm install idfkit` does not
+ * @idfkit/language is an optional peer dependency: `npm install @idfkit/idfkit` does not
  * install it, which is what keeps the language service off disk for the readers
  * who only read and write models (SC-015). `check-install-size.mjs` reports
  * 94.1% of the 1.875 MiB budget used with 114 KB free, and the service emits
@@ -17,7 +17,7 @@
  * is no point at which this file's own code runs first: Node fails the link with
  *
  *     ERR_MODULE_NOT_FOUND: Cannot find package '@idfkit/language' imported from
- *     .../node_modules/idfkit/language.js
+ *     .../node_modules/@idfkit/idfkit/language.js
  *
  * and nothing here is ever reached. `weather.js` next to this file documents the
  * same reasoning and the `imports` fallback array that looks like the mechanism
@@ -31,7 +31,7 @@
  * service's whole point is that it is synchronous and free of input and output
  * (FR-024).
  *
- *     import { contextAt } from 'idfkit/language';
+ *     import { contextAt } from '@idfkit/idfkit/language';
  *     const context = contextAt(text, offset, schema);   // no await, ever
  *
  * The awaited module graph is the whole price. Concretely: `require()` of this
@@ -51,7 +51,7 @@
  * carry no runtime value and so have nothing to re-export here.
  *
  * `scanIdf` and `classify` are deliberately absent. They live in @idfkit/core
- * and reach a reader as `idfkit`, because the syntax layer serves reading and
+ * and reach a reader as `@idfkit/idfkit`, because the syntax layer serves reading and
  * writing too. Re-exporting them here would give one function two names.
  */
 
@@ -95,11 +95,11 @@ try {
   const absent = NOT_FOUND.has(error?.code) && unresolved === '@idfkit/language';
   if (!absent) throw error;
   throw new Error(
-    "idfkit/language requires the optional component '@idfkit/language', which is not installed.\n" +
+    "@idfkit/idfkit/language requires the optional component '@idfkit/language', which is not installed.\n" +
       '\n' +
       '    npm install @idfkit/language\n' +
       '\n' +
-      'It is an optional peer dependency, so installing idfkit deliberately leaves it out: the ' +
+      'It is an optional peer dependency, so installing @idfkit/idfkit deliberately leaves it out: the ' +
       'language service stays off disk for everyone who reads and writes models without an ' +
       'editor in front of them. Everything else in idfkit works without it.',
     { cause: error }
