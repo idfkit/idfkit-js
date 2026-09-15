@@ -10,6 +10,17 @@ The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-14
+
+The first stable 0.3.0, completing the line begun by `rc.1`, `rc.2` and `rc.3`.
+This release moves to `conformance-2026.13` and `governance-2026.18`. The corpus
+level changes no case: 69 cases and 211 assertions, as `conformance-2026.12` had.
+What it removes is the second language's exception on
+`types-choice-field-casing`, because the fix below makes that case pass.
+`governance-2026.18` adds the consumer register and renames nothing.
+
+It is also the first release to publish the facade, as `@idfkit/idfkit`.
+
 ### Changed
 
 - **The facade publishes as `@idfkit/idfkit`, not `idfkit`.** npm refused the
@@ -783,7 +794,8 @@ First published release. The API is not yet stable.
   no schema matches, because loading the wrong schema mis-maps every positional
   field instead of failing.
 
-[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.3...HEAD
+[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.3...v0.3.0
 [0.3.0-rc.3]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.2...v0.3.0-rc.3
 [0.3.0-rc.2]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.1...v0.3.0-rc.2
 [0.3.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.2.0...v0.3.0-rc.1
