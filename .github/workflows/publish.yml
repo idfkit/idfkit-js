@@ -160,6 +160,21 @@ jobs:
           # failed install is better than an underline in the wrong place.
           npm pkg set "peerDependencies.@idfkit/core=$VERSION" -w @idfkit/language
 
+          # @idfkit/geometry peer-depends on core and carries the same "0.0.0" placeholder, for the
+          # same reason and with the same consequence if it is published unchanged: the registry
+          # has never served @idfkit/core@0.0.0, so every install of the geometry package would
+          # fail to resolve its peer.
+          #
+          # A CARET, not the exact pin the language service takes. The two are weighed on the same
+          # question and answered differently because the coupling differs. The language service
+          # reads the syntax layer core builds, so a pair that disagrees about that layer's shape
+          # puts findings on the wrong characters silently. Geometry reads only core's published
+          # object model -- `get`, `fieldSchema`, `regionOf`, `all`, `types` -- and a core that
+          # changed any of those would break it loudly at the first call rather than quietly. The
+          # facade's reasoning applies instead: a patch of core is a patch of geometry and should
+          # reach a consumer without a geometry release.
+          npm pkg set "peerDependencies.@idfkit/core=^$VERSION" -w @idfkit/geometry
+
           # The facade's own dependency specs, which `npm version` does NOT touch: it rewrites
           # the "version" field of each workspace and nothing else. In the repository they read
           # "0.0.0", which is what makes the workspace link resolve. Published unchanged, they
@@ -185,8 +200,8 @@ jobs:
           # already-published package, so a release that failed partway can
           # never be completed by re-running it.
           # schemas first: core depends on it by exact version. weather has no
-          # workspace dependencies, so its position does not matter. language peer-depends on
-          # core and so follows it. The type packages go last:
+          # workspace dependencies, so its position does not matter. language and geometry
+          # peer-depend on core and so follow it. The type packages go last:
           # their peer range resolves against a core that is on the registry by then, so a
           # consumer installing one never sees an unsatisfiable peer.
           # npm applies the `latest` dist-tag on every publish unless told otherwise, and it
@@ -202,7 +217,7 @@ jobs:
           echo "Publishing $VERSION under the '$NPM_TAG' dist-tag."
 
           for pkg in @idfkit/schemas @idfkit/core @idfkit/weather @idfkit/language \
-                     @idfkit/types-v26-1 @idfkit/types-v9-4; do
+                     @idfkit/geometry @idfkit/types-v26-1 @idfkit/types-v9-4; do
             if npm view "$pkg@$VERSION" version >/dev/null 2>&1; then
               echo "$pkg@$VERSION is already published; skipping."
             else

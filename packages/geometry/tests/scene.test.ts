@@ -449,6 +449,37 @@ describe('nothing is dropped silently', () => {
     expect(scene.unresolved[0]?.missingReference).toBe('NoSuchZone');
   });
 
+  it('counts the vertices an object states when it names the reason', async () => {
+    // The two reasons about an object's own vertex list, told apart by the count. A window stating
+    // two vertices is short of vertices, not without them. Reading the extensible wrapper to decide
+    // instead calls it `no-vertices`, because fenestration states its vertices in flat fields and
+    // carries no wrapper at all, which is how the first language read it until this was written.
+    const document = await oneWall();
+    document.addRaw('FenestrationSurface:Detailed', 'TwoVertices', {
+      surface_type: 'Window',
+      construction_name: '',
+      building_surface_name: 'W1',
+      number_of_vertices: 2,
+      vertex_1_x_coordinate: 1,
+      vertex_1_y_coordinate: 0,
+      vertex_1_z_coordinate: 2,
+      vertex_2_x_coordinate: 1,
+      vertex_2_y_coordinate: 0,
+      vertex_2_z_coordinate: 1,
+    });
+    const scene = getScene(document);
+    expect(scene.unresolved.map((entry) => entry.reason)).toEqual(['too-few-vertices']);
+  });
+
+  it('tells an object stating nothing from one stating too little', async () => {
+    // `no-vertices` is the model saying nothing, and is the reason with no test until now.
+    const document = await oneWall();
+    (document.all('BuildingSurface:Detailed').first as IdfObject).set('vertices', []);
+    const scene = getScene(document);
+    expect(scene.unresolved.map((entry) => entry.reason)).toEqual(['no-vertices']);
+    expect(scene.unresolved[0]?.missingReference).toBeUndefined();
+  });
+
   it('names nothing when there was no reference to miss', async () => {
     const document = await oneWall();
     const wall = document.all('BuildingSurface:Detailed').first as IdfObject;

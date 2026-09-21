@@ -115,19 +115,20 @@ export const UNREAD: readonly string[] = [
  * The object is required in practice, so these are what a partial model is read as rather than a
  * documented default, and every one of them is recorded in {@link AppliedRules.defaulted} when it
  * is used.
+ *
+ * One row per rule, carrying the member, the field the model spells it under, and the fallback.
+ * Two parallel tables keyed by the member would let a typo in either one read as a missing key and
+ * default the rule silently, which is the failure a reader of this file could not see.
  */
-const DEFAULT_RULES: readonly (readonly [string, string])[] = [
-  ['startingVertexPosition', 'UpperLeftCorner'],
-  ['vertexEntryDirection', 'Counterclockwise'],
-  ['coordinateSystem', 'Relative'],
-];
-
-/** The field each default is read from, since the model spells them the other way. */
-const RULE_FIELDS: Record<string, string> = {
-  startingVertexPosition: 'starting_vertex_position',
-  vertexEntryDirection: 'vertex_entry_direction',
-  coordinateSystem: 'coordinate_system',
-};
+const DEFAULT_RULES = [
+  {
+    member: 'startingVertexPosition',
+    field: 'starting_vertex_position',
+    fallback: 'UpperLeftCorner',
+  },
+  { member: 'vertexEntryDirection', field: 'vertex_entry_direction', fallback: 'Counterclockwise' },
+  { member: 'coordinateSystem', field: 'coordinate_system', fallback: 'Relative' },
+] as const;
 
 // ---------------------------------------------------------------------------
 // The scene
@@ -309,8 +310,7 @@ function readRules(document: IdfDocument<AnyTypeMap>): AppliedRules {
 
   const declared: Record<string, string> = {};
   const defaulted: string[] = [];
-  for (const [member, fallback] of DEFAULT_RULES) {
-    const field = RULE_FIELDS[member] as string;
+  for (const { member, field, fallback } of DEFAULT_RULES) {
     let value = canonical(rules, field, rules?.get(field));
     if (value === '') {
       value = fallback;
@@ -415,9 +415,9 @@ function typeRank(document: IdfDocument<AnyTypeMap>): Map<string, number> {
  */
 function inDocumentOrder(
   document: IdfDocument<AnyTypeMap>,
-  objectTypes: readonly string[]
+  objectTypes: readonly string[],
+  rank: Map<string, number>
 ): IdfObject[] {
-  const rank = typeRank(document);
   const placed: { at: number; obj: IdfObject }[] = [];
   const unplaced: { type: number; within: number; obj: IdfObject }[] = [];
   for (const objectType of objectTypes) {
@@ -439,18 +439,31 @@ function inDocumentOrder(
  * Two storage shapes, as in the first language. An extensible type holds its repeats under the
  * schema's wrapper; a type whose vertex count is fixed in the schema, `FenestrationSurface:Detailed`
  * among them, holds flat `vertex_N_x_coordinate` fields instead.
+ *
+ * The wrapper is read with `get` and not through the `extensible` accessor, which is a correctness
+ * choice rather than a stylistic one. That accessor WRITES: it stores an empty array on an object
+ * whose wrapper is absent, and on a document that retains its source it replaces the stored array
+ * with a tracking wrapper. A read that modifies the document contradicts this module's one
+ * guarantee. `get` hands back the stored value and touches nothing, which is what the first
+ * language's `data.get("vertices")` does.
  */
 function verticesOf(surface: IdfObject): Vector3D[] {
   const vertices: Vector3D[] = [];
-  for (const group of surface.extensible) {
-    const x = group['vertex_x_coordinate'];
-    const y = group['vertex_y_coordinate'];
-    const z = group['vertex_z_coordinate'];
-    if (x === undefined || y === undefined || z === undefined) continue;
-    if (x === '' || y === '' || z === '') continue;
-    vertices.push(new Vector3D(Number(x), Number(y), Number(z)));
+  const held = surface.get('vertices');
+  if (Array.isArray(held)) {
+    for (const group of held) {
+      const x = group['vertex_x_coordinate'];
+      const y = group['vertex_y_coordinate'];
+      const z = group['vertex_z_coordinate'];
+      if (x === undefined || y === undefined || z === undefined) continue;
+      if (x === '' || y === '' || z === '') continue;
+      vertices.push(new Vector3D(Number(x), Number(y), Number(z)));
+    }
+    // Returned whether or not it yielded a vertex, as the first language returns it. A type that
+    // states the wrapper does not also state flat coordinates, and falling through to them would
+    // read a surface the other language does not.
+    return vertices;
   }
-  if (vertices.length > 0) return vertices;
 
   for (let at = 1; ; at += 1) {
     const x = surface.get(`vertex_${at}_x_coordinate`);
@@ -565,30 +578,31 @@ function resolveOne(
  * dutifully frame.
  */
 function boundsOf(surfaces: readonly ResolvedSurface[]): SceneBounds | undefined {
-  let min: Vector3D | undefined;
-  let max: Vector3D | undefined;
+  // Six numbers rather than two vectors: carrying the running extent as vectors allocates two
+  // immutable objects per vertex, and a real model has tens of thousands of them.
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  let seen = false;
   for (const surface of surfaces) {
     for (const vertex of surface.polygon.vertices) {
-      min =
-        min === undefined
-          ? vertex
-          : new Vector3D(
-              Math.min(min.x, vertex.x),
-              Math.min(min.y, vertex.y),
-              Math.min(min.z, vertex.z)
-            );
-      max =
-        max === undefined
-          ? vertex
-          : new Vector3D(
-              Math.max(max.x, vertex.x),
-              Math.max(max.y, vertex.y),
-              Math.max(max.z, vertex.z)
-            );
+      seen = true;
+      // `Math.min`/`Math.max` rather than a comparison, so that a coordinate the model states
+      // unreadably propagates exactly as it did when the extent was carried as vectors, instead of
+      // being quietly skipped on one axis.
+      minX = Math.min(minX, vertex.x);
+      minY = Math.min(minY, vertex.y);
+      minZ = Math.min(minZ, vertex.z);
+      maxX = Math.max(maxX, vertex.x);
+      maxY = Math.max(maxY, vertex.y);
+      maxZ = Math.max(maxZ, vertex.z);
     }
   }
-  if (min === undefined || max === undefined) return undefined;
-  return { min, max };
+  if (!seen) return undefined;
+  return { min: new Vector3D(minX, minY, minZ), max: new Vector3D(maxX, maxY, maxZ) };
 }
 
 /**
@@ -597,20 +611,28 @@ function boundsOf(surfaces: readonly ResolvedSurface[]): SceneBounds | undefined
  * This is what makes a model of simplified surfaces distinguishable from a model with no geometry
  * at all. Without it, both look like an empty scene and a reader is told nothing.
  */
-function unattemptedOf(document: IdfDocument<AnyTypeMap>): UnattemptedType[] {
-  const rank = typeRank(document);
+function unattemptedOf(
+  document: IdfDocument<AnyTypeMap>,
+  rank: Map<string, number>
+): UnattemptedType[] {
   const found: { known: number; at: number; objectType: string; count: number }[] = [];
   for (const objectType of UNREAD) {
     const objects = objectsOf(document, objectType);
     if (objects.length === 0) continue;
-    const offsets = objects
-      .map((obj) => document.regionOf(obj)?.start)
-      .filter((start): start is number => start !== undefined);
+    // Folded rather than spread into `Math.min`: a model may state more objects of one type than
+    // the engine accepts as arguments in a single call, and a stack overflow there would fail a
+    // read of a file that is merely large.
+    let earliest: number | undefined;
+    for (const obj of objects) {
+      const start = document.regionOf(obj)?.start;
+      if (start === undefined) continue;
+      if (earliest === undefined || start < earliest) earliest = start;
+    }
     // Sorted by byte offset when the document carries its source, and by where the file first
     // states the type otherwise. Never by the order of `UNREAD`, which is this module's.
     found.push(
-      offsets.length > 0
-        ? { known: 0, at: Math.min(...offsets), objectType, count: objects.length }
+      earliest !== undefined
+        ? { known: 0, at: earliest, objectType, count: objects.length }
         : { known: 1, at: rank.get(objectType) ?? rank.size, objectType, count: objects.length }
     );
   }
@@ -649,6 +671,8 @@ function unattemptedOf(document: IdfDocument<AnyTypeMap>): UnattemptedType[] {
  */
 export function getScene(document: IdfDocument<AnyTypeMap>): Scene {
   const rules = readRules(document);
+  // One walk of the document's type keys, shared by the two orderings that need it.
+  const rank = typeRank(document);
 
   const zones = new Map<string, IdfObject>();
   for (const zone of objectsOf(document, 'Zone')) zones.set(zone.name.toUpperCase(), zone);
@@ -661,7 +685,7 @@ export function getScene(document: IdfDocument<AnyTypeMap>): Scene {
 
   const surfaces: ResolvedSurface[] = [];
   const unresolved: UnresolvedObject[] = [];
-  for (const surface of inDocumentOrder(document, READ)) {
+  for (const surface of inDocumentOrder(document, READ, rank)) {
     const outcome = resolveOne(surface, zones, rules, surfacesByName);
     if ('polygon' in outcome) surfaces.push(outcome);
     else unresolved.push(outcome);
@@ -672,6 +696,6 @@ export function getScene(document: IdfDocument<AnyTypeMap>): Scene {
     bounds: boundsOf(surfaces),
     applied: rules,
     unresolved,
-    unattempted: unattemptedOf(document),
+    unattempted: unattemptedOf(document, rank),
   };
 }
