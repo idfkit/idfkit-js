@@ -80,6 +80,10 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCANNED_PACKAGES = [
   { dir: 'packages/core', reason: 'the shared install name' },
   {
+    dir: 'packages/geometry',
+    reason: 'the opt-in geometry peer, ledger entry geometry-extraction',
+  },
+  {
     dir: 'packages/weather',
     reason: 'the opt-in weather peer, ledger entries weather-index and geocoding',
   },
