@@ -642,6 +642,36 @@ describe('the document is unchanged', () => {
     getScene(document);
     expect(written(document)).toBe(before);
   });
+
+  it('does not touch a document that retained its source', async () => {
+    // The case the constructed assertion above cannot reach. A document built through `addRaw`
+    // retains no source text, so `preserveFormatting` degrades to an ordinary write and a mutation
+    // that only shows on a retained-source document passes unseen. The corpus fixtures exercise the
+    // retained path and are skipped wherever a corpus checkout is not beside this one, which is
+    // every CI run, so the guarantee this module rests on had nothing holding it there.
+    //
+    // Both halves are compared: the bytes a preserving write emits, and the document's own value.
+    const text =
+      'Version, 26.1;\n' +
+      'GlobalGeometryRules, UpperLeftCorner, Counterclockwise, Relative;\n' +
+      'Zone, Z1, , 10, 20, 0;\n' +
+      'BuildingSurface:Detailed, W1, Wall, , Z1, , Outdoors, , , , , 3,\n' +
+      '  0,0,3, 0,0,0, 4,0,0;\n' +
+      'FenestrationSurface:Detailed, F1, Window, , W1, , , , , 3,\n' +
+      '  1,0,2, 1,0,1, 2,0,1;\n' +
+      'Wall:Exterior, Simple, , Z1, , 180, 90, 0, 0, 0, 4, 3;\n';
+    const document = parseIdf(text, await schema(), { preserveFormatting: true }).document;
+
+    const bytes = written(document);
+    const value = JSON.stringify(document.toJSON());
+
+    const scene = getScene(document);
+    expect(scene.surfaces).toHaveLength(2);
+    expect(scene.unattempted.map((entry) => entry.objectType)).toEqual(['Wall:Exterior']);
+
+    expect(written(document)).toBe(bytes);
+    expect(JSON.stringify(document.toJSON())).toBe(value);
+  });
 });
 
 // ---------------------------------------------------------------------------

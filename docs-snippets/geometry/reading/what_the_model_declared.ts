@@ -6,14 +6,13 @@ declare const scene: Scene;
 const applied = scene.applied;
 
 // What the model stated, in the schema's spelling rather than the file's casing.
-applied.coordinateSystem; // 'Relative' or 'World'
-applied.vertexEntryDirection; // 'Counterclockwise' or 'Clockwise'
-applied.startingVertexPosition; // 'UpperLeftCorner', and so on
-applied.northAxis; // degrees, clockwise from true north
+console.log(applied.coordinateSystem); // 'Relative' or 'World'
+console.log(applied.vertexEntryDirection); // 'Counterclockwise' or 'Clockwise'
+console.log(applied.startingVertexPosition); // 'UpperLeftCorner', and so on
+console.log(applied.northAxis); // degrees, clockwise from true north
 
 // Two conditions worth asking about directly, since both change the answer.
-applied.isRelative;
-applied.isClockwise;
+console.log(applied.isRelative, applied.isClockwise);
 
 // Fields the model did not state, named rather than silently defaulted.
 if (applied.defaulted.includes('north_axis')) {

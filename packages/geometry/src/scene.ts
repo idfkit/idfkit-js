@@ -153,6 +153,9 @@ const DEFAULT_RULES = [
   { member: 'coordinateSystem', field: 'coordinate_system', fallback: 'Relative' },
 ] as const;
 
+/** The member names the table declares, read off the table so the two cannot disagree. */
+type RuleMember = (typeof DEFAULT_RULES)[number]['member'];
+
 // ---------------------------------------------------------------------------
 // The scene
 // ---------------------------------------------------------------------------
@@ -297,7 +300,9 @@ function objectsOf(document: IdfDocument<AnyTypeMap>, objectType: string): IdfOb
 
 /** The first object of a type, or none. Singletons here, so first is the one. */
 function firstOf(document: IdfDocument<AnyTypeMap>, objectType: string): IdfObject | undefined {
-  return objectsOf(document, objectType)[0];
+  // The collection's own `first`, rather than materialising every object of the type to take the
+  // one at the front. Both types read through here are singletons, so the array was never read.
+  return document.all(objectType).first;
 }
 
 /**
@@ -331,7 +336,13 @@ function readRules(document: IdfDocument<AnyTypeMap>): AppliedRules {
   const rules = firstOf(document, 'GlobalGeometryRules');
   const building = firstOf(document, 'Building');
 
-  const declared: Record<string, string> = {};
+  // Seeded from the same table the loop reads, so the record is total over the member names by
+  // construction. A `Record<string, string>` read back with a cast would let a member spelled one
+  // way here and another way in the table answer `undefined` and throw at the first `toLowerCase`,
+  // which is the silent-missing-key failure the table above exists to prevent.
+  const declared = Object.fromEntries(
+    DEFAULT_RULES.map(({ member, fallback }) => [member, fallback])
+  ) as Record<RuleMember, string>;
   const defaulted: string[] = [];
   for (const { member, field, fallback } of DEFAULT_RULES) {
     let value = canonical(rules, field, rules?.get(field));
@@ -353,12 +364,11 @@ function readRules(document: IdfDocument<AnyTypeMap>): AppliedRules {
     defaulted.push('north_axis');
   }
 
-  const coordinateSystem = declared['coordinateSystem'] as string;
-  const vertexEntryDirection = declared['vertexEntryDirection'] as string;
+  const { coordinateSystem, vertexEntryDirection, startingVertexPosition } = declared;
   return {
     coordinateSystem,
     vertexEntryDirection,
-    startingVertexPosition: declared['startingVertexPosition'] as string,
+    startingVertexPosition,
     northAxis: numberField(building, 'north_axis'),
     defaulted,
     isRelative: coordinateSystem.toLowerCase() === 'relative',
