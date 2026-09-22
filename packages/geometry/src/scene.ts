@@ -55,14 +55,37 @@ import { Vector3D } from './vector.js';
 const HEAT_TRANSFER = 'BuildingSurface:Detailed';
 /** The detailed fenestration surface, stated in its parent surface's frame. */
 const FENESTRATION = 'FenestrationSurface:Detailed';
+/**
+ * Detached shading fixed to the site, and the one place clause two is conditional: the engine turns
+ * every surface by the building's north axis except this one.
+ *
+ * MEASURED, not read. EnergyPlus's schema says of this type that these items "are fixed in space and
+ * would not move with relative geometry", against the building form's "are relative to the current
+ * building and would move with relative geometry", and the two carry identical fields. That is a
+ * memo rather than an oracle, so it was put to the engine: one square from (50, 0) to (60, 0)
+ * entered twice, once under each type, in a model declaring a north axis of 158.434. EnergyPlus
+ * 26.1.0 reports the site form where it was authored and the building form at (-46.50, -18.38) to
+ * (-55.80, -22.05), turned, and labels the two `Detached Shading:Fixed` and
+ * `Detached Shading:Building` in its own report.
+ *
+ * NO FIXTURE CAN CARRY THIS YET. Each fixture in `checks/geometry-vertices` is a byte-for-byte copy
+ * of a shipped example model, and of the twenty such models holding detached shading not one
+ * declares a north axis, which is why the corpus reported this rule green while both libraries had
+ * it wrong. The check's coverage note records the gap.
+ */
+const SITE_SHADING = 'Shading:Site:Detailed';
 /** The three detailed shading forms. */
-const SHADING = [
-  'Shading:Site:Detailed',
-  'Shading:Building:Detailed',
-  'Shading:Zone:Detailed',
-] as const;
+const SHADING = [SITE_SHADING, 'Shading:Building:Detailed', 'Shading:Zone:Detailed'] as const;
 /** @internal Exported for the tests that hold the read and unread lists to the schema. */
 export const READ: readonly string[] = [HEAT_TRANSFER, FENESTRATION, ...SHADING];
+
+/**
+ * The types a `building_surface_name` or a `base_surface_name` may name. The schema declares the
+ * `SurfaceNames` reference list on the heat transfer surfaces and on nothing else, so a shading
+ * surface is never anyone's parent. Keeping it out of the lookup is what stops a name shared across
+ * the two families from answering a parent lookup with a shading object.
+ */
+const PARENTS: readonly string[] = [HEAT_TRANSFER];
 
 /**
  * Geometry types this slice does not read, reported rather than skipped.
@@ -318,7 +341,17 @@ function readRules(document: IdfDocument<AnyTypeMap>): AppliedRules {
     }
     declared[member] = value;
   }
-  if (building === undefined) defaulted.push('north_axis');
+  // A `Building` that states no axis is assumed to be unrotated exactly as an absent one is, so both
+  // are recorded. A stated zero is a declaration and is not.
+  const statedAxis = building?.get('north_axis');
+  if (
+    building === undefined ||
+    statedAxis === undefined ||
+    statedAxis === null ||
+    statedAxis === ''
+  ) {
+    defaulted.push('north_axis');
+  }
 
   const coordinateSystem = declared['coordinateSystem'] as string;
   const vertexEntryDirection = declared['vertexEntryDirection'] as string;
@@ -341,13 +374,24 @@ function readRules(document: IdfDocument<AnyTypeMap>): AppliedRules {
  * Apply clause one and clause two to one polygon.
  *
  * Clause one is conditional on the declared coordinate system, which is the whole reason the twelve
- * world models with a non-zero zone origin come out right. Clause two is unconditional and is
- * applied about the world origin, so that the building turns as one body.
+ * world models with a non-zero zone origin come out right. Clause two is applied about the world
+ * origin, so that the building turns as one body.
+ *
+ * `fixedToSite` is clause two's one exception, and it is the engine's own. Site shading is fixed in
+ * space and does not turn with the building, which is the whole difference between
+ * `Shading:Site:Detailed` and `Shading:Building:Detailed`: the two carry identical fields, and at a
+ * north axis of 158.434 the engine reports the same square where it was authored under the first
+ * type and turned by 158.434 degrees under the second. Every other surface turns.
  *
  * The north axis is negated because EnergyPlus measures it clockwise from true north, while
  * `rotateZ` turns counter-clockwise.
  */
-function place(polygon: Polygon3D, zone: IdfObject | undefined, rules: AppliedRules): Polygon3D {
+function place(
+  polygon: Polygon3D,
+  zone: IdfObject | undefined,
+  rules: AppliedRules,
+  fixedToSite = false
+): Polygon3D {
   let placed = polygon;
   if (rules.isRelative && zone !== undefined) {
     const relativeNorth = numberField(zone, 'direction_of_relative_north');
@@ -359,7 +403,9 @@ function place(polygon: Polygon3D, zone: IdfObject | undefined, rules: AppliedRu
     );
     if (!origin.equals(Vector3D.origin())) placed = placed.translate(origin);
   }
-  if (rules.northAxis !== 0) placed = placed.rotateZ(-rules.northAxis, Vector3D.origin());
+  if (rules.northAxis !== 0 && !fixedToSite) {
+    placed = placed.rotateZ(-rules.northAxis, Vector3D.origin());
+  }
   return placed;
 }
 
@@ -476,10 +522,16 @@ function verticesOf(surface: IdfObject): Vector3D[] {
   return vertices;
 }
 
-/** The zone a surface names, under whichever of the three field names its type uses. */
+/**
+ * The zone a surface names, under whichever of the two field names its type uses.
+ *
+ * Only fields that name a ZONE. `base_surface_name` names a surface, and reading it here handed a
+ * surface's name back to a caller that looks it up among the zones: a miss at best, and a
+ * `zone-not-found` naming a wall at worst.
+ */
 function zoneOf(surface: IdfObject | undefined): string {
   if (surface === undefined) return '';
-  for (const field of ['zone_name', 'zone_or_zonelist_name', 'base_surface_name']) {
+  for (const field of ['zone_name', 'zone_or_zonelist_name']) {
     const value = textField(surface, field);
     if (value !== '') return value;
   }
@@ -543,7 +595,10 @@ function resolveOne(
     return { objectType, name, reason: 'zone-not-found', missingReference: zoneName };
   }
 
-  const polygon = wind(place(new Polygon3D(vertices), zone, rules), rules);
+  const polygon = wind(
+    place(new Polygon3D(vertices), zone, rules, objectType === SITE_SHADING),
+    rules
+  );
 
   // The schema gives a shading surface no surface-type field, so the canonical object type goes in
   // that position. It is neither an empty string, which says nothing, nor an invented word like
@@ -678,7 +733,7 @@ export function getScene(document: IdfDocument<AnyTypeMap>): Scene {
   for (const zone of objectsOf(document, 'Zone')) zones.set(zone.name.toUpperCase(), zone);
 
   const surfacesByName = new Map<string, IdfObject>();
-  for (const objectType of [HEAT_TRANSFER, ...SHADING]) {
+  for (const objectType of PARENTS) {
     for (const obj of objectsOf(document, objectType))
       surfacesByName.set(obj.name.toUpperCase(), obj);
   }

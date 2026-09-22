@@ -290,6 +290,48 @@ describe('the clauses are conditional', () => {
     expect(getScene(await oneWall()).surfaces[0]?.surfaceType).toBe('Wall');
   });
 
+  it('holds site shading fixed in space while building shading turns', async () => {
+    // Clause two's one exception, which no fixture in the corpus carries. The schema separates the
+    // two detached forms on one sentence: site shading items "are fixed in space and would not move
+    // with relative geometry", building shading items "are relative to the current building and
+    // would move with relative geometry". They carry identical fields, so the object type is the
+    // whole of the difference, and a rule that turned both would make the two objects one object.
+    //
+    // Measured rather than read: at a north axis of 158.434 EnergyPlus 26.1.0 reports the same
+    // square where it was authored under the first type and turned under the second, and labels
+    // them `Detached Shading:Fixed` and `Detached Shading:Building` in its own report.
+    const document = await oneWall();
+    document.addRaw('Building', 'B', { north_axis: 90 });
+    for (const objectType of ['Shading:Site:Detailed', 'Shading:Building:Detailed']) {
+      document.addRaw(objectType, `S-${objectType}`, {
+        number_of_vertices: 3,
+        vertices: [
+          { vertex_x_coordinate: 2, vertex_y_coordinate: 0, vertex_z_coordinate: 3 },
+          { vertex_x_coordinate: 2, vertex_y_coordinate: 0, vertex_z_coordinate: 0 },
+          { vertex_x_coordinate: 0, vertex_y_coordinate: 0, vertex_z_coordinate: 0 },
+        ],
+      });
+    }
+    const placed = new Map(
+      getScene(document).surfaces.map((s) => [s.objectType, s.polygon.vertices[0] as Vector3D])
+    );
+    expect(placed.get('Shading:Site:Detailed')?.asTuple()).toEqual([2, 0, 3]);
+    // Ninety degrees clockwise seen from above sends +x to -y.
+    const turned = placed.get('Shading:Building:Detailed') as Vector3D;
+    const round9 = (value: number) => Math.round(value * 1e9) / 1e9;
+    expect([round9(turned.x), round9(turned.y), turned.z]).toEqual([0, -2, 3]);
+  });
+
+  it('records a Building that states no axis as defaulted', async () => {
+    // A stated zero is a declaration; a blank field is not, and is assumed exactly as an absent
+    // object is. FR-016 asks for each governing field as declared or defaulted, and a consumer
+    // warning on assumed values would otherwise stay silent on the one that moves a building most.
+    const text = 'Version,26.1;\n\nBuilding,B,,City;\n\nZone,Z1;\n';
+    const scene = getScene(parseIdf(text, await schema()).document);
+    expect(scene.applied.northAxis).toBe(0);
+    expect(scene.applied.defaulted).toContain('north_axis');
+  });
+
   it('records an absent rules object as defaulted', async () => {
     // A model stating neither object is read under the engine's assumptions, and says so. Parsed
     // from text rather than built: the point is a document that genuinely lacks them.
