@@ -165,15 +165,30 @@ jobs:
           # has never served @idfkit/core@0.0.0, so every install of the geometry package would
           # fail to resolve its peer.
           #
-          # A CARET, not the exact pin the language service takes. The two are weighed on the same
-          # question and answered differently because the coupling differs. The language service
-          # reads the syntax layer core builds, so a pair that disagrees about that layer's shape
-          # puts findings on the wrong characters silently. Geometry reads only core's published
-          # object model -- `get`, `fieldSchema`, `regionOf`, `all`, `types` -- and a core that
-          # changed any of those would break it loudly at the first call rather than quietly. The
-          # facade's reasoning applies instead: a patch of core is a patch of geometry and should
-          # reach a consumer without a geometry release.
-          npm pkg set "peerDependencies.@idfkit/core=^$VERSION" -w @idfkit/geometry
+          # EXACT, like the language service, and this was a caret until the first consumer read
+          # it. The coupling argument for a caret still stands on its own terms: geometry reads
+          # only core's published object model -- `get`, `fieldSchema`, `regionOf`, `all`, `types`
+          # -- and a core that changed any of those breaks it loudly at the first call, where a
+          # language service reading core's syntax layer would instead put findings on the wrong
+          # characters silently. That difference is real. It is not what decides this.
+          #
+          # What decides it is that the caret's benefit goes to nobody. It exists so that a patch
+          # of core reaches a consumer without a geometry release. The only consumer of this
+          # package is envelop, whose register entry declares `form = "exact"` on every scoped
+          # package and holds all of them at one shared version, so it cannot take a core patch
+          # without moving geometry in the same breath. A range bought for flexibility that its
+          # sole consumer is forbidden to use is a range that only has failure modes left.
+          #
+          # The smaller reason, recorded because it is easy to rediscover and misattribute: a
+          # caret's behaviour depends on whether the release it was stamped from was final.
+          # `^0.4.0` does not satisfy `0.4.0-rc.1`, while `^0.4.0-rc.1` satisfies `0.4.0-rc.1`,
+          # `0.4.0-rc.2` and `0.4.0` alike. Five of the nine published @idfkit/core versions are
+          # prereleases, so that asymmetry would have been met eventually.
+          #
+          # Exact composes with the facade exactly as the language service's does, for the reason
+          # given above: npm resolves peers while building the tree, so `@idfkit/idfkit`'s "^X"
+          # and this "X" are satisfied together by X.
+          npm pkg set "peerDependencies.@idfkit/core=$VERSION" -w @idfkit/geometry
 
           # The facade's own dependency specs, which `npm version` does NOT touch: it rewrites
           # the "version" field of each workspace and nothing else. In the repository they read
