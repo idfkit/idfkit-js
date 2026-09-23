@@ -1,14 +1,14 @@
 {
-  "name": "@idfkit/core",
+  "name": "@idfkit/geometry",
   "version": "0.0.0",
-  "description": "Fast EnergyPlus IDF and epJSON parsing and manipulation for JavaScript",
+  "description": "Read-only geometry extraction for EnergyPlus models: vectors, polygons, and a model's resolved scene",
   "type": "module",
   "license": "MIT",
   "author": "Samuel Letellier-Duchesne <developers@idfkit.com>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/idfkit/idfkit-js.git",
-    "directory": "packages/core"
+    "directory": "packages/geometry"
   },
   "homepage": "https://js.idfkit.com/",
   "bugs": {
@@ -17,7 +17,8 @@
   "keywords": [
     "energyplus",
     "idf",
-    "epjson",
+    "geometry",
+    "surfaces",
     "building-energy",
     "simulation"
   ],
@@ -25,10 +26,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./node": {
-      "types": "./dist/node.d.ts",
-      "default": "./dist/node.js"
     }
   },
   "files": [
@@ -41,16 +38,8 @@
   "engines": {
     "node": ">=20"
   },
-  "idfkit": {
-    "conformance": "conformance-2026.15",
-    "governance": "governance-2026.22"
-  },
-  "dependencies": {
-    "@idfkit/schemas": "0.0.0"
-  },
-  "devDependencies": {
-    "@idfkit/types-v26-1": "*",
-    "@idfkit/types-v9-4": "*"
+  "peerDependencies": {
+    "@idfkit/core": "0.0.0"
   },
   "scripts": {
     "build": "tsc --build"
