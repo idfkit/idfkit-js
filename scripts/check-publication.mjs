@@ -110,12 +110,11 @@ class CannotRun extends Error {}
  * asserted by the run in that repository and is not observable from here. So the level is written
  * down by someone who checked both, and moving it is the act of re-attesting.
  *
- * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.13, the level
- * that drops the typescript exception on types-choice-field-casing, and the evidence for it, taken
- * rather than recalled:
+ * T101 named conformance-2026.6, the level that proved the Tier 1 port. This is 2026.15, the level
+ * that adds checks/geometry-vertices, and the evidence for it, taken rather than recalled:
  *
- *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.13
- *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.13
+ *   idfkit-js    packages/core/package.json  idfkit.conformance   = conformance-2026.15
+ *   idfkit       pyproject.toml              [tool.idfkit.conformance] level = conformance-2026.15
  *   idfkit-js    npm run check:release                             green at that level
  *   idfkit       uv run python scripts/check_release_conformance.py green at that level
  *
@@ -123,22 +122,23 @@ class CannotRun extends Error {}
  * off a CI badge, because the two levels that preceded 2026.10 were cut hours apart and a badge
  * would have been reporting the older of them.
  *
- * 2026.13 changes no case: 69 cases and 211 assertions, as 2026.12 had. What it changes is the
- * register. This library now canonicalises a choice value to the casing the schema declares, so
- * types-choice-field-casing passes here, and a passing case whose exception still stands is a
- * failure the runner reports rather than a pass: the entry went with the fix. The python entry on
- * the same case stays, because idfkit#180 is unfixed, which is why this level is reachable by one
- * library before the other has fixed the same bug.
+ * 2026.15 changes no case: 69 cases, as 2026.14 had, and it touches neither the
+ * accepted-divergence register nor checks/weather-monthly. What it adds is checks/geometry-vertices,
+ * seven fixtures compared as rings within 0.005 m over 234 surfaces, whose oracle is EnergyPlus's
+ * own Output:Surfaces:List vertex report.
  *
- * The `checks/` member that 2026.12 opened is unchanged and was run again in both languages at
- * this level, each reporting the same 293 comparisons:
+ * THIS IS THE CASE THE PARAGRAPH BELOW WAS WRITTEN FOR. 2026.15 adds only a check, so
+ * `check:release` above, which runs `run.mjs`, cannot see the thing the level exists for. Both
+ * `checks/` members were therefore run again in both languages at this level, and are recorded
+ * here rather than left implied:
  *
- *   node runners/weather-check.mjs   --library <idfkit-js>   PASS: 293 comparisons
- *   python runners/weather_check.py  --library <idfkit>      PASS: 293 comparisons
+ *   node runners/weather-check.mjs    --library <idfkit-js>   PASS: 293 comparisons
+ *   python runners/weather_check.py   --library <idfkit>      PASS: 293 comparisons
+ *   node runners/geometry-check.mjs   --library <idfkit-js>   PASS: 234 surfaces, 0 unresolved
+ *   python runners/geometry_check.py  --library <idfkit>      PASS: 234 surfaces, 0 unresolved
  *
- * It is recorded here rather than left implied because `check:release` above runs `run.mjs` and
- * therefore cannot see a check: a level that added only a check would attest green on this
- * constant's evidence while nothing had exercised the thing the level exists for.
+ * The Python runner was run twice, --via get-scene and --via translate-to-world, because the
+ * library resolves through two entry points and both must agree with the engine.
  *
  * Each level since 2026.6 contains all of it and adds cases, so the precondition is met more
  * strongly rather than less.
@@ -149,7 +149,7 @@ class CannotRun extends Error {}
  * the pin on every run, so the next time the two part company it fails a cheap gate on the change
  * that caused it rather than a release months later.
  */
-const REQUIRED_CONFORMANCE = 'conformance-2026.13';
+const REQUIRED_CONFORMANCE = 'conformance-2026.15';
 
 /** The distribution gates, precondition 4. Order is cheapest first. */
 const DISTRIBUTION_GATES = [
