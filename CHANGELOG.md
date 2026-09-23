@@ -6,9 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The packages in this repository, `@idfkit/core`, `@idfkit/schemas`,
-`@idfkit/weather` and `@idfkit/language`, are versioned and released together.
+`@idfkit/weather`, `@idfkit/language` and `@idfkit/geometry`, are versioned and
+released together.
 
 ## [Unreleased]
+
+## [0.4.0-rc.1] - 2026-09-23
+
+Adds a fifth package. This release moves to `conformance-2026.15` and
+`governance-2026.22`. The corpus level changes no case: 69 cases, as
+`conformance-2026.14` had, and it leaves the accepted-divergence register alone.
+What it adds is `checks/geometry-vertices`, seven fixtures compared as rings
+within 0.005 m over 234 surfaces, whose oracle is EnergyPlus's own
+`Output:Surfaces:List` vertex report. `governance-2026.22` registers the scene
+description in both languages and governs `@idfkit/geometry`.
+
+### Added
+
+- **`@idfkit/geometry`, a read-only geometry package.** `getScene(doc)` takes a
+  document and returns every detailed surface resolved into world coordinates,
+  the extent of those vertices, the declarations it read, every object it could
+  not place with a reason, and every geometry type it does not read with a
+  count. Every geometry object in the document appears exactly once across the
+  three lists, so a model holding geometry the reader cannot handle is
+  distinguishable from a model holding none. The document is not modified: a
+  preserving write before and after yields identical bytes. The package also
+  carries `Vector3D` and `Polygon3D`.
+- The resolution rule was measured against EnergyPlus's own vertex report rather
+  than derived from the other language, which held two answers and had both
+  wrong. Both languages now run the same corpus check against the same committed
+  expectations.
+
+### Changed
+
+- **`Shading:Site:Detailed` is not turned by the building's north axis.** Site
+  shading is fixed in space and does not move with the building, which is the
+  whole difference between that object and `Shading:Building:Detailed`. A model
+  carrying site shading and a non-zero north axis draws its site shading in a
+  different place than a reader extrapolating from building shading would expect.
+- A `Building` that states no north axis is recorded as assumed rather than
+  stated, where previously only a wholly absent object was.
+- **`@idfkit/geometry` peer-depends on `@idfkit/core` at an exact version**, like
+  `@idfkit/language` and unlike the facade. The caret this was written with had a
+  sound rationale, that geometry reads only core's published object model and
+  would break loudly rather than silently, but its benefit was letting a core
+  patch reach a consumer without a geometry release, and the only consumer holds
+  every scoped package at one shared exact version and cannot take that patch.
 
 ## [0.3.0] - 2026-09-14
 
@@ -795,6 +838,7 @@ First published release. The API is not yet stable.
   field instead of failing.
 
 [unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.3.0...HEAD
+[0.4.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.3.0...v0.4.0-rc.1
 [0.3.0]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.3...v0.3.0
 [0.3.0-rc.3]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.2...v0.3.0-rc.3
 [0.3.0-rc.2]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.1...v0.3.0-rc.2
