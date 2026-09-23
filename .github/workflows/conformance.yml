@@ -127,6 +127,14 @@ jobs:
         working-directory: conformance
         run: node runners/weather-check.mjs --library "$GITHUB_WORKSPACE"
 
+      - name: Run the geometry check against this workspace
+        # checks/geometry-vertices, which like the weather check has its own entry point rather
+        # than a flag on run.mjs, so the corpus step above does not reach it. Its oracle is
+        # EnergyPlus's own Output:Surfaces:List vertex report, committed beside each fixture, so
+        # this measures the library against the engine rather than against the first language.
+        working-directory: conformance
+        run: node runners/geometry-check.mjs --library "$GITHUB_WORKSPACE"
+
   naming:
     name: Naming register
     needs: pins
