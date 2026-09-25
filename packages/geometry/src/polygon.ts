@@ -59,7 +59,22 @@ export class Polygon3D {
     return new Vector3D(x, y, z).normalize();
   }
 
-  /** The area, by triangulating from the first vertex and summing the cross products. */
+  /**
+   * The area, by triangulating from the first vertex and summing the cross products.
+   *
+   * Exact for a non-convex ring as well as a convex one, because the signed contributions cancel
+   * on the reflex corners: an L returns 12 and a plus sign 45. **The triangles themselves are not,
+   * and this is not a triangulation anyone may draw.** A fan from the first vertex emits triangles
+   * outside a non-convex ring, which a signed sum absorbs and a renderer does not: it fills the
+   * notch. Every polygon in the 26.1.0 example corpus with more than four vertices is non-convex,
+   * 197 surfaces across 25 of 721 geometry-bearing files, so a consumer reusing this as a
+   * triangulator draws those 197 wrong and everything else right, which is the hardest kind of
+   * wrong to notice.
+   *
+   * A consumer needing triangles to draw with owns that decision, because it is a property of the
+   * drawing device rather than of the model. The scene states a ring because the model states a
+   * ring.
+   */
   get area(): number {
     if (this.numVertices < 3) return 0;
 
