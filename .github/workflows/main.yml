@@ -286,11 +286,14 @@ jobs:
               IDFKIT_BENCH_PROBE=$mode node bench/budget.mjs 2>&1 >/dev/null | grep PROBE | sed "s/^/run$i /" || true
             done
           done
-          for i in 1 2 3 4 5 6; do
+          for i in 1 2 3 4 5 6 7 8; do
             echo "TRACE run$i"
-            IDFKIT_BENCH_PROBE=legacy node --trace-opt --trace-deopt bench/budget.mjs 2>&1 \
-              | awk '/MARK contextAt rep1 near/{p=1} /MARK contextAt rep2 near/{p=0} p' \
-              | grep -E "MARK|PROBE|bailout|completed optimizing|completed compiling" | cut -c1-230 | head -80 || true
+            IDFKIT_BENCH_PROBE=legacy node --trace-opt --trace-deopt --trace-osr bench/budget.mjs 2>&1 \
+              | grep -v "^  " \
+              | grep -B25 -A200 "MARK contextAt rep1 near" \
+              | awk '{print} /MARK contextAt rep2 near/{exit}' \
+              | sed -E 's/0x[0-9a-f]+ //g; s/ \(sfi = [^)]*\)//g; s/, FP to SP.*//; s/ConcurrencyMode:://' \
+              | cut -c1-220 | head -150 || true
           done
 
       - run: npm run check:bench
