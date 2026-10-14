@@ -17,6 +17,9 @@
       "path": "./packages/weather"
     },
     {
+      "path": "./packages/types-v26-2"
+    },
+    {
       "path": "./packages/types-v26-1"
     },
     {

@@ -239,6 +239,72 @@ const WHOLE_FILE = { warmup: 3, iterations: 21 };
  */
 const ANSWER = { warmupMs: 60, budgetMs: 60, minIterations: 20, maxIterations: 3000 };
 
+/**
+ * How the offset-independence gate is timed: one answer at two offsets of one
+ * file, in interleaved rounds.
+ *
+ * 1. What this replaces. Until 2026-10 the two offsets were timed one after the
+ *    other with `timeAnswerAt`: 3,000 warm-up calls and 3,000 timed calls at
+ *    the first statement, then the same at the last. Each timed window lasted
+ *    one to two milliseconds and each used a function object created for that
+ *    window alone.
+ * 2. What was observed. On the hosted runner (ubuntu-24.04, x64, Node 22) the
+ *    gate for `contextAt` was bimodal across runs of one commit. Of 73
+ *    measurements, 51 lay in 1.26 to 1.69, one at 2.11 and 21 in 2.79 to 3.42,
+ *    of which 12 exceeded the budget of 3. The two populations do not correlate
+ *    with the speed of the runner.
+ * 3. What causes it. In 48 fresh processes on that runner under the superseded
+ *    protocol, one of the two windows cost twice its settled figure in 33: the
+ *    last statement in 18 (median 1,167 ns against 561 ns, a ratio near 3.0)
+ *    and the first in 16 (812 ns against 390 ns, a ratio near 0.7, which the
+ *    gate reads as 1.4 and passes), with both in one. The slow state ends
+ *    inside or shortly after the window. In 14 traced processes the slow window
+ *    was present in exactly the 10 in which a concurrent optimising compilation
+ *    of that window's own function object ran for 5.4 to 7.8 ms, which is
+ *    longer than the window, and absent in the 4 in which it took at most 1.1
+ *    ms or did not finish. The same compilation takes under 0.5 ms on an Apple
+ *    M2, where the bimodality does not reproduce. Why a running compilation
+ *    doubles the cost of the calls beside it on that runner was not
+ *    established. The breach is a property of the timing protocol on that
+ *    runner, and not of `contextAt`.
+ * 4. Both offsets are now warmed before either is timed, in alternating slices
+ *    bounded by the clock alone, and one function object serves every call, so
+ *    that its compilation falls in the warm-up.
+ * 5. The timed calls are taken in rounds. Each round times both offsets, a
+ *    fraction of a millisecond apart, and the order alternates between rounds.
+ *    A disturbance shorter than the run (a recompilation, a collection, a
+ *    noisy neighbour) reaches both halves of a round or a minority of rounds.
+ * 6. The gate is the median of the per-round ratios of medians. One call per
+ *    timed region is kept, as everywhere else in this file.
+ * 7. What was measured under this protocol: 52 runs on the hosted runner gave
+ *    1.29 to 1.57 for `contextAt` and 1.85 to 2.61 for `completionsAt`; 24 runs
+ *    on an Apple M2 gave 1.20 to 1.75 and 2.28 to 2.55. The settled ratio is
+ *    not 1 because the two statements are not the same statement and the two
+ *    offsets are not on the same part of it: the first is inside the type name
+ *    of `Version, 26.1;` and the last is on the terminator of a `Zone` with
+ *    five fields. The ratio therefore carries a statement effect that is
+ *    independent of the offset. For `completionsAt` the first offset is the
+ *    dearer one, and its settled cost differs between processes (4.4 to 6.1
+ *    microseconds on the runner, against 2.3 to 2.6 at the last), which is
+ *    what spreads that gate.
+ *
+ * What the gate protects is unchanged. A search that reads the whole prefix
+ * costs the far offset several orders of magnitude more in every round, and no
+ * round count or ordering hides that. The time box is kept as well: a round
+ * takes at least `minIterations` calls at each offset, so an answer that
+ * regressed to 20 ms per call costs `rounds * minIterations` calls, about six
+ * seconds, and still reports a ratio where a fixed count would report a
+ * timeout.
+ */
+const PAIRED = {
+  warmupSlices: 4,
+  warmupSliceMs: 30,
+  rounds: 15,
+  roundBudgetMs: 4,
+  minIterations: 20,
+  maxIterations: 2000,
+};
+
 /* -------------------------------------------------------------------------- */
 /* Loading what the build produced                                             */
 /* -------------------------------------------------------------------------- */
@@ -442,6 +508,77 @@ function pool(parts) {
   return all;
 }
 
+/**
+ * @typedef {object} PairedTiming
+ * One answer timed at two offsets of one text, in interleaved rounds.
+ * @property {Timing} near Every timed call at the first offset, pooled.
+ * @property {Timing} far Every timed call at the second offset, pooled.
+ * @property {number[]} ratios Per round, the far median over the near median.
+ * @property {number} ratio The median of `ratios`.
+ */
+
+/**
+ * Time one cursor answer at two offsets, interleaved. See `PAIRED` for why.
+ *
+ * @param {(offset: number) => unknown} ask
+ * @param {number} nearOffset
+ * @param {number} farOffset
+ * @returns {PairedTiming}
+ */
+function timeAnswerPair(ask, nearOffset, farOffset) {
+  const offsets = [nearOffset, farOffset];
+
+  // Warm-up, bounded by the clock and not by a count: the slice ends on time
+  // however cheap or expensive one call is.
+  for (let slice = 0; slice < PAIRED.warmupSlices; slice += 1) {
+    const offset = offsets[slice % 2];
+    const until = performance.now() + PAIRED.warmupSliceMs;
+    do keep(ask(offset));
+    while (performance.now() < until);
+  }
+
+  // One warm call at each offset decides how many fit in a round.
+  const iterations = offsets.map((offset) => {
+    const started = performance.now();
+    keep(ask(offset));
+    const each = Math.max(performance.now() - started, Number.EPSILON);
+    return Math.min(
+      PAIRED.maxIterations,
+      Math.max(PAIRED.minIterations, Math.floor(PAIRED.roundBudgetMs / each))
+    );
+  });
+
+  /** @type {Float64Array[][]} */
+  const parts = [[], []];
+  /** @type {number[]} */
+  const ratios = [];
+  for (let round = 0; round < PAIRED.rounds; round += 1) {
+    /** @type {number[]} */
+    const medians = [0, 0];
+    // Near first in even rounds and far first in odd ones.
+    for (const which of round % 2 === 0 ? [0, 1] : [1, 0]) {
+      const offset = offsets[which];
+      const durations = new Float64Array(iterations[which]);
+      for (let i = 0; i < durations.length; i += 1) {
+        const started = performance.now();
+        const produced = ask(offset);
+        durations[i] = performance.now() - started;
+        keep(produced);
+      }
+      parts[which].push(durations);
+      medians[which] = summarize(durations).median;
+    }
+    ratios.push(medians[1] / medians[0]);
+  }
+
+  return {
+    near: summarize(pool(parts[0])),
+    far: summarize(pool(parts[1])),
+    ratios,
+    ratio: quantile(Float64Array.from(ratios).sort(), 0.5),
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* What is measured, and where                                                 */
 /* -------------------------------------------------------------------------- */
@@ -540,6 +677,18 @@ function inUnit(value, unit) {
 /* -------------------------------------------------------------------------- */
 /* The report                                                                  */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * A sub-microsecond median, in the unit of the rest of the report and to the
+ * nanosecond, because four decimal places of a millisecond print 0.0002 for
+ * both halves of a ratio of 1.5.
+ *
+ * @param {number} ms
+ * @returns {string}
+ */
+function fineMsOf(ms) {
+  return `${ms.toFixed(6)} ms`;
+}
 
 /** @param {number} ms @returns {string} */
 function msOf(ms) {
@@ -726,16 +875,18 @@ async function main() {
   // The other axis: cost that grows with the offset rather than with the file.
   // Both readings are in ONE file, so a size ratio cannot explain a breach, and
   // the file carries no comments because that is the shape that exposes it.
+  /** @type {Map<string, PairedTiming>} */
+  const offsetTimings = new Map();
   for (const answer of answers) {
-    const near = summarize(
-      timeAnswerAt((offset) => answer.ask(commentFree.text, offset), commentFree.near)
+    const paired = timeAnswerPair(
+      (offset) => answer.ask(commentFree.text, offset),
+      commentFree.near,
+      commentFree.far
     );
-    const far = summarize(
-      timeAnswerAt((offset) => answer.ask(commentFree.text, offset), commentFree.far)
-    );
+    offsetTimings.set(answer.name, paired);
     gates.push({
       name: `${answer.name}, last vs first statement, no comments`,
-      measured: Math.max(far.median / near.median, near.median / far.median),
+      measured: Math.max(paired.ratio, 1 / paired.ratio),
       budget: BUDGETS.offsetIndependence,
       unit: 'times',
       because:
@@ -790,6 +941,23 @@ async function main() {
       return (durations === undefined ? '' : summarize(durations).p95.toFixed(4)).padStart(16);
     });
     console.log(`  ${probe.label.padEnd(24)}${cells.join('')}`);
+  }
+  console.log('');
+  console.log('  the same answer at the two ends of the comment-free file, median in ms');
+  console.log(
+    `  ${'answer'.padEnd(20)}${'first'.padStart(14)}${'last'.padStart(14)}` +
+      `${'samples'.padStart(10)}   last / first per round, lowest to highest`
+  );
+  for (const answer of answers) {
+    const paired = offsetTimings.get(answer.name);
+    if (paired === undefined) continue;
+    const sorted = [...paired.ratios].sort((a, b) => a - b);
+    console.log(
+      `  ${answer.name.padEnd(20)}${fineMsOf(paired.near.median).padStart(14)}` +
+        `${fineMsOf(paired.far.median).padStart(14)}` +
+        `${String(paired.near.samples + paired.far.samples).padStart(10)}   ` +
+        `${sorted[0].toFixed(2)} to ${sorted[sorted.length - 1].toFixed(2)} over ${sorted.length}`
+    );
   }
   console.log('');
   console.log('  GATES. These are what fails.');

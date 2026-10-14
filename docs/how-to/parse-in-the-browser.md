@@ -24,7 +24,7 @@ const { document } = parseIdf(idfText, schema);
 ```
 
 `httpSource` fetches the gzipped files and inflates them with
-`DecompressionStream`, so the payload stays around 1 MB for all 17 versions. It
+`DecompressionStream`, so the payload stays around 1 MB for all 18 versions. It
 sniffs the gzip magic bytes first, so it works whether your host leaves
 `Content-Encoding` unset or maps the `.gz` extension to `Content-Encoding: gzip`
 (as Vite's dev server and nginx's `gzip_static` do), where the client inflates
@@ -38,7 +38,7 @@ same version into a single fetch.
 
 It is tempting to `import schemas from '@idfkit/schemas/data/index.json'` and let
 the bundler inline it. Do not: the manifests and blob store are megabytes of
-JSON, and inlining them puts all 17 versions into the initial bundle whether or
+JSON, and inlining them puts all 18 versions into the initial bundle whether or
 not the user opens a file.
 
 If you would rather not serve static files at all, supply your own

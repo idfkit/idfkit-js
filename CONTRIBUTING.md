@@ -75,9 +75,15 @@ epJSON schemas and committed:
 npm run build:schemas -- --source ../idfkit/src/idfkit/schemas
 ```
 
-CI clones the Python repository and rebuilds, failing if the committed bundle
-differs. Without that check, someone could edit `build.mjs` and every other test
-would still pass against a stale bundle.
+The build records the idfkit commit it read in `packages/schemas/schema-source.json`,
+and refuses a source outside a git checkout or with uncommitted changes. Commit the
+record with the bundle.
+
+CI fetches the Python repository at that recorded commit and rebuilds, failing if
+the committed bundle or its record differs. Without that check, someone could edit
+`build.mjs` and every other test would still pass against a stale bundle. Rebuilding
+from the recorded commit rather than from idfkit's default branch keeps the check
+green while idfkit has adopted an EnergyPlus release this repository has not yet.
 
 Hashes come from a canonical serialization — sorted keys, fixed separators — and
 **that must stay stable across rebuilds**. If it drifts, every hash changes and a

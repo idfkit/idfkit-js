@@ -134,7 +134,7 @@ jobs:
           # neither side carries runtime, so skew is a type error at the consumer's build and
           # never a failure at run time. Give it an upper bound the day ExtensibleGroup changes
           # shape, and not before.
-          for pkg in @idfkit/types-v26-1 @idfkit/types-v9-4; do
+          for pkg in @idfkit/types-v26-2 @idfkit/types-v26-1 @idfkit/types-v9-4; do
             npm pkg set "peerDependencies.@idfkit/core=>=$VERSION" -w "$pkg"
           done
 
@@ -232,7 +232,7 @@ jobs:
           echo "Publishing $VERSION under the '$NPM_TAG' dist-tag."
 
           for pkg in @idfkit/schemas @idfkit/core @idfkit/weather @idfkit/language \
-                     @idfkit/geometry @idfkit/types-v26-1 @idfkit/types-v9-4; do
+                     @idfkit/geometry @idfkit/types-v26-2 @idfkit/types-v26-1 @idfkit/types-v9-4; do
             if npm view "$pkg@$VERSION" version >/dev/null 2>&1; then
               echo "$pkg@$VERSION is already published; skipping."
             else

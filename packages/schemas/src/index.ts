@@ -29,7 +29,7 @@ export interface BundleSource {
  *
  * Reads the gzipped bundle and inflates it with `DecompressionStream`, which is
  * baseline-available in browsers. That keeps the served payload at roughly 1 MB
- * for all 17 versions instead of the ~6 MB the raw JSON would cost.
+ * for all 18 versions instead of the ~6 MB the raw JSON would cost.
  *
  * The payload is sniffed for the gzip magic bytes before inflating. A host that
  * maps the `.gz` extension to `Content-Encoding: gzip` (Vite's dev server,
@@ -130,7 +130,7 @@ export class SchemaBundle {
    * Load the explanatory prose this bundle's manifests index into.
    *
    * One pool serves every version: `build.mjs` deduplicates the memos and notes
-   * of all seventeen schemas into a single array and the manifests carry indices
+   * of all eighteen schemas into a single array and the manifests carry indices
    * into it, so there is no version to pass here.
    *
    * It is a separate call rather than part of `load` because the two are wanted

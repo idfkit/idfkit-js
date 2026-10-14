@@ -19,11 +19,11 @@ a Python wheel nobody notices. On a page load it decides your architecture.
 The 17 manifests name 14,092 object-type definitions between them, and only
 2,568 of those are distinct. 82% of what the releases carry is a byte-identical
 repeat of a definition another release already has: `Construction`, for
-instance, has changed once in 17 releases. So this package stores each unique
+instance, has changed once in 18 releases. So this package stores each unique
 definition once, keyed by a content hash, and gives every version a manifest
 mapping type name to hash.
 
-|                                          | All 17 versions, gzipped |
+|                                          | All 18 versions, gzipped |
 | ---------------------------------------- | ------------------------ |
 | Raw epJSON schemas                       | 11,915 KB                |
 | Slimmed (documentation metadata dropped) | 2,922 KB                 |
@@ -41,8 +41,8 @@ import { SchemaBundle, httpSource } from '@idfkit/schemas';
 
 const bundle = new SchemaBundle(httpSource('/schemas/'));
 
-await bundle.versions(); // ['8.9.0', '9.0.1', ..., '26.1.0']
-await bundle.latest(); // '26.1.0'
+await bundle.versions(); // ['8.9.0', '9.0.1', ..., '26.2.0']
+await bundle.latest(); // '26.2.0'
 
 const schema = await bundle.load('26.1.0');
 schema.resolve('ZONE'); // 'Zone' (IDF type names are case-insensitive)
