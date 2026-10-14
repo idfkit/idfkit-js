@@ -1,6 +1,6 @@
 # Supported versions
 
-All 17 releases ship in one package. There is no per-version install and no
+All 18 releases ship in one package. There is no per-version install and no
 build step to select one.
 
 | EnergyPlus | Schema key | EnergyPlus | Schema key |
@@ -12,7 +12,7 @@ build step to select one.
 | 9.3        | `9.3.0`    | 25.1       | `25.1.0`   |
 | 9.4        | `9.4.0`    | 25.2       | `25.2.0`   |
 | 9.5        | `9.5.0`    | 26.1       | `26.1.0`   |
-| 9.6        | `9.6.0`    |            |            |
+| 9.6        | `9.6.0`    | 26.2       | `26.2.0`   |
 | 22.1       | `22.1.0`   |            |            |
 | 22.2       | `22.2.0`   |            |            |
 
@@ -21,7 +21,7 @@ the last entry.
 
 ## Generated types
 
-Schemas ship for all 17 versions. Generated TypeScript interfaces are published
+Schemas ship for all 18 versions. Generated TypeScript interfaces are published
 for two of them, each as its own opt-in package:
 
 | Package               | Version | Size            |

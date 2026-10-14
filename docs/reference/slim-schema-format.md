@@ -80,7 +80,7 @@ twice differently](../explanation/choice-casing.md).
 
 ### `auto` and `se`, the two branches of an `anyOf`
 
-13060 fields across the 17 bundled versions are declared `anyOf: [{number},
+13060 fields across the 18 bundled versions are declared `anyOf: [{number},
 {string}]`: a capacity is a number, or the word that asks EnergyPlus to size it.
 The bundle hoists the numeric branch onto the record, so `t`, `e`, `min`, `max`,
 `xmin` and `xmax` all describe that branch, and sets `auto`. What survives of the

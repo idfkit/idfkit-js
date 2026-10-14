@@ -13,7 +13,7 @@ for a reason that is not visible from the code alone:
   `zone.ceiling_height` is a real property.
 - [Static types generated from the schema](generated-types.md) — how a
   misspelled field name becomes a compile error.
-- [Content-addressed schemas](content-addressed-schemas.md) — how 17 versions fit
+- [Content-addressed schemas](content-addressed-schemas.md) — how 18 versions fit
   in about 1 MB.
 - [Why epJSON field names are used verbatim](epjson-field-names.md) — why it is
   `zone_name` and not a converted form.

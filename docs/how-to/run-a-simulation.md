@@ -46,7 +46,7 @@ ep.dispose();
 
 `@idfkit/engine-assets` is versioned by the EnergyPlus release it carries, so
 `@idfkit/engine-assets@26.1.0` is EnergyPlus 26.1.0. A document here can be any
-of the [17 supported versions](../reference/versions.md), so load the schema that
+of the [18 supported versions](../reference/versions.md), so load the schema that
 matches the asset package you installed.
 
 Nothing checks this for you. A mismatch means the engine reads a model written

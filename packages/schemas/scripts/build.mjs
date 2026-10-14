@@ -6,7 +6,7 @@
  * byte-identical repeat of a definition another version already carries
  * (Construction has changed once in 17 releases), so the bundle stores each
  * unique definition once and gives every version a manifest of
- * `typeName -> hash`. Supporting all 17 versions therefore costs barely more
+ * `typeName -> hash`. Supporting all 18 versions therefore costs barely more
  * than supporting one. The `unique defs` line this script prints is the
  * complement, so the figure is re-measured on every rebuild.
  *

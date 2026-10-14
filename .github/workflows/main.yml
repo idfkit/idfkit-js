@@ -358,6 +358,7 @@ jobs:
           - { version: "25.1.0", findings: 3, errors: 0 }
           - { version: "25.2.0", findings: 8, errors: 0 }
           - { version: "26.1.0", findings: 3, errors: 0 }
+          - { version: "26.2.0", findings: 3, errors: 0 }
     steps:
       - uses: actions/checkout@v4
 

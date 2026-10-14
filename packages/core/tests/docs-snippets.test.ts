@@ -274,7 +274,7 @@ describe('packages/schemas/README.md usage', () => {
       read: (fileName) => Promise.resolve(readBundleFileSync(fileName)),
     });
 
-    expect(await bundle.latest()).toBe('26.1.0');
+    expect(await bundle.latest()).toBe('26.2.0');
 
     const schema = await bundle.load('26.1.0');
     expect(schema.resolve('ZONE')).toBe('Zone');

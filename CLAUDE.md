@@ -13,7 +13,7 @@ manipulation. It is a deliberate re-design for JavaScript, not a transliteration
 | Package            | npm name          | Purpose                                           |
 | ------------------ | ----------------- | ------------------------------------------------- |
 | `packages/core`    | `@idfkit/core`    | Parser, object model, reference graph, writers    |
-| `packages/schemas` | `@idfkit/schemas` | Content-addressed epJSON schemas, all 17 versions |
+| `packages/schemas` | `@idfkit/schemas` | Content-addressed epJSON schemas, all 18 versions |
 | `packages/weather` | `@idfkit/weather` | TMYx station index and browser EPW retrieval      |
 
 Related: [`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine) runs
@@ -150,7 +150,7 @@ The READMEs are front doors, not documentation. Design rationale lives in
 
 ## Version Support
 
-EnergyPlus 8.9.0 through 26.1.0, all shipped together. IDF files write
+EnergyPlus 8.9.0 through 26.2.0, all shipped together. IDF files write
 `Version, 9.0;` while schemas are keyed `9.0.1`, so `resolveVersion` matches on
 major.minor and takes the newest patch. It returns `undefined` rather than
 guessing when there is no match: loading the wrong schema mis-maps every

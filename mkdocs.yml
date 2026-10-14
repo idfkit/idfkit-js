@@ -1,7 +1,7 @@
 site_name: idfkit-js
 repo_url: https://github.com/idfkit/idfkit-js
 site_url: https://js.idfkit.com/
-site_description: EnergyPlus IDF and epJSON parsing and manipulation for JavaScript and TypeScript. Synchronous, dependency-free, all 17 EnergyPlus versions, with generated static types.
+site_description: EnergyPlus IDF and epJSON parsing and manipulation for JavaScript and TypeScript. Synchronous, dependency-free, all 18 EnergyPlus versions, with generated static types.
 site_author: Samuel Letellier-Duchesne
 edit_uri: edit/main/docs/
 repo_name: idfkit/idfkit-js
