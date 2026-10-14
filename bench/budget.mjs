@@ -258,16 +258,18 @@ const ANSWER = { warmupMs: 60, budgetMs: 60, minIterations: 20, maxIterations: 3
  *    last statement in 18 (median 1,167 ns against 561 ns, a ratio near 3.0)
  *    and the first in 16 (812 ns against 390 ns, a ratio near 0.7, which the
  *    gate reads as 1.4 and passes), with both in one. The slow state ends
- *    inside or shortly after the window. In every traced run a concurrent
- *    optimising compilation of the window's own function object was pending
- *    for 5 to 8 ms, which is longer than the window; the same compilation
- *    takes under 0.5 ms on an Apple M2, where the bimodality does not
- *    reproduce. Why a pending compilation doubles the cost of some windows and
- *    not of others was not established. The breach is a property of the timing
- *    protocol on that runner, and not of `contextAt`.
+ *    inside or shortly after the window. In 14 traced processes the slow window
+ *    was present in exactly the 10 in which a concurrent optimising compilation
+ *    of that window's own function object ran for 5.4 to 7.8 ms, which is
+ *    longer than the window, and absent in the 4 in which it took at most 1.1
+ *    ms or did not finish. The same compilation takes under 0.5 ms on an Apple
+ *    M2, where the bimodality does not reproduce. Why a running compilation
+ *    doubles the cost of the calls beside it on that runner was not
+ *    established. The breach is a property of the timing protocol on that
+ *    runner, and not of `contextAt`.
  * 4. Both offsets are now warmed before either is timed, in alternating slices
  *    bounded by the clock alone, and one function object serves every call, so
- *    that compilation is complete before the first timed call.
+ *    that its compilation falls in the warm-up.
  * 5. The timed calls are taken in rounds. Each round times both offsets, a
  *    fraction of a millisecond apart, and the order alternates between rounds.
  *    A disturbance shorter than the run (a recompilation, a collection, a
