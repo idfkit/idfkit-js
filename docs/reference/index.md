@@ -20,7 +20,7 @@ Facts about what the packages contain and how they behave. For tasks, see the
 
 ## Other reference
 
-- [Supported versions](versions.md) — the 17 bundled releases and how a version
+- [Supported versions](versions.md) — the 18 bundled releases and how a version
   string in a file is matched to one of them.
 - [Slim schema format](slim-schema-format.md) — what the bundle keeps, what it
   drops, and the single-letter keys.

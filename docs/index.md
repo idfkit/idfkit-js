@@ -18,7 +18,7 @@ hide:
 </div>
 
 <div class="feature-chips" markdown>
-<span class="chip">17 EnergyPlus versions</span>
+<span class="chip">18 EnergyPlus versions</span>
 <span class="chip">Zero runtime dependencies</span>
 <span class="chip">Node · browser · worker · edge</span>
 <span class="chip">760 example files round-tripped</span>
@@ -66,7 +66,7 @@ await saveIdf(doc, 'model-renamed.idf');
   ***
 
   Every supported EnergyPlus schema, content-addressed down to about 1 MB
-  gzipped for all 17 versions instead of 11.9 MB.
+  gzipped for all 18 versions instead of 11.9 MB.
 
   [Reference](reference/schemas.md)
 
@@ -102,11 +102,11 @@ that one handles the simulation. They meet over IDF text — see
 
   [Why](explanation/accessors-not-proxies.md)
 
-- :material-package-variant-closed: **All 17 versions, ~1 MB**
+- :material-package-variant-closed: **All 18 versions, ~1 MB**
 
   ***
 
-  82% of what the 17 releases carry is a byte-identical repeat of a
+  82% of what the 18 releases carry is a byte-identical repeat of a
   definition another release already has, so each is stored once and shared
   by content hash. A cross-version diff is a manifest
   comparison, not a deep walk.

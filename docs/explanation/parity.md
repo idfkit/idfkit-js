@@ -13,7 +13,7 @@ purpose, and one thing here has no Python counterpart at all.
 | epJSON parse and write     | Round-trips against IDF                                    |
 | Object model               | Typed accessors, collections, clone, extensible groups     |
 | Reference graph            | Live, with rename propagation and dangling detection       |
-| All 17 EnergyPlus versions | 8.9.0 through 26.1.0                                       |
+| All 18 EnergyPlus versions | 8.9.0 through 26.2.0                                       |
 | Generated static types     | Per version — [no Python equivalent](generated-types.md)   |
 | Weather                    | `@idfkit/weather`: station index and browser EPW retrieval |
 

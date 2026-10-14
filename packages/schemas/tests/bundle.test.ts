@@ -45,9 +45,9 @@ describe('httpSource', () => {
 describe('SchemaBundle', () => {
   it('ships every supported EnergyPlus version', async () => {
     const versions = await bundle.versions();
-    expect(versions.length).toBe(17);
+    expect(versions.length).toBe(18);
     expect(versions[0]).toBe('8.9.0');
-    expect(versions.at(-1)).toBe('26.1.0');
+    expect(versions.at(-1)).toBe('26.2.0');
   });
 
   it('sorts versions numerically, not lexically', async () => {
@@ -56,7 +56,7 @@ describe('SchemaBundle', () => {
     const versions = await bundle.versions();
     expect(versions.indexOf('8.9.0')).toBeLessThan(versions.indexOf('9.0.1'));
     expect(versions.indexOf('9.6.0')).toBeLessThan(versions.indexOf('22.1.0'));
-    expect(await bundle.latest()).toBe('26.1.0');
+    expect(await bundle.latest()).toBe('26.2.0');
   });
 
   it('returns the same instance for repeat loads', async () => {

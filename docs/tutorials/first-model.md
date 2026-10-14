@@ -50,7 +50,7 @@ objects: 1
 ```
 
 Two things to notice. `schemas()` returns the bundle that ships inside
-`@idfkit/schemas`, holding all 17 EnergyPlus versions; loading one is the only
+`@idfkit/schemas`, holding all 18 EnergyPlus versions; loading one is the only
 step in this whole tutorial that is asynchronous. And `Version` takes `null`
 where the other objects will take a name, because it has no name field at all.
 

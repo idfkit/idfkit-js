@@ -8,13 +8,13 @@ your architecture.
 
 The 17 manifests name 14,092 object-type definitions between them, and only
 2,568 of those are distinct: 82% of what the releases carry is a byte-identical
-repeat. `Construction` has changed once in 17 releases, so shipping 17 schemas
+repeat. `Construction` has changed once in 18 releases, so shipping 18 schemas
 means shipping the same definition of `Construction` sixteen times over.
 
 So the bundle stores each unique definition once, keyed by a hash of its
 content, and gives every version a manifest mapping type name to hash.
 
-|                                          | All 17 versions, gzipped |
+|                                          | All 18 versions, gzipped |
 | ---------------------------------------- | ------------------------ |
 | Raw epJSON schemas, as Python ships them | 11,915 KB                |
 | Slimmed (documentation metadata dropped) | 2,922 KB                 |

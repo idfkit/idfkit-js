@@ -39,7 +39,7 @@ describe('httpSource', () => {
     const { base, server } = await serveBundle(false);
     open = server;
     const versions = await new SchemaBundle(httpSource(base)).versions();
-    expect(versions.length).toBe(17);
+    expect(versions.length).toBe(18);
   });
 
   it('reads plain JSON when the host inflated the body itself', async () => {
@@ -50,7 +50,7 @@ describe('httpSource', () => {
     open = server;
     const bundle = new SchemaBundle(httpSource(base));
     const versions = await bundle.versions();
-    expect(versions.length).toBe(17);
+    expect(versions.length).toBe(18);
     const schema = await bundle.load('26.1.0');
     expect(schema.resolve('Zone')).toBe('Zone');
   });

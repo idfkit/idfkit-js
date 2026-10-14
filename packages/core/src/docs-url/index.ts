@@ -60,6 +60,7 @@ const DOCUMENTED_VERSIONS: readonly string[] = [
   '25.1.0',
   '25.2.0',
   '26.1.0',
+  '26.2.0',
 ];
 
 /**

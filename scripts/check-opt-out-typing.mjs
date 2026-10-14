@@ -117,6 +117,16 @@ if (!text.includes('Building') || !text.includes('30')) {
 console.log('OK ' + text.replace(/\\s+/g, ' ').trim());
 `;
 
+/**
+ * The package the control installs. Named rather than taken from the front of
+ * TYPE_PACKAGES: the fixture below imports this package, loads its release and
+ * asserts a union that release declares, so the three must name the same one.
+ */
+const CONTROL_PACKAGE = '@idfkit/types-v26-1';
+if (!TYPE_PACKAGES.includes(CONTROL_PACKAGE)) {
+  throw new Error(`the control package ${CONTROL_PACKAGE} is not in TYPE_PACKAGES`);
+}
+
 /** The control: the same library, parameterised by an installed map. */
 const OPT_IN_TS = `
 import { parseIdf, type IdfDocument } from '@idfkit/idfkit';
@@ -252,7 +262,7 @@ async function main() {
     // ---- 4. The control: opting in still works ----------------------------
     const optIn = installSharedNameOrFail(scratch, tarballs, {
       label: 'with-type-package',
-      also: [TYPE_PACKAGES[0]],
+      also: [CONTROL_PACKAGE],
     });
     writeFileSync(join(optIn.dir, 'app.ts'), OPT_IN_TS);
     writeJson(join(optIn.dir, 'tsconfig.json'), tsconfig(['app.ts']));
@@ -261,7 +271,7 @@ async function main() {
       const diagnostics = inTypes.output.trim().split('\n').filter(Boolean);
       findings.push(
         new Finding(
-          `installing ${TYPE_PACKAGES[0]} does not give a working type map`,
+          `installing ${CONTROL_PACKAGE} does not give a working type map`,
           `tsc reported ${diagnostics.length} diagnostic(s): ${diagnostics.slice(0, 4).join(' | ')}. ` +
             'This is the control for the three findings above: an absence nobody can turn into ' +
             'a presence is not an opt-out, it is a missing feature.'
@@ -298,7 +308,7 @@ async function main() {
       `  no map, runs           ${outRun.code === 0 ? `yes: ${outRun.stdout.trim().slice(3, 74)}` : 'NO'}`
     );
     console.log('');
-    console.log(`  control: npm install ${TYPE_PACKAGES[0]}`);
+    console.log(`  control: npm install ${CONTROL_PACKAGE}`);
     console.log(`    tsc --noEmit         ${inTypes.code === 0 ? 'clean, TypeMap in use' : 'DIAGNOSTICS'}`);
     console.log(
       `    costs                ${kib(inTotal.apparent - total.apparent)} more on disk, which SC-014 does not measure`

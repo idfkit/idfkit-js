@@ -18,7 +18,7 @@ One site teaches both languages. `js.idfkit.com` is retired and redirects there.
 | Package            | What it is                                        | npm                                                                |
 | ------------------ | ------------------------------------------------- | ------------------------------------------------------------------ |
 | `packages/core`    | Parsing, the object model, references, writers    | [`@idfkit/core`](https://www.npmjs.com/package/@idfkit/core)       |
-| `packages/schemas` | Content-addressed epJSON schemas, all 17 versions | [`@idfkit/schemas`](https://www.npmjs.com/package/@idfkit/schemas) |
+| `packages/schemas` | Content-addressed epJSON schemas, all 18 versions | [`@idfkit/schemas`](https://www.npmjs.com/package/@idfkit/schemas) |
 | `packages/weather` | TMYx station index and browser EPW retrieval      | [`@idfkit/weather`](https://www.npmjs.com/package/@idfkit/weather) |
 
 It sits alongside [`@idfkit/engine`](https://www.npmjs.com/package/@idfkit/engine),
@@ -132,7 +132,7 @@ Five decisions shape the API, each chosen over an obvious alternative:
 | [A synchronous core with async edges](https://developers.idfkit.com/explanation/sync-core-async-edge/) | The same core runs in Node, a browser, a worker, and an edge runtime.                            |
 | [Real accessors, not a `Proxy`](https://developers.idfkit.com/explanation/accessors-not-proxies/)      | Editors can see the fields, V8 can optimize them, and the setter keeps the reference graph live. |
 | [Static types generated from the schema](https://developers.idfkit.com/explanation/generated-types/)   | 858 interfaces per version, so a misspelled field is a compile error.                            |
-| [Content-addressed schemas](https://developers.idfkit.com/explanation/content-addressed-schemas/)      | All 17 versions in ~1 MB gzipped instead of 11.9 MB.                                             |
+| [Content-addressed schemas](https://developers.idfkit.com/explanation/content-addressed-schemas/)      | All 18 versions in ~1 MB gzipped instead of 11.9 MB.                                             |
 | [epJSON field names verbatim](https://developers.idfkit.com/explanation/epjson-field-names/)           | `zone_name`. No name-conversion layer to get wrong.                                              |
 
 ## Correctness
