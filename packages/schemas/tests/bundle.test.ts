@@ -285,15 +285,19 @@ describe('the prose pool', () => {
 
 describe('field order and accepted values in the bundle', () => {
   /**
-   * T028: exactly three types need `fo`, and no fourth may silently join them.
+   * T028: exactly the types listed here need `fo`, and no other may silently join them.
    *
    * `fo` is emitted only where `f` holds at most the name and the type has more
    * than one property, which is the condition under which the description path
    * would otherwise fall back to the alphabetized key list. If a future schema
-   * adds a fourth such type, this fails and somebody decides deliberately,
+   * adds another such type, this fails and somebody decides deliberately,
    * rather than a reader quietly getting the wrong field order.
+   *
+   * Decided for 26.2.0: `ZoneMRTCalculation`, new in that release, lists only
+   * `zone_name` in its legacy fields and also has the extensible `people_names`,
+   * so its order is recorded from 26.2.0 onward.
    */
-  it('records declaration order for exactly three types, in every version', async () => {
+  it('records declaration order for exactly the decided types, in every version', async () => {
     const index = (await nodeSource().read('index.json')) as { versions: string[] };
     const store = (await nodeSource().read('types.json')) as Record<string, { fo?: string[] }>;
 
@@ -307,9 +311,13 @@ describe('field order and accepted values in the bundle', () => {
         .map(([typeName]) => typeName)
         .sort();
 
+      const [major = 0, minor = 0] = version.split('.').map(Number);
+      const from26_2 = major > 26 || (major === 26 && minor >= 2);
+
       // `bySurfaceName` in 8.9.0 through 9.3.0, `BySurfaceName` after.
       expect(withOrder.map((n) => n.toLowerCase())).toEqual([
         'solarcollector:unglazedtranspired:multisystem',
+        ...(from26_2 ? ['zonemrtcalculation'] : []),
         'zoneproperty:userviewfactors:bysurfacename',
         'zoneterminalunitlist',
       ]);
