@@ -35,12 +35,15 @@ import { gunzipSync } from 'node:zlib';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
 const INDEX = join(REPO, 'packages/schemas/data/index.json.gz');
 
-const checkOnly = process.argv.includes('--check');
+// Strict, so a misspelt `--check` is refused instead of being ignored and the files written.
+const checkOnly = parseArgs({ options: { check: { type: 'boolean', default: false } } }).values
+  .check;
 
 /** Minimum height of the left half of the versions table. */
 const MIN_LEFT_ROWS = 10;

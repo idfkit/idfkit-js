@@ -37,6 +37,11 @@ jobs:
 
       - run: npm run format:check
 
+      - name: Check the lists that restate the bundled versions
+        # docs-url.test.ts holds two of the three lists against the bundle. The table in
+        # docs/reference/versions.md is held by this check alone.
+        run: npm run check:versions
+
       - name: Check the exported conformance level against the declared one
         # FR-024 makes the level a claim the release asserts, and CONFORMANCE_LEVEL is generated
         # from the pin in packages/core/package.json rather than restated beside it. A pin advanced

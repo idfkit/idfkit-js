@@ -8,3 +8,6 @@ dist/
 site/
 .typedoc.json
 __pycache__/
+
+# What `npm run codegen:staged` prepares for a person to inspect. It must not be merged.
+.energyplus-adoption/

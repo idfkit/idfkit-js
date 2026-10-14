@@ -33,10 +33,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { gunzipSync } from 'node:zlib';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
 const WORKFLOW = join(REPO, '.github/workflows/main.yml');
+const INDEX = join(REPO, 'packages/schemas/data/index.json.gz');
 const SPARSE = join(REPO, '.github/ep-testfiles.sparse');
 const SWEEP = join(HERE, 'sweep-example-files.mjs');
 
@@ -68,16 +70,10 @@ function fetchExamples(directory) {
     .split('\n')
     .filter((line) => !/^\s*(#|$)/.test(line));
   const git = (...args) => execFileSync('git', args, { cwd: directory, stdio: 'inherit' });
-  execFileSync(
-    'git',
-    ['clone', '--quiet', '--filter=blob:none', '--no-checkout', '--depth', '1'].concat([
-      '--branch',
-      `v${version}`,
-      UPSTREAM,
-      directory,
-    ]),
-    { stdio: 'inherit' }
-  );
+  const clone = ['clone', '--quiet', '--filter=blob:none', '--no-checkout', '--depth', '1'];
+  execFileSync('git', [...clone, '--branch', `v${version}`, UPSTREAM, directory], {
+    stdio: 'inherit',
+  });
   git('sparse-checkout', 'set', '--no-cone', ...patterns);
   git('checkout', '--quiet');
   return join(directory, 'testfiles');
@@ -107,6 +103,16 @@ function measure(examples) {
 function withRow(text, findings, errors) {
   const rows = [...text.matchAll(ROW)];
   if (rows.length === 0) throw new Error(`${WORKFLOW}: the sweep matrix has no rows`);
+  // A row written in another form, for example with a trailing comment, is not matched by `ROW`.
+  // At either end of the block it would pass the contiguity check below, be left where it is, and
+  // the matrix would come out unordered or with the version stated twice.
+  const stated = text.match(/^ *- \{ version:/gm) ?? [];
+  if (stated.length !== rows.length) {
+    throw new Error(
+      `${WORKFLOW}: ${stated.length} matrix rows state a version and ${rows.length} have the ` +
+        'form this script writes'
+    );
+  }
   const first = rows[0];
   const last = rows.at(-1);
   if (last.index + last[0].length - first.index !== rows.reduce((n, row) => n + row[0].length, 0)) {
@@ -126,8 +132,24 @@ function withRow(text, findings, errors) {
   return text.slice(0, first.index) + block + text.slice(last.index + last[0].length);
 }
 
+/**
+ * Refuse when the schema bundle does not carry the release.
+ *
+ * Without its schema every example file of the release is unreadable. The sweep would then exit 0
+ * under an unbounded ceiling, and the count of files would be written as the `errors` ceiling.
+ */
+function requireBundled() {
+  const index = JSON.parse(gunzipSync(readFileSync(INDEX)).toString('utf8'));
+  if (!Array.isArray(index.versions) || !index.versions.includes(version)) {
+    throw new Error(
+      `the schema bundle does not carry ${version}; run \`npm run build:schemas\` before measuring`
+    );
+  }
+}
+
 let scratch;
 try {
+  requireBundled();
   let examples = values.examples;
   if (examples === undefined) {
     scratch = mkdtempSync(join(tmpdir(), 'ep-examples-'));
