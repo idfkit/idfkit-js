@@ -11,7 +11,9 @@
   "scripts": {
     "build:schemas": "node packages/schemas/scripts/build.mjs",
     "codegen": "node scripts/emit-types.mjs",
+    "codegen:staged": "node scripts/prepare-type-package.mjs",
     "codegen:sentinels": "node scripts/emit-sentinels.mjs",
+    "sync:versions": "node scripts/sync-documented-versions.mjs",
     "typecheck": "tsc --build",
     "typecheck:docs": "tsc -p tsconfig.docs.json",
     "test": "vitest run",
@@ -34,6 +36,7 @@
     "check:publication": "node scripts/check-publication.mjs",
     "check:release": "node scripts/check-release-conformance.mjs",
     "check:type-packages": "node scripts/check-type-packages.mjs",
+    "check:versions": "node scripts/sync-documented-versions.mjs --check",
     "docs:serve": "uv run --with-requirements docs-requirements.txt mkdocs serve",
     "docs:build": "uv run --with-requirements docs-requirements.txt mkdocs build --strict",
     "docs:api": "typedoc --json .typedoc.json"

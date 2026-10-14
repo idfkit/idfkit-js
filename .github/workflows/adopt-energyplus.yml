@@ -1,0 +1,42 @@
+name: adopt-energyplus
+
+# Adopt one EnergyPlus release in this repository (feature 012, T048).
+#
+# A caller and nothing else. The procedure is the reusable workflow in idfkit-conformance, and the
+# steps it performs here are the ones the version roster, `governance/energyplus.toml`, declares
+# for the project `idfkit-js`, read at the governance tag below and never at a branch. It rebuilds
+# the schema bundle from idfkit's default branch, rewrites the lists and statements that restate
+# the bundled versions, measures the sweep row, stages the type package for a person to decide on,
+# runs the gate, and opens a pull request on `energyplus/X.Y.Z`.
+#
+# IT NEVER merges, publishes or releases. It is granted `contents: write` and `pull-requests: write`
+# only.
+#
+# THE TAG APPEARS TWICE, on `uses:` and as `governance_level`, because a called workflow cannot see
+# its own ref. The two must be the same string and the reusable workflow refuses the run otherwise.
+#
+# `run-name` is how an evaluation of the adoption finds the run for a release.
+run-name: Adopt EnergyPlus ${{ inputs.release }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: The EnergyPlus release to adopt, as X.Y.Z.
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  adopt:
+    uses: idfkit/idfkit-conformance/.github/workflows/adopt-energyplus.yml@governance-2026.25
+    with:
+      project: idfkit-js
+      governance_level: governance-2026.25
+      release: ${{ inputs.release }}
+    secrets:
+      APP_ID: ${{ secrets.APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
