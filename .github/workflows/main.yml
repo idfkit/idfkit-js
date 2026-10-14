@@ -273,6 +273,26 @@ jobs:
       # than the sources a bundler would transform.
       - run: npx tsc --build
 
+      # TEMPORARY DIAGNOSTIC, removed before this branch is reviewed. It samples the
+      # offset-independence gate in fresh processes on the hosted runner, under the superseded
+      # sequential protocol and under the paired one, because the bimodal result seen in CI
+      # does not reproduce on arm64. It cannot fail the job.
+      - name: Temporary diagnostic of the offset gate
+        run: |
+          grep -m1 "model name" /proc/cpuinfo || true
+          nproc
+          for mode in legacy paired; do
+            for i in $(seq 1 24); do
+              IDFKIT_BENCH_PROBE=$mode node bench/budget.mjs 2>&1 >/dev/null | grep PROBE | sed "s/^/run$i /" || true
+            done
+          done
+          for i in 1 2 3 4 5 6; do
+            echo "TRACE run$i"
+            IDFKIT_BENCH_PROBE=legacy node --trace-opt --trace-deopt bench/budget.mjs 2>&1 \
+              | awk '/MARK contextAt rep1 near/{p=1} /MARK contextAt rep2 near/{p=0} p' \
+              | grep -E "MARK|PROBE|bailout|completed optimizing|completed compiling" | cut -c1-230 | head -80 || true
+          done
+
       - run: npm run check:bench
 
   docs:
