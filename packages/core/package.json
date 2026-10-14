@@ -49,6 +49,7 @@
     "@idfkit/schemas": "0.0.0"
   },
   "devDependencies": {
+    "@idfkit/types-v26-2": "*",
     "@idfkit/types-v26-1": "*",
     "@idfkit/types-v9-4": "*"
   },

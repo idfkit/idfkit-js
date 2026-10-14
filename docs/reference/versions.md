@@ -22,18 +22,19 @@ the last entry.
 ## Generated types
 
 Schemas ship for all 18 versions. Generated TypeScript interfaces are published
-for two of them, each as its own opt-in package:
+for three of them, each as its own opt-in package:
 
 | Package               | Version | Size            |
 | --------------------- | ------- | --------------- |
+| `@idfkit/types-v26-2` | 26.2.0  | 2.7 MB of types |
 | `@idfkit/types-v26-1` | 26.1.0  | 2.7 MB of types |
 | `@idfkit/types-v9-4`  | 9.4.0   | 2.4 MB of types |
 
 ```bash
-npm install --save-dev @idfkit/types-v26-1
+npm install --save-dev @idfkit/types-v26-2
 ```
 
-Neither is installed by `@idfkit/core`, and installing neither leaves the
+None is installed by `@idfkit/core`, and installing none leaves the
 library complete. They are separate because together they are thirty times the
 size of everything else in core.
 

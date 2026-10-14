@@ -457,7 +457,7 @@ export const CORE = '@idfkit/core';
 export const SCHEMAS = '@idfkit/schemas';
 export const WEATHER = '@idfkit/weather';
 export const LANGUAGE = '@idfkit/language';
-export const TYPE_PACKAGES = ['@idfkit/types-v26-1', '@idfkit/types-v9-4'];
+export const TYPE_PACKAGES = ['@idfkit/types-v26-2', '@idfkit/types-v26-1', '@idfkit/types-v9-4'];
 export const ENGINE = ['@idfkit/engine', '@idfkit/engine-assets'];
 
 /**
