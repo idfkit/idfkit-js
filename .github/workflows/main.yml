@@ -29,10 +29,20 @@ jobs:
         # someone edits build.mjs without regenerating, every other check still
         # passes against a stale bundle. The source schemas live in the Python
         # repo, so fetch it shallowly and rebuild.
+        #
+        # From the commit the bundle records, not from idfkit's default branch:
+        # that branch moves on every EnergyPlus adoption in idfkit, and this
+        # repository adopts the same release later, so a rebuild from it failed
+        # every pull request in between for a reason none of them caused (#76).
         run: |
-          git clone --depth 1 https://github.com/idfkit/idfkit.git /tmp/idfkit-py
-          npm run build:schemas -- --source /tmp/idfkit-py/src/idfkit/schemas
-          git diff --exit-code -- packages/schemas/data \
+          repository=$(node -p "require('./packages/schemas/schema-source.json').repository")
+          commit=$(node -p "require('./packages/schemas/schema-source.json').commit")
+          path=$(node -p "require('./packages/schemas/schema-source.json').path")
+          git init --quiet /tmp/idfkit-py
+          git -C /tmp/idfkit-py fetch --quiet --depth 1 "https://github.com/$repository.git" "$commit"
+          git -C /tmp/idfkit-py checkout --quiet FETCH_HEAD
+          npm run build:schemas -- --source "/tmp/idfkit-py/$path"
+          git diff --exit-code -- packages/schemas/data packages/schemas/schema-source.json \
             || (echo "::error::Schema bundle is stale; run npm run build:schemas" && exit 1)
 
       - run: npm run format:check
