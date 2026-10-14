@@ -11,6 +11,55 @@ released together.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-14
+
+The stable release of the `0.4.0-rc.1` line, which added `@idfkit/geometry`.
+Since that candidate it adds EnergyPlus 26.2.0: the schema bundle covers 18
+versions, from 8.9.0 through 26.2.0, and a third type package publishes the
+interfaces for the new release. The geometry code is unchanged from the
+candidate apart from one documentation correction.
+
+`0.4.0` is also where the shared install name, `@idfkit/idfkit`, rejoins the
+line. It has been at `0.3.0` while the scoped packages moved ahead, which is the
+situation it exists to prevent.
+
+### Added
+
+- **EnergyPlus 26.2.0 in `@idfkit/schemas`.** The bundle carries the 26.2.0
+  schema, so `bundle.versions()` lists 18 versions and `bundle.latest()` returns
+  `'26.2.0'`. `ZoneMRTCalculation`, new in 26.2.0, reads its fields in
+  declaration order (`zone_name`, then `people_names`) rather than alphabetically,
+  like the three types that already did.
+- **`@idfkit/types-v26-2`**, the generated interfaces and `TypeMap` for
+  EnergyPlus 26.2.0. It is opt-in like `@idfkit/types-v26-1` and
+  `@idfkit/types-v9-4`, and carries declarations only.
+- `@idfkit/core` builds docs.idfkit.com links for a 26.2.0 document, where it
+  previously emitted none, matching the Python library.
+
+### Changed
+
+- **`@idfkit/idfkit` advances to `0.4.0` with the packages it re-exports**, so a
+  reader installing the shared name gets the same library as a reader installing
+  the scoped packages. The four `FR-044` preconditions were verified before
+  publication, as `FR-088` requires.
+- **The `latest` tag moves to `0.4.0` on every package.** `@idfkit/geometry` was
+  published as a prerelease and npm made that version `latest`, because the
+  first publish of a package takes the tag whatever `--tag` says. Its peer on
+  `@idfkit/core` is exact, so `npm install @idfkit/geometry @idfkit/core`
+  resolved a prerelease against `@idfkit/core@0.3.0` and conflicted. That is the
+  defect this release closes.
+
+### Fixed
+
+- **`Polygon3D.area` no longer reads as a triangulator.** The area is exact for
+  non-convex rings, because the signed contributions cancel on the reflex
+  corners, and its docstring described the fan that computes it without saying
+  the fan is sound only for the signed sum. A consumer reusing it to draw with
+  would emit triangles outside the ring. Every polygon in the 26.1.0 example
+  corpus with more than four vertices is non-convex, 197 surfaces across 25 of
+  721 geometry-bearing files, so that reuse draws 0.47 per cent of surfaces
+  wrong and everything else right. No behaviour changed.
+
 ## [0.4.0-rc.1] - 2026-09-23
 
 Adds a fifth package. This release moves to `conformance-2026.15` and
@@ -837,7 +886,8 @@ First published release. The API is not yet stable.
   no schema matches, because loading the wrong schema mis-maps every positional
   field instead of failing.
 
-[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/idfkit/idfkit-js/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/idfkit/idfkit-js/compare/v0.4.0-rc.1...v0.4.0
 [0.4.0-rc.1]: https://github.com/idfkit/idfkit-js/compare/v0.3.0...v0.4.0-rc.1
 [0.3.0]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.3...v0.3.0
 [0.3.0-rc.3]: https://github.com/idfkit/idfkit-js/compare/v0.3.0-rc.2...v0.3.0-rc.3
