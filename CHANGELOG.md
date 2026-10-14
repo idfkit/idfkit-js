@@ -11,15 +11,30 @@ released together.
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-09-25
+## [0.4.0] - 2026-10-14
 
-The stable release of the `0.4.0-rc.1` line, which added `@idfkit/geometry`. The
-library code is unchanged from that candidate: one documentation correction has
-landed since, and nothing else.
+The stable release of the `0.4.0-rc.1` line, which added `@idfkit/geometry`.
+Since that candidate it adds EnergyPlus 26.2.0: the schema bundle covers 18
+versions, from 8.9.0 through 26.2.0, and a sixth type package publishes the
+interfaces for the new release. The geometry code is unchanged from the
+candidate apart from one documentation correction.
 
 `0.4.0` is also where the shared install name, `@idfkit/idfkit`, rejoins the
 line. It has been at `0.3.0` while the scoped packages moved ahead, which is the
 situation it exists to prevent.
+
+### Added
+
+- **EnergyPlus 26.2.0 in `@idfkit/schemas`.** The bundle carries the 26.2.0
+  schema, so `bundle.versions()` lists 18 versions and `bundle.latest()` returns
+  `'26.2.0'`. `ZoneMRTCalculation`, new in 26.2.0, reads its fields in
+  declaration order (`zone_name`, then `people_names`) rather than alphabetically,
+  like the three types that already did.
+- **`@idfkit/types-v26-2`**, the generated interfaces and `TypeMap` for
+  EnergyPlus 26.2.0. It is opt-in like `@idfkit/types-v26-1` and
+  `@idfkit/types-v9-4`, and carries declarations only.
+- `@idfkit/core` builds docs.idfkit.com links for a 26.2.0 document, where it
+  previously emitted none, matching the Python library.
 
 ### Changed
 
