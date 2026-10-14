@@ -276,14 +276,17 @@ const ANSWER = { warmupMs: 60, budgetMs: 60, minIterations: 20, maxIterations: 3
  *    noisy neighbour) reaches both halves of a round or a minority of rounds.
  * 6. The gate is the median of the per-round ratios of medians. One call per
  *    timed region is kept, as everywhere else in this file.
- * 7. What was measured under this protocol: 50 runs on the hosted runner gave
- *    1.29 to 1.54 for `contextAt` and 1.85 to 2.38 for `completionsAt`; 24 runs
- *    on an Apple M2 gave 1.20 to 1.74 and 2.21 to 2.58. The settled ratio is
+ * 7. What was measured under this protocol: 52 runs on the hosted runner gave
+ *    1.29 to 1.57 for `contextAt` and 1.85 to 2.61 for `completionsAt`; 24 runs
+ *    on an Apple M2 gave 1.20 to 1.75 and 2.28 to 2.55. The settled ratio is
  *    not 1 because the two statements are not the same statement and the two
  *    offsets are not on the same part of it: the first is inside the type name
  *    of `Version, 26.1;` and the last is on the terminator of a `Zone` with
  *    five fields. The ratio therefore carries a statement effect that is
- *    independent of the offset.
+ *    independent of the offset. For `completionsAt` the first offset is the
+ *    dearer one, and its settled cost differs between processes (4.4 to 6.1
+ *    microseconds on the runner, against 2.3 to 2.6 at the last), which is
+ *    what spreads that gate.
  *
  * What the gate protects is unchanged. A search that reads the whole prefix
  * costs the far offset several orders of magnitude more in every round, and no
