@@ -15,7 +15,7 @@ released together.
 
 The stable release of the `0.4.0-rc.1` line, which added `@idfkit/geometry`.
 Since that candidate it adds EnergyPlus 26.2.0: the schema bundle covers 18
-versions, from 8.9.0 through 26.2.0, and a sixth type package publishes the
+versions, from 8.9.0 through 26.2.0, and a third type package publishes the
 interfaces for the new release. The geometry code is unchanged from the
 candidate apart from one documentation correction.
 
