@@ -136,6 +136,22 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
+      # A release of this library can complete a step of an EnergyPlus adoption that was waiting on
+      # it, so the watch in idfkit-conformance is asked to evaluate again at once (feature 012,
+      # T055). It precedes the waves: they can wait an hour each, the token is valid for one hour,
+      # and the version is published before either runs. A consumer evaluated before its bump
+      # lands is reported as waiting. A dispatch that does not land is a warning and never a
+      # failure, because the watch also runs on a daily schedule.
+      - name: Ask the EnergyPlus watch to evaluate again
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          gh workflow run energyplus-watch.yml --repo idfkit/idfkit-conformance \
+            -f reason="idfkit-js $VERSION released" \
+            || echo "::warning title=Watch not dispatched::The daily schedule evaluates the adoption instead."
+
       - name: Dispatch in waves
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -146,22 +162,6 @@ jobs:
           --library javascript
           --level "$VERSION"
           --report adoption-report.json
-
-      # A release of this library can complete a step of an EnergyPlus adoption that was waiting on
-      # it, so the watch in idfkit-conformance is asked to evaluate again at once (feature 012,
-      # T055). It runs whether or not every wave landed: the version is published either way. A
-      # dispatch that does not land is a warning and never a failure, because the watch also runs
-      # on a daily schedule.
-      - name: Ask the EnergyPlus watch to evaluate again
-        if: always() && steps.app-token.outputs.token != ''
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VERSION: ${{ steps.ver.outputs.version }}
-        run: |
-          gh workflow run energyplus-watch.yml --repo idfkit/idfkit-conformance \
-            -f reason="idfkit-js $VERSION released" \
-            || echo "::warning title=Watch not dispatched::The daily schedule evaluates the adoption instead."
 
       - name: Keep the adoption report
         if: always()
