@@ -13,15 +13,22 @@
  * Usage: node scripts/build.mjs [--source <dir>]
  */
 
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '..');
 const OUT = join(PKG, 'data');
+/**
+ * Where the bundle records the idfkit commit it was built from. Outside `data/`,
+ * so it is never published; the Quality job reads it to rebuild from exactly
+ * that commit, rather than from whatever idfkit's default branch holds by then.
+ */
+const SOURCE_RECORD = join(PKG, 'schema-source.json');
 
 const argv = process.argv.slice(2);
 const sourceFlag = argv.indexOf('--source');
@@ -283,6 +290,10 @@ function main() {
     process.exit(1);
   }
 
+  // Read before anything is written, so a source that cannot be recorded
+  // leaves the committed bundle as it was.
+  const record = sourceRecord(SOURCE);
+
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
@@ -363,6 +374,44 @@ function main() {
     `prose strings   ${proseStrings.length} distinct (${(docsBytes / 1024).toFixed(1)} KB gzipped)`
   );
   console.log(`bundle on disk  ${(gzTotal / 1024).toFixed(1)} KB gzipped`);
+
+  writeFileSync(SOURCE_RECORD, `${JSON.stringify(record, null, 2)}\n`);
+  console.log(`built from      ${record.repository}@${record.commit.slice(0, 12)}`);
+}
+
+/**
+ * The idfkit commit the schemas under `source` belong to.
+ *
+ * Refuses a directory outside a git checkout, and one with uncommitted changes
+ * under it: a bundle built from either names no commit anyone could rebuild
+ * it from, so the Quality job could only ever report it as stale.
+ */
+function sourceRecord(source) {
+  const git = (...args) =>
+    execFileSync('git', ['-C', source, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  let root;
+  try {
+    root = git('rev-parse', '--show-toplevel');
+  } catch {
+    console.error(
+      `${source} is not inside a git checkout of idfkit, so the bundle could not record its source.`
+    );
+    process.exit(1);
+  }
+  if (git('status', '--porcelain', '--', '.') !== '') {
+    console.error(
+      `${source} has uncommitted changes. Commit them, or build from a clean checkout.`
+    );
+    process.exit(1);
+  }
+  return {
+    repository: 'idfkit/idfkit',
+    commit: git('rev-parse', 'HEAD'),
+    path: relative(root, source).split('\\').join('/'),
+  };
 }
 
 /**
