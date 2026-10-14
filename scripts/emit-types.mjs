@@ -36,7 +36,7 @@
  * complete one, and `npm run check:type-packages` closes the gap: it fails on a
  * single runtime byte and on any exported value declaration.
  *
- * Usage: node scripts/emit-types.mjs [version...] [--packages <dir>] [--no-notes]
+ * Usage: node scripts/emit-types.mjs [version...] [--source <dir>] [--packages <dir>] [--no-notes]
  */
 
 import { gunzipSync } from 'node:zlib';
@@ -46,9 +46,12 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..');
-const SCHEMA_SRC = resolve(REPO, '../idfkit/src/idfkit/schemas');
-
 const argv = process.argv.slice(2);
+// `--source <dir>` names the directory of raw epJSON schemas, as it does for
+// packages/schemas/scripts/build.mjs. The default remains the sibling `idfkit` checkout.
+const sourceFlag = argv.indexOf('--source');
+const SCHEMA_SRC =
+  sourceFlag !== -1 ? resolve(argv[sourceFlag + 1]) : resolve(REPO, '../idfkit/src/idfkit/schemas');
 const packagesFlag = argv.indexOf('--packages');
 const PACKAGES = packagesFlag !== -1 ? resolve(argv[packagesFlag + 1]) : join(REPO, 'packages');
 const WITH_NOTES = !argv.includes('--no-notes');
@@ -372,7 +375,8 @@ function emitVersion(version) {
   // One licence text, copied rather than restated, so the packages cannot drift
   // apart on the one file a consumer is entitled to read verbatim.
   const license = join(dir, 'LICENSE');
-  if (!existsSync(license)) copyFileSync(join(PACKAGES, 'core', 'LICENSE'), license);
+  // Read from this repository and not from `PACKAGES`, which `--packages` may point elsewhere.
+  if (!existsSync(license)) copyFileSync(join(REPO, 'packages', 'core', 'LICENSE'), license);
 
   return { packageName, file, bytes: text.length, count };
 }
