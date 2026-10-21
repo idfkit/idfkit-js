@@ -11,6 +11,8 @@ released together.
 
 ## [Unreleased]
 
+This release moves to `conformance-2026.19`. The corpus adds five cases for the multi-field `update` shared with the Python library, an `update` operation and a `post-operation-epjson` assertion (`conformance-2026.17`), and removes the six TypeScript divergence entries for those cases that the changes below close. An `@idfkit/core` release without them fails the three refused update cases at this level.
+
 ### Changed
 
 - `IdfObject.update` now examines every entry before applying any. A group containing an unknown field, `name` in any letter case, or a value for the extensible key (such as `vertices`) that assignment would reject leaves the object unchanged and reports every refused entry, one per line, under the heading `Update of object type '<Type>' refused; no field was changed:`. Previously, entries before the first unknown field were applied. The signature and the returned object are unchanged, and `null` or `undefined` for the extensible key still clears it. The Python `IDFObject.update` follows the same contract.
