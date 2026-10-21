@@ -4,6 +4,7 @@ import { ExtensibleList } from './extensible.js';
 import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
 import {
   choiceSpellingsFor,
+  extensibleValueProblem,
   shapeFor,
   spellChoice,
   type ChoiceSpellings,
@@ -173,10 +174,48 @@ export class IdfObject {
     (this as unknown as Record<string, unknown>)[field] = value ?? undefined;
   }
 
-  /** Apply several fields at once. */
+  /**
+   * Apply several fields at once, all or nothing.
+   *
+   * Every entry is examined before any is applied. An entry is refused when its name is not a
+   * field of the type, when it is `name` in any letter case (assign the `name` property instead,
+   * which also updates the objects that refer to this one), or when it gives the extensible key
+   * (such as `vertices`) a value that assignment would reject: anything other than `null`,
+   * `undefined` or an array of repeats whose fields all belong to the repeat. If any entry is
+   * refused, no field changes and the error lists every refused entry, one per line. Otherwise
+   * each entry is applied in order through the field's accessor, so reference tracking and change
+   * notification are those of consecutive `set` calls.
+   *
+   * The Python `IDFObject.update` follows the same contract and returns `None` where this returns
+   * the object.
+   */
   update(values: FieldValues): this {
-    for (const [field, value] of Object.entries(values)) {
-      this.set(field, value ?? undefined);
+    const entries = Object.entries(values);
+    const shape = this[SHAPE];
+    const refused: string[] = [];
+    for (const [field, value] of entries) {
+      if (field.toLowerCase() === 'name') {
+        refused.push(`  - ${field}: name (use the name setter to rename an object)`);
+      } else if (field === shape.extensibleKey) {
+        const problem = extensibleValueProblem(value, shape.type.x?.fields ?? []);
+        if (problem !== undefined) refused.push(`  - ${field}: wrapper-value (${problem})`);
+      } else if (!Object.hasOwn(shape.type.p, field)) {
+        refused.push(`  - ${field}: unknown (not a field of ${this.typeName})`);
+      }
+    }
+    if (refused.length > 0) {
+      throw new Error(
+        [
+          `Update of object type '${this.typeName}' refused; no field was changed:`,
+          ...refused,
+        ].join('\n')
+      );
+    }
+    // Every name was checked above, so write through the accessor directly rather than `set`,
+    // which would check each one again. The accessor is what fires reference tracking.
+    const target = this as unknown as Record<string, unknown>;
+    for (const [field, value] of entries) {
+      target[field] = value ?? undefined;
     }
     return this;
   }

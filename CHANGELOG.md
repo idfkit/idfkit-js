@@ -13,6 +13,7 @@ released together.
 
 ### Changed
 
+- `IdfObject.update` now examines every entry before applying any. A group containing an unknown field, `name` in any letter case, or a value for the extensible key (such as `vertices`) that assignment would reject leaves the object unchanged and reports every refused entry, one per line, under the heading `Update of object type '<Type>' refused; no field was changed:`. Previously, entries before the first unknown field were applied. The signature and the returned object are unchanged, and `null` or `undefined` for the extensible key still clears it. The Python `IDFObject.update` follows the same contract.
 - Assigning the extensible key (such as `vertices`), through the property or `set`, now throws a `TypeError` before writing unless the value is `null`, `undefined`, or an array of plain objects whose keys are all fields of the repeat. Previously any value was stored: a string was written out as a malformed list; a repeat with an unknown field kept it in epJSON output, where it is not a schema property, and lost it in IDF output; and `[null]` was stored before the reference update failed on it, leaving the reference graph without the list's edges. `null` and `undefined` still clear the list. Values given at construction, by a reader or by `add`, do not pass through the accessor and are not checked here; `validateObject` still reports them. The Python library's single assignment already rejects the same values.
 
 ## [0.4.0] - 2026-10-14
