@@ -236,6 +236,64 @@ describe('update', () => {
     expect(zone.update({ x_origin: 1 })).toBe(zone);
     expect(zone.update({})).toBe(zone);
   });
+
+  it('refuses a repeat that is not an object, keeping the reference graph intact', () => {
+    doc.add('Branch', 'B1');
+    const list = doc.add('BranchList', 'BL', { branches: [{ branch_name: 'B1' }] });
+    expect(() => list.update({ branches: [null] as unknown as undefined })).toThrow(
+      /branches: wrapper-value \(item 0 is null, expected an object\)/
+    );
+    expect(list.toJSON()).toEqual({ branches: [{ branch_name: 'B1' }] });
+    expect(doc.references.isReferenced('B1')).toBe(true);
+  });
+
+  it('refuses a repeat with an unknown field, writing nothing', () => {
+    const surface = doc.add('BuildingSurface:Detailed', 'S1', { surface_type: 'Wall' });
+    expect(() =>
+      surface.update({ surface_type: 'Roof', vertices: [{ bogus: 1 }] as unknown as undefined })
+    ).toThrow(/item 0 has unknown field\(s\) bogus/);
+    expect(surface.get('surface_type')).toBe('Wall');
+    expect(surface.get('vertices')).toBeUndefined();
+  });
+
+  it('clears the extensible list when given null', () => {
+    const surface = doc.add('BuildingSurface:Detailed', 'S1', { vertices: [{ ...vertex }] });
+    surface.update({ surface_type: 'Roof', vertices: null });
+    expect(surface.get('surface_type')).toBe('Roof');
+    expect(surface.get('vertices')).toBeUndefined();
+  });
+
+  it('refuses name in any letter case', () => {
+    const zone = doc.add('Zone', 'Z1', { x_origin: 3 });
+    expect(() => zone.update({ x_origin: 9, Name: 'Z2' })).toThrow(
+      /- Name: name \(use the name setter/
+    );
+    expect(zone.name).toBe('Z1');
+    expect(zone.get('x_origin')).toBe(3);
+  });
+
+  it('opens the message with the same header as the Python library', () => {
+    const zone = doc.add('Zone', 'Z1');
+    expect(() => zone.update({ bogus: 1 })).toThrow(
+      "Update of object type 'Zone' refused; no field was changed:\n" +
+        '  - bogus: unknown (not a field of Zone)'
+    );
+  });
+
+  it('agrees with set and property assignment on invalid extensible values', () => {
+    const surface = doc.add('BuildingSurface:Detailed', 'S1', { vertices: [{ ...vertex }] });
+    const record = surface as unknown as Record<string, unknown>;
+    for (const bad of ['x', [null], [[1]], [{ bogus: 1 }]]) {
+      expect(() => surface.set('vertices', bad as unknown as undefined)).toThrow(TypeError);
+      expect(() => {
+        record.vertices = bad;
+      }).toThrow(TypeError);
+      expect(() => surface.update({ vertices: bad as unknown as undefined })).toThrow(
+        /wrapper-value/
+      );
+    }
+    expect(surface.toJSON()).toEqual({ vertices: [{ ...vertex }] });
+  });
 });
 
 describe('remove', () => {
