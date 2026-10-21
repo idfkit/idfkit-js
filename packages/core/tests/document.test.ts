@@ -122,6 +122,33 @@ describe('field access', () => {
 
     expect(surface.extensible[0]?.['vertex_x_coordinate']).toBe(1);
   });
+
+  it('rejects an extensible value that is not an array of repeats, writing nothing', () => {
+    const vertex = { vertex_x_coordinate: 0, vertex_y_coordinate: 0, vertex_z_coordinate: 0 };
+    const surface = doc.add('BuildingSurface:Detailed', 'S1', { vertices: [{ ...vertex }] });
+    const record = surface as unknown as Record<string, unknown>;
+    for (const bad of ['x', [null], [[1]], [{ bogus: 1 }]]) {
+      expect(() => surface.set('vertices', bad as unknown as undefined)).toThrow(TypeError);
+      expect(() => {
+        record.vertices = bad;
+      }).toThrow(TypeError);
+    }
+    expect(() => surface.set('vertices', [{ bogus: 1 }] as unknown as undefined)).toThrow(
+      'BuildingSurface:Detailed.vertices: item 0 has unknown field(s) bogus'
+    );
+    expect(surface.toJSON()).toEqual({ vertices: [{ ...vertex }] });
+  });
+
+  it('clears the extensible list when given null or undefined', () => {
+    const surface = doc.add('BuildingSurface:Detailed', 'S1', {
+      vertices: [{ vertex_x_coordinate: 1 }],
+    });
+    surface.set('vertices', null);
+    expect(surface.get('vertices')).toBeUndefined();
+    surface.set('vertices', [{ vertex_x_coordinate: 2 }]);
+    surface.set('vertices', undefined);
+    expect(surface.get('vertices')).toBeUndefined();
+  });
 });
 
 describe('remove', () => {

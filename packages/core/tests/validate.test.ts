@@ -140,7 +140,9 @@ describe('field types (E003)', () => {
       zone_name: 'Z1',
       outside_boundary_condition: 'Outdoors',
     });
-    surface.set('vertices', 'nope');
+    // `set` now refuses this value, but a document read from epJSON stores what the file says
+    // without passing the accessor, so the validator must still report it.
+    surface[DATA]['vertices'] = 'nope';
 
     const findings = validateObject(surface, v26);
     expect(codes(findings)).toEqual(['E003']);

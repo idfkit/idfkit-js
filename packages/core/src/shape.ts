@@ -63,19 +63,58 @@ export class ObjectShape {
         : extensible.fields.filter((f) => (extensible.p[f]?.ol?.length ?? 0) > 0);
 
     const proto = Object.create(base) as object;
+    const groupFields = extensible?.fields;
     for (const field of fields) {
-      defineFieldAccessor(proto, field);
+      defineFieldAccessor(proto, field, field === this.extensibleKey ? groupFields : undefined);
     }
     // The extensible array lives under its own epJSON key (`vertices`) rather
     // than in the positional field list, so it needs an accessor of its own.
     if (this.extensibleKey !== undefined && !fields.includes(this.extensibleKey)) {
-      defineFieldAccessor(proto, this.extensibleKey);
+      defineFieldAccessor(proto, this.extensibleKey, groupFields ?? []);
     }
     this.proto = Object.freeze(proto);
   }
 }
 
-function defineFieldAccessor(proto: object, field: string): void {
+/**
+ * Why a value cannot be written to the extensible key, or `undefined` when it can.
+ *
+ * `null` and `undefined` clear the list. Anything else must be an array of plain objects whose
+ * keys are all fields of the repeat (`groupFields`). A value outside that shape is not stored:
+ * `[null]` reached the reference graph and broke it, and an unknown key in a repeat is dropped by
+ * every writer, so the caller would read it back and then lose it on save. The accessor, `set`
+ * and `update` all ask this one question, so the three paths agree.
+ */
+export function extensibleValueProblem(
+  value: unknown,
+  groupFields: readonly string[]
+): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) return `expected an array, got ${describe(value)}`;
+  for (let index = 0; index < value.length; index += 1) {
+    const group: unknown = value[index];
+    if (typeof group !== 'object' || group === null || Array.isArray(group)) {
+      return `item ${index} is ${describe(group)}, expected an object`;
+    }
+    const unknown = Object.keys(group).filter((key) => !groupFields.includes(key));
+    if (unknown.length > 0) {
+      return `item ${index} has unknown field(s) ${unknown.join(', ')}`;
+    }
+  }
+  return undefined;
+}
+
+function describe(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'an array';
+  return `a ${typeof value}`;
+}
+
+function defineFieldAccessor(
+  proto: object,
+  field: string,
+  groupFields: readonly string[] | undefined
+): void {
   Object.defineProperty(proto, field, {
     enumerable: true,
     configurable: false,
@@ -83,6 +122,12 @@ function defineFieldAccessor(proto: object, field: string): void {
       return this[DATA][field];
     },
     set(this: IdfObject, value: unknown) {
+      if (groupFields !== undefined) {
+        const problem = extensibleValueProblem(value, groupFields);
+        if (problem !== undefined) {
+          throw new TypeError(`${this[SHAPE].typeName}.${field}: ${problem}`);
+        }
+      }
       const previous = this[DATA][field];
       if (previous === value) return;
 
