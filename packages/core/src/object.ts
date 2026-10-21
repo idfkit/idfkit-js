@@ -173,9 +173,37 @@ export class IdfObject {
     (this as unknown as Record<string, unknown>)[field] = value ?? undefined;
   }
 
-  /** Apply several fields at once. */
+  /**
+   * Apply several fields at once, all or nothing.
+   *
+   * Every entry is examined before any is applied. An entry is refused when its name is not a
+   * field of the type, when it is `name` (assign the `name` property instead, which also updates
+   * the objects that refer to this one), or when it gives the extensible key (such as `vertices`)
+   * a value that is not an array. If any entry is refused, no field changes and the error lists
+   * every refused entry, one per line. Otherwise each entry is applied in order through `set`, so
+   * reference tracking and change notification are those of consecutive `set` calls.
+   *
+   * The shared contract with the Python `IDFObject.update`, which returns `None` where this
+   * returns the object, is proven by the `update-*` conformance cases.
+   */
   update(values: FieldValues): this {
-    for (const [field, value] of Object.entries(values)) {
+    const entries = Object.entries(values);
+    const refused: string[] = [];
+    for (const [field, value] of entries) {
+      if (field === 'name') {
+        refused.push(`  - name: name (use the name setter to rename an object)`);
+      } else if (field === this[SHAPE].extensibleKey && !Array.isArray(value)) {
+        refused.push(`  - ${field}: wrapper-value (expected an array)`);
+      } else if (!this.hasField(field)) {
+        refused.push(`  - ${field}: unknown (not a field of ${this.typeName})`);
+      }
+    }
+    if (refused.length > 0) {
+      throw new Error(
+        [`Update of ${this.typeName} refused; no field was changed:`, ...refused].join('\n')
+      );
+    }
+    for (const [field, value] of entries) {
       this.set(field, value ?? undefined);
     }
     return this;

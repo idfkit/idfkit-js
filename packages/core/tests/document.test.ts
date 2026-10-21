@@ -151,6 +151,93 @@ describe('field access', () => {
   });
 });
 
+describe('update', () => {
+  const vertex = { vertex_x_coordinate: 0, vertex_y_coordinate: 0, vertex_z_coordinate: 0 };
+
+  it('leaves every field at its prior value when one entry is unknown', () => {
+    const zone = doc.add('Zone', 'Z1', { x_origin: 3 });
+    expect(() => zone.update({ x_origin: 9, bogus: 1 })).toThrow(/bogus/);
+    expect(zone.get('x_origin')).toBe(3);
+    expect(zone.toJSON()).not.toHaveProperty('bogus');
+  });
+
+  it('refuses name, pointing to the name setter', () => {
+    const zone = doc.add('Zone', 'Z1', { x_origin: 3 });
+    expect(() => zone.update({ x_origin: 9, name: 'Z2' })).toThrow(/name.*setter/);
+    expect(zone.name).toBe('Z1');
+    expect(zone.get('x_origin')).toBe(3);
+  });
+
+  it('refuses a wrapper-key value that is not an array, writing nothing', () => {
+    const surface = doc.add('BuildingSurface:Detailed', 'S1', { surface_type: 'Wall' });
+    surface.extensible.push({ ...vertex });
+    expect(() =>
+      surface.update({ surface_type: 'Roof', vertices: 'not a list' as unknown as undefined })
+    ).toThrow(/vertices/);
+    expect(surface.get('surface_type')).toBe('Wall');
+    expect(surface.extensible).toHaveLength(1);
+  });
+
+  it('lists every refused entry, one per line, in group order', () => {
+    const surface = doc.add('BuildingSurface:Detailed', 'S1', { surface_type: 'Wall' });
+    let message = '';
+    try {
+      surface.update({
+        surface_type: 'Roof',
+        bogus: 1,
+        name: 'S2',
+        vertices: 7 as unknown as undefined,
+      });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    const lines = message.split('\n');
+    expect(lines[0]).toMatch(/BuildingSurface:Detailed/);
+    expect(lines.slice(1).map((line) => line.trim().split(':')[0])).toEqual([
+      '- bogus',
+      '- name',
+      '- vertices',
+    ]);
+    expect(surface.get('surface_type')).toBe('Wall');
+  });
+
+  it('applies an all-valid group exactly as the same edits through set', () => {
+    const seen: [string, unknown, unknown][] = [];
+    const original = doc.onFieldChanged.bind(doc);
+    doc.onFieldChanged = (obj, field, previous, next) => {
+      seen.push([field, previous, next]);
+      original(obj, field, previous, next);
+    };
+    const group = {
+      zone_name: 'Zone B',
+      surface_type: 'Roof',
+      construction_name: 'Other',
+      view_factor_to_ground: undefined,
+      vertices: [{ ...vertex }, { ...vertex, vertex_x_coordinate: 1 }],
+    };
+    const fields = { zone_name: 'Zone A', construction_name: 'C', view_factor_to_ground: 0.5 };
+
+    const updated = doc.add('BuildingSurface:Detailed', 'S1', { ...fields });
+    seen.length = 0;
+    updated.update(group);
+    const byUpdate = [...seen];
+
+    const assigned = doc.add('BuildingSurface:Detailed', 'S2', { ...fields });
+    seen.length = 0;
+    for (const [field, value] of Object.entries(group)) assigned.set(field, value);
+    const bySet = [...seen];
+
+    expect(updated.toJSON()).toEqual(assigned.toJSON());
+    expect(byUpdate).toEqual(bySet);
+  });
+
+  it('still returns the object', () => {
+    const zone = doc.add('Zone', 'Z1');
+    expect(zone.update({ x_origin: 1 })).toBe(zone);
+    expect(zone.update({})).toBe(zone);
+  });
+});
+
 describe('remove', () => {
   it('removes an object and drops its reference edges', () => {
     doc.add('Zone', 'Z1');
