@@ -43,7 +43,7 @@
   },
   "idfkit": {
     "conformance": "conformance-2026.15",
-    "governance": "governance-2026.22"
+    "governance": "governance-2026.30"
   },
   "dependencies": {
     "@idfkit/schemas": "0.0.0"
