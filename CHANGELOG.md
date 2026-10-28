@@ -15,7 +15,7 @@ This release moves to `conformance-2026.19`. The corpus adds five cases for the 
 
 ### Added
 
-- `GeocodingError` from `@idfkit/weather` now carries a `kind`, `'not-found'`, `'unreachable'`, `'http'` or `'invalid-response'`, and, for `'http'`, the response `status`, so an application can tell a place name that matches nothing from a geocoding service that could not be reached without matching message text. `geocode` and `detectLocation` set it on every error they throw; a body that is not the expected JSON, which previously read as either "no results" or a network failure depending on its shape, is now `'invalid-response'`. The union is spelled `GeocodingError['kind']`; no new names are exported. The Python `GeocodingError` carries the same `kind` and `status` ([#88](https://github.com/idfkit/idfkit-js/issues/88)).
+- `GeocodingError` from `@idfkit/weather` now carries a `kind`, `'not-found'`, `'unreachable'`, `'http'` or `'invalid-response'`, and, for `'http'`, the response `status`, so an application can tell a place name that matches nothing from a geocoding service that could not be reached without matching message text. `geocode` and `detectLocation` set it on every error they throw; a body that is not the expected JSON, which previously read as either "no results" or a network failure depending on its shape, is now `'invalid-response'`, as are coordinates that are `null`, blank or not numeric, which previously came back as `0` or `NaN`; an ipapi.co payload that reports a rate limit is `'http'` with `status` `429`. The union is spelled `GeocodingError['kind']`; no new names are exported. The Python `GeocodingError` carries the same `kind` and `status` ([#88](https://github.com/idfkit/idfkit-js/issues/88)).
 
 ### Changed
 

@@ -97,6 +97,35 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Read a response body as JSON. A body that fails to arrive (a dropped connection, an abort)
+ * is `'unreachable'`, as it would be had the headers never arrived; a body that arrives and
+ * does not parse is `'invalid-response'`.
+ */
+async function readJson(response: Response, message: (cause: unknown) => string): Promise<unknown> {
+  let body: string;
+  try {
+    body = await response.text();
+  } catch (cause) {
+    throw new GeocodingError(message(cause), { kind: 'unreachable', cause });
+  }
+  try {
+    return JSON.parse(body) as unknown;
+  } catch (cause) {
+    throw new GeocodingError(message(cause), { kind: 'invalid-response', cause });
+  }
+}
+
+/**
+ * A coordinate from a JSON field: a number, or a non-blank numeric string. Anything else,
+ * including `null`, `''` and `true` (which `Number` reads as `0` or `1`), is `NaN`.
+ */
+function coordinate(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return NaN;
+}
+
 const nominatimLimiter = new RateLimiter(1000);
 const ipapiLimiter = new RateLimiter(1000);
 
@@ -145,15 +174,7 @@ export async function geocode(
     );
   }
 
-  let data: unknown;
-  try {
-    data = await response.json();
-  } catch (cause) {
-    throw new GeocodingError(`Failed to geocode address: ${address}`, {
-      kind: 'invalid-response',
-      cause,
-    });
-  }
+  const data = await readJson(response, () => `Failed to geocode address: ${address}`);
   if (!Array.isArray(data)) {
     throw new GeocodingError(`Unexpected response geocoding address: ${address}`, {
       kind: 'invalid-response',
@@ -164,8 +185,8 @@ export async function geocode(
   }
 
   const first = data[0] as { lat?: unknown; lon?: unknown } | null;
-  const lat = Number(first?.lat ?? NaN);
-  const lon = Number(first?.lon ?? NaN);
+  const lat = coordinate(first?.lat);
+  const lon = coordinate(first?.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     throw new GeocodingError(`Unexpected response geocoding address: ${address}`, {
       kind: 'invalid-response',
@@ -201,7 +222,8 @@ export interface DetectLocationOptions extends GeocodeOptions {
  *
  * @throws {@link GeocodingError} when the IP cannot be located. Its `kind`
  * reads as for {@link geocode}; `'not-found'` means ipapi.co answered with an
- * error payload, such as for a reserved address.
+ * error payload, such as for a reserved address. An error payload that reports a
+ * rate limit or an exhausted quota is `'http'` with `status` `429` instead.
  */
 export async function detectLocation(
   options: DetectLocationOptions = {}
@@ -233,34 +255,43 @@ export async function detectLocation(
     );
   }
 
-  let data: {
-    error?: boolean;
-    reason?: string;
-    latitude?: number;
-    longitude?: number;
+  const data = (await readJson(
+    response,
+    (cause) => `Failed to detect location from IP: ${String(cause)}`
+  )) as {
+    error?: unknown;
+    reason?: unknown;
+    message?: unknown;
+    latitude?: unknown;
+    longitude?: unknown;
   } | null;
-  try {
-    data = (await response.json()) as typeof data;
-  } catch (cause) {
-    throw new GeocodingError(`Failed to detect location from IP: ${String(cause)}`, {
-      kind: 'invalid-response',
-      cause,
-    });
-  }
 
   if (data?.error) {
-    throw new GeocodingError(
-      `ipapi.co could not locate this IP: ${data.reason ?? 'unknown error'}`,
-      { kind: 'not-found' }
-    );
+    const reason = String(data.reason || data.message || 'unknown error');
+    // ipapi.co reports a rate limit or an exhausted quota in the same payload shape as a
+    // reserved address. Only the latter means a retry will not help.
+    if (/rate ?limit|quota/i.test(`${reason} ${String(data.message ?? '')}`)) {
+      throw new GeocodingError(`ipapi.co rate-limited this request: ${reason}`, {
+        kind: 'http',
+        status: 429,
+      });
+    }
+    throw new GeocodingError(`ipapi.co could not locate this IP: ${reason}`, { kind: 'not-found' });
   }
-  if (data?.latitude === undefined || data.longitude === undefined) {
+  if (data?.latitude == null || data.longitude == null) {
     throw new GeocodingError('ipapi.co response missing latitude/longitude', {
       kind: 'invalid-response',
     });
   }
+  const latitude = coordinate(data.latitude);
+  const longitude = coordinate(data.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new GeocodingError('ipapi.co response has non-numeric latitude/longitude', {
+      kind: 'invalid-response',
+    });
+  }
 
-  const coords: [number, number] = [Number(data.latitude), Number(data.longitude)];
+  const coords: [number, number] = [latitude, longitude];
   if (maxAgeMs > 0) ipCache = { coords, fetchedAt: Date.now() };
   return coords;
 }

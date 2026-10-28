@@ -1,11 +1,36 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { detectLocation, geocode, GeocodingError, RateLimiter } from '@idfkit/weather';
 import type { FetchLike } from '@idfkit/weather';
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 
+// The module-level limiters would otherwise hold every call here a second apart.
+// RateLimiter's own behaviour is covered on a fresh instance below.
+const skipRateLimit = () => {
+  beforeEach(() => {
+    vi.spyOn(RateLimiter.prototype, 'wait').mockResolvedValue(undefined);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+};
+
+// A 200 whose body fails part-way through, as a dropped connection produces.
+const truncated = () =>
+  new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('[{"lat":'));
+        controller.error(new TypeError('terminated'));
+      },
+    }),
+    { status: 200 }
+  );
+
 describe('geocode', () => {
+  skipRateLimit();
+
   it('returns coordinates from a Nominatim hit', async () => {
     const fetchMock: FetchLike = vi.fn(async () => json([{ lat: '40.7484', lon: '-73.9857' }]));
     const [lat, lon] = await geocode('Empire State Building', { fetch: fetchMock });
@@ -56,9 +81,16 @@ describe('geocode', () => {
     ['a body that is not JSON', '<html>captive portal</html>'],
     ['a JSON body that is not an array', '{"error":"bad"}'],
     ['a hit without coordinates', '[{"display_name":"x"}]'],
+    ['a hit with blank coordinates', '[{"lat":"","lon":""}]'],
+    ['a hit with null coordinates', '[{"lat":null,"lon":null}]'],
   ])("reports %s as kind 'invalid-response'", async (_label, body) => {
     const error = await rejection(async () => new Response(body, { status: 200 }));
     expect(error.kind).toBe('invalid-response');
+  });
+
+  it("reports a body cut off in transit as kind 'unreachable'", async () => {
+    const error = await rejection(async () => truncated());
+    expect(error.kind).toBe('unreachable');
   });
 });
 
@@ -72,6 +104,8 @@ describe('GeocodingError', () => {
 });
 
 describe('detectLocation', () => {
+  skipRateLimit();
+
   it('reads latitude/longitude from ipapi.co', async () => {
     const fetchMock: FetchLike = async () => json({ latitude: 41.85, longitude: -87.65 });
     const [lat, lon] = await detectLocation({ fetch: fetchMock, maxAgeMs: 0 });
@@ -80,11 +114,36 @@ describe('detectLocation', () => {
   });
 
   it('raises on an ipapi.co error payload', async () => {
-    const fetchMock: FetchLike = async () => json({ error: true, reason: 'rate limited' });
-    await expect(detectLocation({ fetch: fetchMock, maxAgeMs: 0 })).rejects.toThrow(/rate limited/);
+    const fetchMock: FetchLike = async () => json({ error: true, reason: 'Reserved IP Address' });
+    await expect(detectLocation({ fetch: fetchMock, maxAgeMs: 0 })).rejects.toThrow(/Reserved IP/);
     await expect(detectLocation({ fetch: fetchMock, maxAgeMs: 0 })).rejects.toMatchObject({
       kind: 'not-found',
     });
+  });
+
+  it("reports a rate-limit payload as kind 'http' with status 429, not 'not-found'", async () => {
+    const fetchMock: FetchLike = async () =>
+      json({ error: true, reason: 'RateLimited', message: 'Visit https://ipapi.co/ratelimited/' });
+    await expect(detectLocation({ fetch: fetchMock, maxAgeMs: 0 })).rejects.toMatchObject({
+      kind: 'http',
+      status: 429,
+    });
+  });
+
+  it.each([
+    ['null', { latitude: null, longitude: null }],
+    ['non-numeric', { latitude: 'abc', longitude: 'def' }],
+  ])("reports %s coordinates as kind 'invalid-response'", async (_label, body) => {
+    const fetchMock: FetchLike = async () => json(body);
+    await expect(detectLocation({ fetch: fetchMock, maxAgeMs: 0 })).rejects.toMatchObject({
+      kind: 'invalid-response',
+    });
+  });
+
+  it("reports a body cut off in transit as kind 'unreachable'", async () => {
+    await expect(
+      detectLocation({ fetch: async () => truncated(), maxAgeMs: 0 })
+    ).rejects.toMatchObject({ kind: 'unreachable' });
   });
 
   it("reports an HTTP error as kind 'http' with its status", async () => {
