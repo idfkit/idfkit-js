@@ -71,6 +71,63 @@ describe('StationIndex.search', () => {
   });
 });
 
+describe('StationIndex.search tokenisation (idfkit/idfkit-js#87)', () => {
+  const rows: [string, string, string, string][] = [
+    ['USA', 'CO', 'Boulder.Muni.AP', '724699'],
+    ['USA', 'CO', 'Nederland-Univ.Colorado.Boulder.Mountain.Research.Stn', '720533'],
+    ['USA', 'MS', 'Columbus-Golden.Triangle.Rgnl.AP', '723307'],
+    ['AGO', 'ZAI', 'Mbanza.Congo', '661600'],
+    ['BEN', 'LI', 'Cotonou-Cadjehoun.AP', '653440'],
+    ['CAN', 'QC', 'Montreal-Trudeau.Intl.AP', '716270'],
+    ['CHE', 'ZH', 'Zürich.AP', '066700'],
+  ];
+  const towns = StationIndex.fromStations(
+    rows.map(([country, state, city, wmo]) => makeStation({ country, state, city, wmo }))
+  );
+  const ranked = (query: string): [string, number][] =>
+    towns.search(query).map((r) => [r.station.wmo, r.score]);
+
+  it('splits "City, state" on the comma and treats the state as a qualifier', () => {
+    const results = towns.search('Boulder, CO');
+    expect(results[0]?.station.city).toBe('Boulder.Muni.AP');
+    expect(results[0]?.score).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it('ranks the same with a semicolon or no separator', () => {
+    const expected = ranked('Boulder, CO');
+    expect(ranked('Boulder;CO')).toEqual(expected);
+    expect(ranked('Boulder CO')).toEqual(expected);
+  });
+
+  it('does not let a short token prefix-match unrelated names', () => {
+    const results = towns.search('Golden, CO', { limit: 20 });
+    const cities = results.map((r) => r.station.city);
+    expect(cities).not.toContain('Mbanza.Congo');
+    expect(cities).not.toContain('Cotonou-Cadjehoun.AP');
+    // Golden Triangle matches on "golden" alone: "co" is not its state.
+    const golden = results.find((r) => r.station.city.startsWith('Columbus'));
+    expect(golden?.score).toBeCloseTo(0.15);
+  });
+
+  it('matches a short token against a whole name token only', () => {
+    const jfk = StationIndex.fromStations([
+      makeStation({ state: 'NY', city: 'New.York.J.F.Kennedy.Intl.AP', wmo: '744860' }),
+    ]);
+    expect(jfk.search('kennedy j f')[0]?.score).toBeGreaterThanOrEqual(0.6);
+    expect(jfk.search('york ke')[0]?.score).toBeCloseTo(0.15);
+  });
+
+  it('folds diacritics in the query', () => {
+    const results = towns.search('Montréal');
+    expect(results[0]?.station.city).toBe('Montreal-Trudeau.Intl.AP');
+    expect(results[0]?.score).toBeGreaterThan(0.85);
+  });
+
+  it('folds diacritics in station names', () => {
+    expect(towns.search('zurich')[0]?.station.city).toBe('Zürich.AP');
+  });
+});
+
 describe('StationIndex.nearest', () => {
   it('orders stations by distance', () => {
     const results = index.nearest(40.71, -74.0); // Manhattan

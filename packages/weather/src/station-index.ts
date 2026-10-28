@@ -40,21 +40,70 @@ function extractWmoFromFilename(filename: string): string | undefined {
   return /^\d+$/.test(tail) ? tail : undefined;
 }
 
+/** Query separators: whitespace, commas, and semicolons, so "Golden, CO" is two tokens. */
+const QUERY_SPLIT_RE = /[\s,;]+/;
+
 /**
- * Score a station against a lower-cased query and its whitespace tokens.
+ * A query token shorter than this must equal a name token rather than prefix
+ * one: two letters such as "co" would otherwise prefix-match "congo".
+ */
+const MIN_PREFIX_TOKEN_LENGTH = 3;
+
+/** Lower-case and strip diacritics, so "Montréal" reads as "montreal". */
+function fold(text: string): string {
+  const lowered = text.toLowerCase();
+  if (!/[^\x00-\x7f]/.test(lowered)) return lowered;
+  return lowered.normalize('NFD').replace(/\p{Mn}/gu, '');
+}
+
+/** Split a folded query into tokens, dropping empty ones. */
+function tokenizeQuery(query: string): string[] {
+  return query.split(QUERY_SPLIT_RE).filter(Boolean);
+}
+
+/**
+ * Score the query tokens that must match a station name against its tokens.
+ *
+ * A token of {@link MIN_PREFIX_TOKEN_LENGTH} characters or more matches as a
+ * prefix of a name token; a shorter one must equal a whole name token. All
+ * tokens matching scores 0.6–0.9 by coverage of the name; some of them
+ * matching scores up to 0.3, as a share of all `tokenCount` query tokens
+ * (qualifiers included).
+ */
+function scoreNameTokens(nameLower: string, nameQuery: string[], tokenCount: number): number {
+  if (nameQuery.length === 0) return 0;
+  const nameTokens = nameLower.split(/\s+/).filter(Boolean);
+  const inName = (qt: string): boolean =>
+    qt.length < MIN_PREFIX_TOKEN_LENGTH
+      ? nameTokens.includes(qt)
+      : nameTokens.some((t) => t.startsWith(qt));
+
+  const matching = nameQuery.filter(inName).length;
+  if (matching === nameQuery.length) {
+    const covered = nameQuery.reduce((sum, qt) => sum + qt.length, 0);
+    const coverage = covered / Math.max(nameLower.length, 1);
+    return 0.6 + 0.3 * Math.min(coverage, 1.0);
+  }
+  return 0.3 * (matching / tokenCount);
+}
+
+/**
+ * Score a station against a folded query and its tokens.
  *
  * The signals, strongest first: an exact WMO number, a full-query substring of
  * the display or city name, all query tokens as name-token prefixes, a partial
- * token overlap, and finally a bare state or country code. The constants match
- * the Python library so both rank a given query identically.
+ * token overlap, and finally a bare state or country code. A token equal to the
+ * station's state or country code is a location qualifier ("Boulder, CO") and
+ * need not appear in the name. The constants match the Python library so both
+ * rank a given query identically.
  */
 function scoreStation(
   station: WeatherStation,
   query: string,
   tokens: string[]
 ): [number, MatchField] {
-  const nameLower = station.city.toLowerCase().replace(/[.-]/g, ' ');
-  const displayLower = station.displayName.toLowerCase();
+  const nameLower = fold(station.city).replace(/[.-]/g, ' ');
+  const displayLower = fold(station.displayName);
 
   if (/^\d+$/.test(query) && query === station.wmo) return [1.0, 'wmo'];
 
@@ -67,19 +116,12 @@ function scoreStation(
     return [0.85 + 0.1 * coverage, 'name'];
   }
 
-  const nameTokens = nameLower.split(/\s+/).filter(Boolean);
-  const startsWithAny = (qt: string): boolean => nameTokens.some((t) => t.startsWith(qt));
-
-  if (tokens.length > 0 && tokens.every(startsWithAny)) {
-    const covered = tokens.reduce((sum, qt) => sum + qt.length, 0);
-    const coverage = covered / Math.max(nameLower.length, 1);
-    return [0.6 + 0.3 * Math.min(coverage, 1.0), 'name'];
-  }
-
-  if (tokens.length > 0) {
-    const matching = tokens.filter(startsWithAny).length;
-    if (matching > 0) return [0.3 * (matching / tokens.length), 'name'];
-  }
+  const qualifiers = new Set(
+    [station.state.toLowerCase(), station.country.toLowerCase()].filter(Boolean)
+  );
+  const nameQuery = tokens.filter((qt) => !qualifiers.has(qt));
+  const tokenScore = scoreNameTokens(nameLower, nameQuery, tokens.length);
+  if (tokenScore > 0) return [tokenScore, 'name'];
 
   if (query === station.state.toLowerCase()) return [0.5, 'state'];
   if (query === station.country.toLowerCase()) return [0.4, 'country'];
@@ -270,14 +312,18 @@ export class StationIndex {
   /**
    * Fuzzy-search by name, city, state, WMO number, or EPW filename.
    *
-   * Matching is case-insensitive and substring/token-prefix based — no NLP
-   * dependency. A canonical EPW filename is detected and resolved through
+   * Matching is case- and accent-insensitive ("Montréal" finds "Montreal")
+   * and substring/token-prefix based — no NLP dependency. The query is split
+   * on whitespace, commas, and semicolons, and a token equal to a station's
+   * state or country code qualifies the match rather than having to appear in
+   * the name, so "Boulder, CO" ranks Boulder, Colorado first. A token shorter
+   * than three characters must equal a whole word of the name. A canonical EPW filename is detected and resolved through
    * {@link getByFilename} on the fast path.
    */
   search(query: string, options: SearchOptions = {}): SearchResult[] {
     const { limit = 10, country } = options;
     const raw = query.trim();
-    const q = raw.toLowerCase();
+    const q = fold(raw);
     if (!q) return [];
 
     const inCountry = (s: WeatherStation): boolean =>
@@ -293,7 +339,7 @@ export class StationIndex {
       }
     }
 
-    const tokens = q.split(/\s+/).filter(Boolean);
+    const tokens = tokenizeQuery(q);
     const scored: SearchResult[] = [];
     for (const station of this.#stations) {
       if (!inCountry(station)) continue;
