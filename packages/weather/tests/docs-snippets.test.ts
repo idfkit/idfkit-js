@@ -9,6 +9,7 @@ import {
   fetchEpw,
   fetchWeatherFiles,
   geocode,
+  GeocodingError,
   loadStationIndex,
   monthlyMeans,
   parseEpw,
@@ -92,6 +93,26 @@ describe('how-to/fetch-weather-files.md', () => {
       ...(await geocode('350 Fifth Avenue, New York', { fetch: fetchMock }))
     );
     expect(results[0]?.station.country).toBe('USA');
+  });
+
+  it('tells a place that does not exist from a service that cannot be reached', async () => {
+    let fetchMock: FetchLike = async () => new Response('[]', { status: 200 });
+
+    async function locate(query: string): Promise<[number, number] | string> {
+      try {
+        return await geocode(query, { fetch: fetchMock });
+      } catch (error) {
+        if (!(error instanceof GeocodingError)) throw error;
+        if (error.kind === 'not-found') return `No place called "${query}" was found.`;
+        return 'The place-name service could not be reached; try again shortly.';
+      }
+    }
+
+    expect(await locate('zzzzqq')).toBe('No place called "zzzzqq" was found.');
+    fetchMock = async () => {
+      throw new TypeError('fetch failed');
+    };
+    expect(await locate('Chicago')).toMatch(/could not be reached/);
   });
 });
 
