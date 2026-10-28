@@ -13,6 +13,10 @@ released together.
 
 This release moves to `conformance-2026.19`. The corpus adds five cases for the multi-field `update` shared with the Python library, an `update` operation and a `post-operation-epjson` assertion (`conformance-2026.17`), and removes the six TypeScript divergence entries for those cases that the changes below close. An `@idfkit/core` release without them fails the three refused update cases at this level.
 
+### Added
+
+- `GeocodingError` from `@idfkit/weather` now carries a `kind`, `'not-found'`, `'unreachable'`, `'http'` or `'invalid-response'`, and, for `'http'`, the response `status`, so an application can tell a place name that matches nothing from a geocoding service that could not be reached without matching message text. `geocode` and `detectLocation` set it on every error they throw; a body that is not the expected JSON, which previously read as either "no results" or a network failure depending on its shape, is now `'invalid-response'`, as are coordinates that are `null`, blank or not numeric, which previously came back as `0` or `NaN`; an ipapi.co payload that reports a rate limit is `'http'` with `status` `429`. The union is spelled `GeocodingError['kind']`; no new names are exported. The Python `GeocodingError` carries the same `kind` and `status` ([#88](https://github.com/idfkit/idfkit-js/issues/88)).
+
 ### Changed
 
 - `IdfObject.update` now examines every entry before applying any. A group containing an unknown field, `name` in any letter case, or a value for the extensible key (such as `vertices`) that assignment would reject leaves the object unchanged and reports every refused entry, one per line, under the heading `Update of object type '<Type>' refused; no field was changed:`. Previously, entries before the first unknown field were applied. The signature and the returned object are unchanged, and `null` or `undefined` for the extensible key still clears it. The Python `IDFObject.update` follows the same contract.
