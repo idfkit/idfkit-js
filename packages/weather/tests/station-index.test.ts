@@ -126,6 +126,38 @@ describe('StationIndex.search tokenisation (idfkit/idfkit-js#87)', () => {
   it('folds diacritics in station names', () => {
     expect(towns.search('zurich')[0]?.station.city).toBe('Zürich.AP');
   });
+
+  it('folds letters that carry no combining mark', () => {
+    const tromso = StationIndex.fromStations([
+      makeStation({ country: 'NOR', state: 'TR', city: 'Tromso', wmo: '010250' }),
+    ]);
+    expect(tromso.search('Tromsø')[0]?.station.city).toBe('Tromso');
+  });
+
+  it('splits dots and hyphens as station names do', () => {
+    const towns2 = StationIndex.fromStations([
+      makeStation({ country: 'USA', state: 'MO', city: 'St.Louis-Lambert.Intl.AP', wmo: '724340' }),
+      makeStation({ country: 'SEN', state: 'SL', city: 'Saint.Louis.AP', wmo: '616000' }),
+      makeStation({
+        country: 'USA',
+        state: 'NC',
+        city: 'Winston-Salem-Smith.Reynolds.AP',
+        wmo: '723193',
+      }),
+    ]);
+    const stLouis = towns2.search('St. Louis, MO')[0];
+    expect(stLouis?.station.wmo).toBe('724340');
+    expect(stLouis?.score).toBeGreaterThanOrEqual(0.6);
+    expect(towns2.search('Winston-Salem, NC')[0]?.station.wmo).toBe('723193');
+  });
+
+  it('counts a qualifier toward a partial match', () => {
+    const boulder = towns
+      .search('Boulder Denver, CO')
+      .find((r) => r.station.city === 'Boulder.Muni.AP');
+    // "boulder" and the qualifier "co" match; "denver" does not.
+    expect(boulder?.score).toBeCloseTo(0.2);
+  });
 });
 
 describe('StationIndex.nearest', () => {

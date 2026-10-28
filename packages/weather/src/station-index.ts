@@ -40,8 +40,12 @@ function extractWmoFromFilename(filename: string): string | undefined {
   return /^\d+$/.test(tail) ? tail : undefined;
 }
 
-/** Query separators: whitespace, commas, and semicolons, so "Golden, CO" is two tokens. */
-const QUERY_SPLIT_RE = /[\s,;]+/;
+/**
+ * Query separators: whitespace, commas, and semicolons, so "Golden, CO" is two
+ * tokens, and dots and hyphens as in station names ("St.Louis-Lambert"), so
+ * "St. Louis" and "Winston-Salem" tokenise the way the names they target do.
+ */
+const QUERY_SPLIT_RE = /[\s,;.-]+/;
 
 /**
  * A query token shorter than this must equal a name token rather than prefix
@@ -49,11 +53,33 @@ const QUERY_SPLIT_RE = /[\s,;]+/;
  */
 const MIN_PREFIX_TOKEN_LENGTH = 3;
 
+/**
+ * Lower-case letters that carry no combining mark under NFD, so stripping
+ * marks leaves them alone: "Tromsø" must still read as "tromso".
+ */
+const FOLD_TABLE: Readonly<Record<string, string>> = {
+  æ: 'ae',
+  ð: 'd',
+  đ: 'd',
+  ħ: 'h',
+  ı: 'i',
+  ł: 'l',
+  ø: 'o',
+  œ: 'oe',
+  ß: 'ss',
+  þ: 'th',
+  ŧ: 't',
+};
+const FOLD_TABLE_RE = new RegExp(`[${Object.keys(FOLD_TABLE).join('')}]`, 'g');
+
 /** Lower-case and strip diacritics, so "Montréal" reads as "montreal". */
 function fold(text: string): string {
   const lowered = text.toLowerCase();
   if (!/[^\x00-\x7f]/.test(lowered)) return lowered;
-  return lowered.normalize('NFD').replace(/\p{Mn}/gu, '');
+  return lowered
+    .normalize('NFD')
+    .replace(/\p{Mn}/gu, '')
+    .replace(FOLD_TABLE_RE, (c) => FOLD_TABLE[c] ?? c);
 }
 
 /** Split a folded query into tokens, dropping empty ones. */
@@ -67,8 +93,8 @@ function tokenizeQuery(query: string): string[] {
  * A token of {@link MIN_PREFIX_TOKEN_LENGTH} characters or more matches as a
  * prefix of a name token; a shorter one must equal a whole name token. All
  * tokens matching scores 0.6–0.9 by coverage of the name; some of them
- * matching scores up to 0.3, as a share of all `tokenCount` query tokens
- * (qualifiers included).
+ * matching scores up to 0.3, as a share of all `tokenCount` query tokens,
+ * where each qualifier the caller removed from `nameQuery` counts as matched.
  */
 function scoreNameTokens(nameLower: string, nameQuery: string[], tokenCount: number): number {
   if (nameQuery.length === 0) return 0;
@@ -84,7 +110,9 @@ function scoreNameTokens(nameLower: string, nameQuery: string[], tokenCount: num
     const coverage = covered / Math.max(nameLower.length, 1);
     return 0.6 + 0.3 * Math.min(coverage, 1.0);
   }
-  return 0.3 * (matching / tokenCount);
+  if (matching === 0) return 0;
+  const qualifiers = tokenCount - nameQuery.length;
+  return 0.3 * ((matching + qualifiers) / tokenCount);
 }
 
 /**
@@ -314,7 +342,7 @@ export class StationIndex {
    *
    * Matching is case- and accent-insensitive ("Montréal" finds "Montreal")
    * and substring/token-prefix based — no NLP dependency. The query is split
-   * on whitespace, commas, and semicolons, and a token equal to a station's
+   * on whitespace, commas, semicolons, dots, and hyphens, and a token equal to a station's
    * state or country code qualifies the match rather than having to appear in
    * the name, so "Boulder, CO" ranks Boulder, Colorado first. A token shorter
    * than three characters must equal a whole word of the name. A canonical EPW filename is detected and resolved through
