@@ -665,7 +665,12 @@ function groupFields(definition: SlimType, a: ExtensibleGroup, b: ExtensibleGrou
   return out;
 }
 
-/** A string equal for two objects of one type exactly when every field and repeat is equal. */
+/**
+ * A string equal for two objects of one type exactly when `compareObjects` finds no difference.
+ *
+ * A repeat keys only the fields it holds a value for: one wrapped by `obj.extensible` carries unset
+ * fields as `undefined`.
+ */
 function contentKey(obj: IdfObject): string {
   const definition = obj.schema;
   const key = definition.x?.key;
@@ -675,7 +680,12 @@ function contentKey(obj: IdfObject): string {
   }
   if (key !== undefined) {
     for (const group of groupsOf(obj, key)) {
-      values.push(groupFields(definition, group, group).map((field) => [field, group[field]]));
+      values.push(
+        Object.keys(group)
+          .filter((field) => group[field] !== undefined)
+          .sort()
+          .map((field) => [field, group[field]])
+      );
     }
   }
   return JSON.stringify(values);

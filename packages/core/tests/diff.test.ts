@@ -608,6 +608,37 @@ describe('diffDocuments', () => {
     });
   });
 
+  describe('repeats read through extensible on a preserving document', () => {
+    // Reading `obj.extensible` on a document read with `preserveFormatting` wraps each repeat, and
+    // the wrapper carries every declared field as an own property, an unset one reading undefined.
+    // The repeat holds the same values, so the comparison must not tell the two apart.
+    function preserving(text: string): IdfDocument {
+      return parseIdf(text, v26, { strict: false, preserveFormatting: true }).document;
+    }
+
+    it('match an object without a name to its plain equal', () => {
+      const text =
+        'Version, 26.1;\nSurfaceProperty:ExposedFoundationPerimeter, Floor-1, BySegment, , , Yes, , No;\n';
+      const before = preserving(text);
+      void before.all('SurfaceProperty:ExposedFoundationPerimeter').first?.extensible;
+
+      expect(summary(diffDocuments(before, parse(text)))).toEqual([]);
+    });
+
+    it('leave a named object renamed with identical content recognisable as a rename', () => {
+      const text =
+        'Version, 26.1;\nZoneHVAC:EquipmentList, Z1 Equipment, SequentialLoad,\n' +
+        '  ZoneHVAC:IdealLoadsAirSystem, Z1 Ideal, 1, 1;\n';
+      const before = preserving(text);
+      void before.all('ZoneHVAC:EquipmentList').first?.extensible;
+      const after = parse(text.replace('Z1 Equipment', 'Core Equipment'));
+
+      expect(summary(diffDocuments(before, after))).toEqual([
+        'renamed ZoneHVAC:EquipmentList "Z1 Equipment" -> "Core Equipment"',
+      ]);
+    });
+  });
+
   describe('two documents of different schema versions', () => {
     it('throws IncomparableVersionsError naming both versions', () => {
       const before = parse(BASE);
