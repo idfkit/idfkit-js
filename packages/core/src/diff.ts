@@ -1,4 +1,4 @@
-import type { SlimType } from '@idfkit/schemas';
+import type { SlimField, SlimType } from '@idfkit/schemas';
 
 import type { IdfDocument } from './document.js';
 import type { ExtensibleGroup, FieldValue, IdfObject } from './object.js';
@@ -207,7 +207,7 @@ export class IncomparableVersionsError extends Error {
  * 4. An object without a name, either because its type has no name field (`Output:Variable`) or
  *    because it was left blank, has no identity beyond its content. It is matched to an object of
  *    its type with equal content, or equal content once the references explained by the renames
- *    of step 3 are set aside, taking the first such object in document order. An object without a
+ *    found above are set aside, taking the first such object in document order. An object without a
  *    name that was edited is therefore reported as one removal and one addition.
  *
  * Anything left unmatched is reported as added or removed. Position is not compared: an object
@@ -316,8 +316,8 @@ export function diffDocuments<A extends AnyTypeMap, B extends AnyTypeMap>(
   }
   for (const [old, current] of acceptUnique(
     contentCandidates(
-      unpaired(beforeByType, pairs.forward, true),
-      unpaired(afterByType, pairs.backward, true)
+      unpaired(removedNamed, pairs.forward, true),
+      unpaired(addedNamed, pairs.backward, true)
     )
   )) {
     pairs.add(old, current);
@@ -420,14 +420,17 @@ function newRename(old: IdfObject, current: IdfObject): Rename {
 
 /** A document's objects grouped by canonical type, both in document order. */
 function byType(objects: Iterable<IdfObject>): Map<string, IdfObject[]> {
-  const out = new Map<string, IdfObject[]>();
-  for (const obj of objects) {
-    let list = out.get(obj.typeName);
-    if (list === undefined) {
-      list = [];
-      out.set(obj.typeName, list);
-    }
-    list.push(obj);
+  return groupBy(objects, (obj) => obj.typeName);
+}
+
+/** Items grouped by a key, each group in the items' order. */
+function groupBy<K, T>(items: Iterable<T>, keyOf: (item: T) => K): Map<K, T[]> {
+  const out = new Map<K, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    const list = out.get(key);
+    if (list === undefined) out.set(key, [item]);
+    else list.push(item);
   }
   return out;
 }
@@ -501,13 +504,7 @@ function contentCandidates(
   for (const [type, olds] of removed) {
     const news = added.get(type);
     if (news === undefined) continue;
-    const byContent = new Map<string, IdfObject[]>();
-    for (const obj of news) {
-      const key = contentKey(obj);
-      const list = byContent.get(key);
-      if (list === undefined) byContent.set(key, [obj]);
-      else list.push(obj);
-    }
+    const byContent = groupBy(news, (obj) => contentKey(obj));
     for (const old of olds) {
       for (const current of byContent.get(contentKey(old)) ?? []) {
         addCandidate(candidates, old, current);
@@ -554,13 +551,7 @@ function matchUnnamed(
     const news = added.get(type);
     if (news === undefined) continue;
 
-    const byContent = new Map<string, IdfObject[]>();
-    for (const obj of news) {
-      const key = contentKey(obj);
-      const list = byContent.get(key);
-      if (list === undefined) byContent.set(key, [obj]);
-      else list.push(obj);
-    }
+    const byContent = groupBy(news, (obj) => contentKey(obj));
     const left: IdfObject[] = [];
     for (const old of olds) {
       const match = byContent.get(contentKey(old))?.shift();
@@ -568,33 +559,31 @@ function matchUnnamed(
       else pairs.add(old, match);
     }
 
-    if (renames.length === 0) continue;
+    if (renames.length === 0 || left.length === 0) continue;
+    // Only objects equal outside reference fields can differ by rewritten references alone.
+    const open = groupBy(
+      news.filter((current) => !pairs.backward.has(current)),
+      (current) => contentKey(current, false)
+    );
     for (const old of left) {
-      const match = news.find(
-        (current) =>
-          !pairs.backward.has(current) &&
-          compareObjects(old, current).every(
-            (change) =>
-              (change.kind === 'field' || change.kind === 'group-field') &&
-              attribute(current.schema, change, renames) !== undefined
-          )
-      );
+      const match = open
+        .get(contentKey(old, false))
+        ?.find(
+          (current) =>
+            !pairs.backward.has(current) &&
+            compareObjects(old, current).every(
+              (change) =>
+                (change.kind === 'field' || change.kind === 'group-field') &&
+                attribute(current.schema, change, renames) !== undefined
+            )
+        );
       if (match !== undefined) pairs.add(old, match);
     }
   }
 }
 
 function byLowerName(grouped: ReadonlyMap<string, readonly IdfObject[]>): Map<string, IdfObject[]> {
-  const out = new Map<string, IdfObject[]>();
-  for (const objects of grouped.values()) {
-    for (const obj of objects) {
-      const key = obj.name.toLowerCase();
-      const list = out.get(key);
-      if (list === undefined) out.set(key, [obj]);
-      else list.push(obj);
-    }
-  }
-  return out;
+  return groupBy([...grouped.values()].flat(), (obj) => obj.name.toLowerCase());
 }
 
 // ---------------------------------------------------------------------------
@@ -669,20 +658,22 @@ function groupFields(definition: SlimType, a: ExtensibleGroup, b: ExtensibleGrou
  * A string equal for two objects of one type exactly when `compareObjects` finds no difference.
  *
  * A repeat keys only the fields it holds a value for: one wrapped by `obj.extensible` carries unset
- * fields as `undefined`.
+ * fields as `undefined`. With `references` false, fields that read a reference list are left out.
  */
-function contentKey(obj: IdfObject): string {
+function contentKey(obj: IdfObject, references = true): string {
   const definition = obj.schema;
   const key = definition.x?.key;
+  const kept = (field: string, fields: Record<string, SlimField> | undefined): boolean =>
+    references || !fields?.[field]?.ol?.length;
   const values: unknown[] = [];
   for (const field of obj.fieldNames) {
-    if (field !== key) values.push(obj.get(field) ?? null);
+    if (field !== key) values.push(kept(field, definition.p) ? (obj.get(field) ?? null) : null);
   }
   if (key !== undefined) {
     for (const group of groupsOf(obj, key)) {
       values.push(
         Object.keys(group)
-          .filter((field) => group[field] !== undefined)
+          .filter((field) => group[field] !== undefined && kept(field, definition.x?.p))
           .sort()
           .map((field) => [field, group[field]])
       );
