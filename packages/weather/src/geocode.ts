@@ -19,11 +19,45 @@ import { resolveFetch, USER_AGENT, type FetchLike } from './http.js';
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 const IPAPI_URL = 'https://ipapi.co/json/';
 
-/** Raised when an address or IP cannot be resolved to coordinates. */
+/**
+ * Why a geocoding call failed. Not exported by name; spell it
+ * `GeocodingError['kind']`.
+ *
+ * - `'not-found'`: the service answered and has no location for the query. Retrying will not help;
+ *   a different query might.
+ * - `'unreachable'`: the request never got an answer (offline, DNS, refused, timed out, aborted).
+ *   A retry may help.
+ * - `'http'`: the service answered with an HTTP error; {@link GeocodingError.status} holds the
+ *   code. A `429` or `5xx` may clear on retry.
+ * - `'invalid-response'`: the service answered `2xx` with a body that is not the expected JSON,
+ *   which is what a captive portal or an intercepting proxy produces.
+ */
+type GeocodingErrorKind = 'not-found' | 'unreachable' | 'http' | 'invalid-response';
+
+/** Options for constructing a {@link GeocodingError}. */
+interface GeocodingErrorOptions {
+  /** Defaults to `'unreachable'`. */
+  kind?: GeocodingErrorKind;
+  /** The HTTP status, when `kind` is `'http'`. */
+  status?: number;
+  cause?: unknown;
+}
+
+/**
+ * Raised when an address or IP cannot be resolved to coordinates. Branch on
+ * {@link GeocodingError.kind} rather than on the message, whose wording may change.
+ */
 export class GeocodingError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
+  /** Why the call failed. */
+  readonly kind: GeocodingErrorKind;
+  /** The HTTP status, when {@link GeocodingError.kind} is `'http'`; otherwise `undefined`. */
+  readonly status: number | undefined;
+
+  constructor(message: string, options: GeocodingErrorOptions = {}) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'GeocodingError';
+    this.kind = options.kind ?? 'unreachable';
+    this.status = options.status;
   }
 }
 
@@ -63,6 +97,35 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Read a response body as JSON. A body that fails to arrive (a dropped connection, an abort)
+ * is `'unreachable'`, as it would be had the headers never arrived; a body that arrives and
+ * does not parse is `'invalid-response'`.
+ */
+async function readJson(response: Response, message: (cause: unknown) => string): Promise<unknown> {
+  let body: string;
+  try {
+    body = await response.text();
+  } catch (cause) {
+    throw new GeocodingError(message(cause), { kind: 'unreachable', cause });
+  }
+  try {
+    return JSON.parse(body) as unknown;
+  } catch (cause) {
+    throw new GeocodingError(message(cause), { kind: 'invalid-response', cause });
+  }
+}
+
+/**
+ * A coordinate from a JSON field: a number, or a non-blank numeric string. Anything else,
+ * including `null`, `''` and `true` (which `Number` reads as `0` or `1`), is `NaN`.
+ */
+function coordinate(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return NaN;
+}
+
 const nominatimLimiter = new RateLimiter(1000);
 const ipapiLimiter = new RateLimiter(1000);
 
@@ -78,8 +141,10 @@ export interface GeocodeOptions {
  * No API key. Requests are rate-limited to one per second to comply with the
  * Nominatim usage policy.
  *
- * @throws {@link GeocodingError} when the address cannot be resolved or the
- * service is unreachable.
+ * @throws {@link GeocodingError} when the address cannot be resolved. Its
+ * `kind` says why: `'not-found'` when Nominatim has no match, `'unreachable'`
+ * when the request failed, `'http'` (with `status`) on an HTTP error, and
+ * `'invalid-response'` when the body is not what Nominatim returns.
  */
 export async function geocode(
   address: string,
@@ -90,28 +155,44 @@ export async function geocode(
   const params = new URLSearchParams({ q: address, format: 'json', limit: '1' });
   const url = `${NOMINATIM_URL}?${params.toString()}`;
 
-  let data: Array<{ lat?: string; lon?: string }>;
+  let response: Response;
   try {
-    const response = await doFetch(url, {
+    response = await doFetch(url, {
       headers: { 'User-Agent': USER_AGENT },
       signal: options.signal,
     });
-    if (!response.ok) {
-      throw new GeocodingError(
-        `Failed to geocode address ${address}: ${response.status} ${response.statusText}`
-      );
-    }
-    data = (await response.json()) as Array<{ lat?: string; lon?: string }>;
   } catch (cause) {
-    if (cause instanceof GeocodingError) throw cause;
-    throw new GeocodingError(`Failed to geocode address: ${address}`, { cause });
+    throw new GeocodingError(`Failed to geocode address: ${address}`, {
+      kind: 'unreachable',
+      cause,
+    });
+  }
+  if (!response.ok) {
+    throw new GeocodingError(
+      `Failed to geocode address ${address}: ${response.status} ${response.statusText}`,
+      { kind: 'http', status: response.status }
+    );
   }
 
-  const first = data[0];
-  if (first?.lat === undefined || first.lon === undefined) {
-    throw new GeocodingError(`No results found for address: ${address}`);
+  const data = await readJson(response, () => `Failed to geocode address: ${address}`);
+  if (!Array.isArray(data)) {
+    throw new GeocodingError(`Unexpected response geocoding address: ${address}`, {
+      kind: 'invalid-response',
+    });
   }
-  return [Number(first.lat), Number(first.lon)];
+  if (data.length === 0) {
+    throw new GeocodingError(`No results found for address: ${address}`, { kind: 'not-found' });
+  }
+
+  const first = data[0] as { lat?: unknown; lon?: unknown } | null;
+  const lat = coordinate(first?.lat);
+  const lon = coordinate(first?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    throw new GeocodingError(`Unexpected response geocoding address: ${address}`, {
+      kind: 'invalid-response',
+    });
+  }
+  return [lat, lon];
 }
 
 interface CachedLocation {
@@ -139,7 +220,10 @@ export interface DetectLocationOptions extends GeocodeOptions {
  * ipapi.co; prefer {@link geocode} or explicit coordinates if you would rather
  * it did not.
  *
- * @throws {@link GeocodingError} when the IP cannot be located.
+ * @throws {@link GeocodingError} when the IP cannot be located. Its `kind`
+ * reads as for {@link geocode}; `'not-found'` means ipapi.co answered with an
+ * error payload, such as for a reserved address. An error payload that reports a
+ * rate limit or an exhausted quota is `'http'` with `status` `429` instead.
  */
 export async function detectLocation(
   options: DetectLocationOptions = {}
@@ -152,38 +236,62 @@ export async function detectLocation(
   await ipapiLimiter.wait();
   const doFetch = resolveFetch(options.fetch);
 
-  let data: {
-    error?: boolean;
-    reason?: string;
-    latitude?: number;
-    longitude?: number;
-  };
+  let response: Response;
   try {
-    const response = await doFetch(IPAPI_URL, {
+    response = await doFetch(IPAPI_URL, {
       headers: { 'User-Agent': USER_AGENT },
       signal: options.signal,
     });
-    if (!response.ok) {
-      throw new GeocodingError(
-        `Failed to detect location from IP: ${response.status} ${response.statusText}`
-      );
-    }
-    data = (await response.json()) as typeof data;
   } catch (cause) {
-    if (cause instanceof GeocodingError) throw cause;
-    throw new GeocodingError(`Failed to detect location from IP: ${String(cause)}`, { cause });
+    throw new GeocodingError(`Failed to detect location from IP: ${String(cause)}`, {
+      kind: 'unreachable',
+      cause,
+    });
   }
-
-  if (data.error) {
+  if (!response.ok) {
     throw new GeocodingError(
-      `ipapi.co could not locate this IP: ${data.reason ?? 'unknown error'}`
+      `Failed to detect location from IP: ${response.status} ${response.statusText}`,
+      { kind: 'http', status: response.status }
     );
   }
-  if (data.latitude === undefined || data.longitude === undefined) {
-    throw new GeocodingError('ipapi.co response missing latitude/longitude');
+
+  const data = (await readJson(
+    response,
+    (cause) => `Failed to detect location from IP: ${String(cause)}`
+  )) as {
+    error?: unknown;
+    reason?: unknown;
+    message?: unknown;
+    latitude?: unknown;
+    longitude?: unknown;
+  } | null;
+
+  if (data?.error) {
+    const reason = String(data.reason || data.message || 'unknown error');
+    // ipapi.co reports a rate limit or an exhausted quota in the same payload shape as a
+    // reserved address. Only the latter means a retry will not help.
+    if (/rate ?limit|quota/i.test(`${reason} ${String(data.message ?? '')}`)) {
+      throw new GeocodingError(`ipapi.co rate-limited this request: ${reason}`, {
+        kind: 'http',
+        status: 429,
+      });
+    }
+    throw new GeocodingError(`ipapi.co could not locate this IP: ${reason}`, { kind: 'not-found' });
+  }
+  if (data?.latitude == null || data.longitude == null) {
+    throw new GeocodingError('ipapi.co response missing latitude/longitude', {
+      kind: 'invalid-response',
+    });
+  }
+  const latitude = coordinate(data.latitude);
+  const longitude = coordinate(data.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new GeocodingError('ipapi.co response has non-numeric latitude/longitude', {
+      kind: 'invalid-response',
+    });
   }
 
-  const coords: [number, number] = [Number(data.latitude), Number(data.longitude)];
+  const coords: [number, number] = [latitude, longitude];
   if (maxAgeMs > 0) ipCache = { coords, fetchedAt: Date.now() };
   return coords;
 }

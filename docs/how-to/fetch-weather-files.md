@@ -74,6 +74,26 @@ second. For "stations near me", `detectLocation()` resolves the caller's public
 IP the same way. Both send data to a third-party service — pass explicit
 coordinates instead if that is a concern.
 
+When either call fails it throws a `GeocodingError`. Branch on its `kind` to
+tell a place that does not exist from a service that could not be reached:
+
+```ts
+import { geocode, GeocodingError } from '@idfkit/weather';
+
+async function locate(query: string): Promise<[number, number] | string> {
+  try {
+    return await geocode(query);
+  } catch (error) {
+    if (!(error instanceof GeocodingError)) throw error;
+    if (error.kind === 'not-found') return `No place called "${query}" was found.`;
+    return 'The place-name service could not be reached; try again shortly.';
+  }
+}
+```
+
+`kind` is `'not-found'`, `'unreachable'`, `'http'` (with the code in `status`),
+or `'invalid-response'`. Only `'not-found'` means retrying will not help.
+
 When you already know the exact EPW filename, resolve it directly:
 
 ```ts

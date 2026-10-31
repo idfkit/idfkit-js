@@ -11,6 +11,8 @@ released together.
 
 ## [Unreleased]
 
+This release moves to `conformance-2026.19`. The corpus adds five cases for the multi-field `update` shared with the Python library, an `update` operation and a `post-operation-epjson` assertion (`conformance-2026.17`), and removes the six TypeScript divergence entries for those cases that the changes below close. An `@idfkit/core` release without them fails the three refused update cases at this level.
+
 ### Added
 
 - The README opens with the idfkit identity header at `identity-2026.2`: the mark, the
@@ -18,11 +20,18 @@ released together.
   (`.github/workflows/check-identity.yml`) holds the header to that tag on every pull request.
 - Every package's README opens with the package header: the mark, its name as installed, one
   sentence and the family links. `@idfkit/weather` gains a README, since its npm page had none.
+- `GeocodingError` from `@idfkit/weather` now carries a `kind`, `'not-found'`, `'unreachable'`, `'http'` or `'invalid-response'`, and, for `'http'`, the response `status`, so an application can tell a place name that matches nothing from a geocoding service that could not be reached without matching message text. `geocode` and `detectLocation` set it on every error they throw; a body that is not the expected JSON, which previously read as either "no results" or a network failure depending on its shape, is now `'invalid-response'`, as are coordinates that are `null`, blank or not numeric, which previously came back as `0` or `NaN`; an ipapi.co payload that reports a rate limit is `'http'` with `status` `429`. The union is spelled `GeocodingError['kind']`; no new names are exported. The Python `GeocodingError` carries the same `kind` and `status` ([#88](https://github.com/idfkit/idfkit-js/issues/88)).
 
 ### Changed
 
 - Package READMEs and each package's `homepage` link `developers.idfkit.com` in place of the retired
   `js.idfkit.com`.
+- `IdfObject.update` now examines every entry before applying any. A group containing an unknown field, `name` in any letter case, or a value for the extensible key (such as `vertices`) that assignment would reject leaves the object unchanged and reports every refused entry, one per line, under the heading `Update of object type '<Type>' refused; no field was changed:`. Previously, entries before the first unknown field were applied. The signature and the returned object are unchanged, and `null` or `undefined` for the extensible key still clears it. The Python `IDFObject.update` follows the same contract.
+- Assigning the extensible key (such as `vertices`), through the property or `set`, now throws a `TypeError` before writing unless the value is `null`, `undefined`, or an array of plain objects whose keys are all fields of the repeat. Previously any value was stored: a string was written out as a malformed list; a repeat with an unknown field kept it in epJSON output, where it is not a schema property, and lost it in IDF output; and `[null]` was stored before the reference update failed on it, leaving the reference graph without the list's edges. `null` and `undefined` still clear the list. Values given at construction, by a reader or by `add`, do not pass through the accessor and are not checked here; `validateObject` still reports them. The Python library's single assignment already rejects the same values.
+
+### Fixed
+
+- `StationIndex.search` in `@idfkit/weather` missed queries in the form "City, state" and accented queries, and now finds them. Tokens are split on commas and semicolons as well as whitespace, so `'Golden, CO'` no longer keeps the comma in `'golden,'`, and on dots and hyphens as station names are, so `'St. Louis, MO'` and `'Winston-Salem, NC'` find their stations; a token equal to a station's state or country code qualifies the match rather than having to appear in its name, and counts as matched in a partial match, so `'Boulder, CO'` ranks Boulder, Colorado first; a token shorter than three characters must equal a whole word of the name, so `'co'` no longer prefix-matches Mbanza Congo and Cotonou; and query and station names are compared with diacritics folded, so `'Montréal'` finds Montreal and `'Tromsø'` finds Tromso. The Python library makes the same change, and both return the same results and scores. ([#87](https://github.com/idfkit/idfkit-js/issues/87), [#90](https://github.com/idfkit/idfkit-js/pull/90))
 
 ## [0.4.0] - 2026-10-14
 

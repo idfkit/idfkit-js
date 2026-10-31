@@ -287,4 +287,27 @@ WeatherProperty:SkyTemperature,
     const zone = new IdfDocument(v94).add('Zone', 'Z1');
     expect(() => new IdfDocument(v26).attach(zone.clone('Z2'))).not.toThrow();
   });
+  it('rejects a malformed extensible list before it reaches the reference graph', () => {
+    // The accessor stored any value. `[null]` was written, then the document's reference update
+    // read a field of the null repeat and threw, leaving the list stored and the edge to B1 gone.
+    const doc = new IdfDocument(v26);
+    doc.add('Branch', 'B1');
+    const list = doc.add('BranchList', 'BL', { branches: [{ branch_name: 'B1' }] });
+
+    expect(() => list.set('branches', [null] as unknown as undefined)).toThrow(TypeError);
+    expect(list.toJSON()).toEqual({ branches: [{ branch_name: 'B1' }] });
+    expect(doc.references.isReferenced('B1')).toBe(true);
+  });
+  it('keeps update all or nothing when an extensible repeat is malformed', () => {
+    // `update` checked that the value for the extensible key was an array but not what it held, so
+    // `[null]` passed examination and reached the accessor after earlier entries were written.
+    // `update` now asks the accessor's own validator before writing anything.
+    const doc = new IdfDocument(v26);
+    doc.add('Branch', 'B1');
+    const list = doc.add('BranchList', 'BL', { branches: [{ branch_name: 'B1' }] });
+
+    expect(() => list.update({ branches: [null] as unknown as undefined })).toThrow(/refused/);
+    expect(list.toJSON()).toEqual({ branches: [{ branch_name: 'B1' }] });
+    expect(doc.references.isReferenced('B1')).toBe(true);
+  });
 });
