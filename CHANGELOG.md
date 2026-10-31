@@ -11,6 +11,12 @@ released together.
 
 ## [Unreleased]
 
+### Added
+
+- The README opens with the idfkit identity header at `identity-2026.1`: the mark, the
+  repository's one sentence, the family links and the badge row. The `Identity` workflow
+  (`.github/workflows/check-identity.yml`) holds the header to that tag on every pull request.
+
 ## [0.4.0] - 2026-10-14
 
 The stable release of the `0.4.0-rc.1` line, which added `@idfkit/geometry`.
