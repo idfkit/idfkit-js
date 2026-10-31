@@ -1,6 +1,16 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-light.svg">
+    <img alt="idfkit" width="72" src="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/tile.png">
+  </picture>
+</p>
+
 # @idfkit/types-v26-2
 
 Generated TypeScript interfaces and a `TypeMap` for EnergyPlus 26.2.0.
+
+[idfkit](https://idfkit.com) · [Developers](https://developers.idfkit.com) · [EnergyPlus docs](https://docs.idfkit.com) · [Envelop](https://app.idfkit.com) · [MCP](https://mcp.idfkit.com) · [Shoebox](https://shoebox.idfkit.com) · [GitHub](https://github.com/idfkit)
 
 Opt-in. `@idfkit/core` is fully usable without it: a document with no map is
 typed permissively rather than not at all, so nothing here is needed to read,

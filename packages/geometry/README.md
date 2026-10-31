@@ -1,4 +1,16 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-light.svg">
+    <img alt="idfkit" width="72" src="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/tile.png">
+  </picture>
+</p>
+
 # @idfkit/geometry
+
+Read-only geometry extraction for EnergyPlus models: vectors, polygons and a model's resolved scene.
+
+[idfkit](https://idfkit.com) · [Developers](https://developers.idfkit.com) · [EnergyPlus docs](https://docs.idfkit.com) · [Envelop](https://app.idfkit.com) · [MCP](https://mcp.idfkit.com) · [Shoebox](https://shoebox.idfkit.com) · [GitHub](https://github.com/idfkit)
 
 Read-only geometry extraction for EnergyPlus models: where a model's surfaces
 are, in one frame, without editing the model to find out.
@@ -7,8 +19,8 @@ Peer-depends on [`@idfkit/core`](../core) and on nothing else. Everything
 exported here is synchronous, reads no files and holds no state, so it runs
 unchanged in Node, a browser tab, a worker, or an edge runtime.
 
-**[Documentation](https://js.idfkit.com/)** ·
-[API reference](https://js.idfkit.com/reference/geometry/)
+**[Documentation](https://developers.idfkit.com/)** ·
+[API reference](https://developers.idfkit.com/reference/typescript/geometry/)
 
 ```bash
 npm install @idfkit/geometry

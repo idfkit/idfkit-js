@@ -1,11 +1,23 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-light.svg">
+    <img alt="idfkit" width="72" src="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/tile.png">
+  </picture>
+</p>
+
 # @idfkit/schemas
+
+Content-addressed EnergyPlus epJSON schemas for every supported version.
+
+[idfkit](https://idfkit.com) · [Developers](https://developers.idfkit.com) · [EnergyPlus docs](https://docs.idfkit.com) · [Envelop](https://app.idfkit.com) · [MCP](https://mcp.idfkit.com) · [Shoebox](https://shoebox.idfkit.com) · [GitHub](https://github.com/idfkit)
 
 EnergyPlus epJSON schemas for every supported version, in a form small enough to
 send to a browser.
 
-**[Documentation](https://js.idfkit.com/)** ·
-[API reference](https://js.idfkit.com/reference/schemas/) ·
-[Slim schema format](https://js.idfkit.com/reference/slim-schema-format/)
+**[Documentation](https://developers.idfkit.com/)** ·
+[API reference](https://developers.idfkit.com/reference/typescript/schemas/) ·
+[Slim schema format](https://developers.idfkit.com/reference/slim-schema-format/)
 
 ```bash
 npm install @idfkit/schemas
@@ -32,7 +44,7 @@ mapping type name to hash.
 Splitting per version would have been the obvious move and is the wrong one: it
 duplicates the shared 82% across packages and makes cross-version work require
 several installs. The longer argument is in [Content-addressed
-schemas](https://js.idfkit.com/explanation/content-addressed-schemas/).
+schemas](https://developers.idfkit.com/explanation/content-addressed-schemas/).
 
 ## Usage
 
@@ -74,7 +86,7 @@ delta.changed;
 ```
 
 See [How to compare two EnergyPlus
-versions](https://js.idfkit.com/how-to/compare-versions/).
+versions](https://developers.idfkit.com/how-to/compare-versions/).
 
 ### Shared identity
 
@@ -102,7 +114,7 @@ every parse. Tooling that renders documentation should read the source schemas.
 
 Keys are single letters because this file is parsed on every cold start. The full
 key-by-key description is in [Slim schema
-format](https://js.idfkit.com/reference/slim-schema-format/).
+format](https://developers.idfkit.com/reference/slim-schema-format/).
 
 ## Regenerating
 
