@@ -1,4 +1,18 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-light.svg">
+    <img alt="idfkit" width="72" src="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/tile.png">
+  </picture>
+</p>
+
 # idfkit-js
+
+EnergyPlus IDF and epJSON parsing and manipulation for JavaScript and TypeScript.
+
+[idfkit](https://idfkit.com) · [Developers](https://developers.idfkit.com) · [EnergyPlus docs](https://docs.idfkit.com) · [Envelop](https://app.idfkit.com) · [MCP](https://mcp.idfkit.com) · [Shoebox](https://shoebox.idfkit.com) · [GitHub](https://github.com/idfkit)
+
+[![Release](https://img.shields.io/github/v/release/idfkit/idfkit-js?filter=v*)](https://github.com/idfkit/idfkit-js/releases) [![Build status](https://img.shields.io/github/actions/workflow/status/idfkit/idfkit-js/main.yml?branch=main)](https://github.com/idfkit/idfkit-js/actions/workflows/main.yml?query=branch%3Amain) [![codecov](https://codecov.io/gh/idfkit/idfkit-js/branch/main/graph/badge.svg)](https://codecov.io/gh/idfkit/idfkit-js) [![License](https://img.shields.io/github/license/idfkit/idfkit-js)](https://github.com/idfkit/idfkit-js/blob/main/LICENSE) [![Capability parity](https://img.shields.io/badge/capability-parity-informational)](https://developers.idfkit.com/explanation/parity/)
 
 EnergyPlus IDF and epJSON tooling for JavaScript and TypeScript. A sibling to the
 Python [idfkit](https://github.com/idfkit/idfkit), not a transliteration of it.

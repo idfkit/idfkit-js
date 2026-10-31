@@ -1,14 +1,24 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-light.svg">
+    <img alt="idfkit" width="72" src="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/tile.png">
+  </picture>
+</p>
+
 # @idfkit/core
 
 EnergyPlus IDF and epJSON parsing and manipulation for JavaScript.
+
+[idfkit](https://idfkit.com) · [Developers](https://developers.idfkit.com) · [EnergyPlus docs](https://docs.idfkit.com) · [Envelop](https://app.idfkit.com) · [MCP](https://mcp.idfkit.com) · [Shoebox](https://shoebox.idfkit.com) · [GitHub](https://github.com/idfkit)
 
 Zero runtime dependencies apart from [`@idfkit/schemas`](../schemas). The main
 entry point is synchronous and free of I/O, so it runs unchanged in Node, a
 browser, a worker, or an edge runtime.
 
-**[Documentation](https://js.idfkit.com/)** ·
-[API reference](https://js.idfkit.com/reference/core/) ·
-[Tutorial](https://js.idfkit.com/tutorials/first-model/)
+**[Documentation](https://developers.idfkit.com/)** ·
+[API reference](https://developers.idfkit.com/reference/typescript/core/) ·
+[Tutorial](https://developers.idfkit.com/tutorials/first-model/)
 
 ```bash
 npm install @idfkit/core @idfkit/schemas
@@ -81,7 +91,7 @@ const { document, diagnostics } = parseIdf(text, schema, { strict: false });
 const output = writeIdf(document);
 ```
 
-See [How to parse in the browser](https://js.idfkit.com/how-to/parse-in-the-browser/).
+See [How to parse in the browser](https://developers.idfkit.com/how-to/parse-in-the-browser/).
 
 ### Diagnostics
 
@@ -97,12 +107,12 @@ for (const d of diagnostics) {
 ```
 
 See [How to collect diagnostics instead of
-throwing](https://js.idfkit.com/how-to/collect-diagnostics/).
+throwing](https://developers.idfkit.com/how-to/collect-diagnostics/).
 
 ## API
 
 The full API is generated from the source and published at
-**[js.idfkit.com/reference/core](https://js.idfkit.com/reference/core/)**.
+**[developers.idfkit.com/reference/typescript/core](https://developers.idfkit.com/reference/typescript/core/)**.
 
 The main entry points:
 

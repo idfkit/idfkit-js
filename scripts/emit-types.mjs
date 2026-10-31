@@ -257,7 +257,7 @@ function manifest(version, packageName) {
       url: 'git+https://github.com/idfkit/idfkit-js.git',
       directory: `packages/types-${moduleName(version)}`,
     },
-    homepage: 'https://js.idfkit.com/',
+    homepage: 'https://developers.idfkit.com/',
     bugs: { url: 'https://github.com/idfkit/idfkit-js/issues' },
     keywords: ['energyplus', 'idf', 'epjson', 'types', 'typescript'],
     types: './index.d.ts',
@@ -304,10 +304,24 @@ function tsconfig() {
 `;
 }
 
+/** The tag of the idfkit identity whose header this README carries (contract readme-header.md section 7). */
+const IDENTITY_TAG = 'identity-2026.2';
+const IDENTITY_MARKS = `https://raw.githubusercontent.com/idfkit/idfkit-brand/${IDENTITY_TAG}/marks`;
+
 function readme(version, packageName) {
-  return `# ${packageName}
+  return `<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="${IDENTITY_MARKS}/mark-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="${IDENTITY_MARKS}/mark-on-light.svg">
+    <img alt="idfkit" width="72" src="${IDENTITY_MARKS}/tile.png">
+  </picture>
+</p>
+
+# ${packageName}
 
 Generated TypeScript interfaces and a \`TypeMap\` for EnergyPlus ${version}.
+
+[idfkit](https://idfkit.com) · [Developers](https://developers.idfkit.com) · [EnergyPlus docs](https://docs.idfkit.com) · [Envelop](https://app.idfkit.com) · [MCP](https://mcp.idfkit.com) · [Shoebox](https://shoebox.idfkit.com) · [GitHub](https://github.com/idfkit)
 
 Opt-in. \`@idfkit/core\` is fully usable without it: a document with no map is
 typed permissively rather than not at all, so nothing here is needed to read,

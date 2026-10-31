@@ -1,4 +1,16 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/mark-on-light.svg">
+    <img alt="idfkit" width="72" src="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.2/marks/tile.png">
+  </picture>
+</p>
+
 # @idfkit/language
+
+The opt-in IDF language service: cursor answers and positioned findings, synchronous and free of I/O.
+
+[idfkit](https://idfkit.com) · [Developers](https://developers.idfkit.com) · [EnergyPlus docs](https://docs.idfkit.com) · [Envelop](https://app.idfkit.com) · [MCP](https://mcp.idfkit.com) · [Shoebox](https://shoebox.idfkit.com) · [GitHub](https://github.com/idfkit)
 
 The opt-in language service for IDF text: what completes here, what this means,
 what this points at, and where a finding sits in the characters the reader is
@@ -8,8 +20,8 @@ Peer-depends on [`@idfkit/core`](../core) and on nothing else. Everything
 exported here is synchronous and free of I/O, so it runs unchanged in Node, a
 browser, a worker, or behind an editor server.
 
-**[Documentation](https://js.idfkit.com/)** ·
-[API reference](https://js.idfkit.com/reference/language/)
+**[Documentation](https://developers.idfkit.com/)** ·
+[API reference](https://developers.idfkit.com/reference/)
 
 ```bash
 npm install @idfkit/language
