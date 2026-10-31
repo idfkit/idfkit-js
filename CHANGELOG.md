@@ -15,7 +15,7 @@ This release moves to `conformance-2026.19`. The corpus adds five cases for the 
 
 ### Added
 
-- The README opens with the idfkit identity header at `identity-2026.2`: the mark, the
+- The README opens with the idfkit identity header at `identity-2026.3`: the mark, the
   repository's one sentence, the family links and the badge row. The `Identity` workflow
   (`.github/workflows/check-identity.yml`) holds the header to that tag on every pull request.
 - Every package's README opens with the package header: the mark, its name as installed, one
