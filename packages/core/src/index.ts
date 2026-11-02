@@ -18,6 +18,21 @@
 
 export { IdfCollection } from './collection.js';
 export { IdfDocument } from './document.js';
+export { diffDocuments, IncomparableVersionsError } from './diff.js';
+export type {
+  DocumentDelta,
+  FieldChange,
+  FieldValueChange,
+  GroupAdded,
+  GroupFieldChange,
+  GroupRemoved,
+  ObjectAdded,
+  ObjectChanged,
+  ObjectDelta,
+  ObjectRemoved,
+  ObjectRenamed,
+  ReferenceRewrite,
+} from './diff.js';
 export { IdfObject } from './object.js';
 export type {
   ExtensibleGroup,

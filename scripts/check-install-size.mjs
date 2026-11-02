@@ -4,16 +4,16 @@
  *
  * THE CRITERION
  *
- * `contracts/distribution.md`: "Under 1.875 MB on disk under the shared name in
+ * `contracts/distribution.md`: "Under 1.9375 MB on disk under the shared name in
  * JavaScript, no opt-in component installed". So: pack the workspace, install
  * `@idfkit/idfkit` and nothing else into an isolated project, and measure.
  *
- * WHICH 1.875 MB, AND WHICH "ON DISK"
+ * WHICH 1.9375 MB, AND WHICH "ON DISK"
  *
  * Both halves of that sentence need pinning down, because the two readings of
  * "on disk" now disagree about the verdict rather than merely about the number.
  *
- *   1.875 MB    is 1.875 MiB, 1,966,080 bytes. Every other size in the contract
+ *   1.9375 MB   is 1.9375 MiB, 2,031,616 bytes. Every other size in the contract
  *               is quoted the way npm quotes them, and npm's are binary.
  *
  *   on disk     is APPARENT bytes: the sum of the file sizes, which is what
@@ -90,6 +90,18 @@
  * is a 4.2x reduction from the former 7.9 MB, against 4.3x under the old figure
  * and 5.0x under the one before that.
  *
+ * AND WHY 1.9375 MB, AS OF 2026-11-02
+ *
+ * SC-012 was amended a third time, from 1.875 MB to 1.9375 MB, for
+ * `diffDocuments`, by the owner's decision. The module is 54,269 bytes of `dist`
+ * and landed the install at 101.9 percent, 36 KB over; with every comment removed
+ * it would still have been over. It belongs in `@idfkit/core` by the owner's
+ * earlier decision, so moving it to an opt-in component was not taken up. 1.9375
+ * MiB is the next figure in the same series, 1 + 1/2 + 1/4 + 1/8 + 1/16. Unlike
+ * the amendments before it, it leaves less than the feature cost: 27.4 KB of
+ * slack at 98.6 percent. SC-012's purpose survives it: a 4.1x reduction from the
+ * former 7.9 MB, against 4.2x under the old figure.
+ *
  * THE LEVER THAT WAS NOT PULLED, AND IS STILL THERE
  *
  * 396 KB of the install, 21 percent of the whole budget, is `*.js.map` and
@@ -99,19 +111,22 @@
  * what a consumer can debug, which is a packaging decision rather than this
  * feature's to make. It is written down so that the next time this figure is
  * under pressure, raising it again is a choice made against a known alternative
- * rather than the only idea in the room.
+ * rather than the only idea in the room. It was so made on 2026-11-02: the owner
+ * was shown that the published maps name `../src/*.ts`, which is not published,
+ * and embed no source, and chose the budget.
  *
  * HEADROOM, AND WHAT THE INCREASE WAS FOR
  *
- * The first increase has been spent, on the thing it was raised for, and so has
- * a good deal of the second. 1.76 of 1.875 MB is 94.0 percent, about 114 KB of
- * slack, with the prose in `@idfkit/schemas`, and the syntax layer and the
- * preserving writer in `@idfkit/core`. The language service is not in this
+ * The first two increases have been spent, on what they were raised for, and
+ * most of the third went with its own feature. 1.91 of 1.9375 MB is 98.6 percent,
+ * about 27.4 KB of slack, with the prose in `@idfkit/schemas`, and the syntax
+ * layer, the preserving writer and the document comparison in `@idfkit/core`. The
+ * language service is not in this
  * measurement at all: it is an optional peer, so it puts nothing on disk here,
  * and the per-package breakdown is what would say otherwise, since a package
  * the contract does not list is a finding whether or not the total passes.
  *
- * 38 KB is thin, and it is meant to be read that way. The gate therefore does
+ * 27.4 KB is thin, and it is meant to be read that way. The gate therefore does
  * not just print PASS: it prints the percentage, the remaining headroom, and
  * the per-package breakdown, so the number that matters is visible in the log
  * of every run rather than only in the run that finally fails. The next feature
@@ -153,8 +168,8 @@ import {
   walkFiles,
 } from './lib/clean-install.mjs';
 
-/** SC-012, in bytes. 1.875 MiB. */
-const BUDGET = Math.round(1.875 * 1024 * 1024);
+/** SC-012, in bytes. 1.9375 MiB. */
+const BUDGET = Math.round(1.9375 * 1024 * 1024);
 
 /** What the shared name is allowed to put on disk. Anything else is a finding. */
 const EXPECTED = new Set([FACADE, CORE, SCHEMAS]);
@@ -197,7 +212,7 @@ async function main() {
     );
     console.log(`  files        ${total.count}`);
     console.log('');
-    console.log(`  budget       ${BUDGET.toLocaleString()} bytes  ${mib(BUDGET)} (1.875 MiB)`);
+    console.log(`  budget       ${BUDGET.toLocaleString()} bytes  ${mib(BUDGET)} (1.9375 MiB)`);
     console.log(
       `  used         ${percent.toFixed(1)} percent of budget, ` +
         (headroom < 0

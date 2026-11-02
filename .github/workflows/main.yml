@@ -161,10 +161,11 @@ jobs:
     # workspace silently resolves packages it never installed), and measures that. Each takes one
     # to three seconds.
     #
-    #   install size      under 1.875 MB on disk, measured as apparent bytes. The gate's own header
-    #                     says why apparent and not allocated, prints both, and records why the
-    #                     budget was raised from 1.5 MB on 2026-09-03 and again to 1.875 MB on
-    #                     2026-09-06. 1.76 of 1.875 MB, 94 percent, with 114 KB of slack. The
+    #   install size      under 1.9375 MB on disk, measured as apparent bytes. The gate's own
+    #                     header says why apparent and not allocated, prints both, and records why
+    #                     the budget was raised from 1.5 MB on 2026-09-03, to 1.875 MB on
+    #                     2026-09-06 and to 1.9375 MB on 2026-11-02. 1.91 of 1.9375 MB, 98.6
+    #                     percent, with 27.4 KB of slack. The
     #                     header also names the lever nobody has pulled: 396 KB of the install is
     #                     source maps, which serve debugging and nothing at runtime.
     #   no index          zero stations.json bytes, the weather peer not auto-installed, no

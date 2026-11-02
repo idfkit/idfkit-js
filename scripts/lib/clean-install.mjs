@@ -4,7 +4,7 @@
  * WHAT A "CLEAN INSTALL" HAS TO MEAN HERE
  *
  * Five of the criteria in `contracts/distribution.md` are statements about what
- * `npm install @idfkit/idfkit` puts on a stranger's disk: under 1.875 MB (SC-012), zero
+ * `npm install @idfkit/idfkit` puts on a stranger's disk: under 1.9375 MB (SC-012), zero
  * station-index bytes (SC-016), zero type-package bytes (SC-014), no
  * post-install scripting (SC-015), and a browser bundle that pulls in none of
  * the data (SC-013). None of them can be measured against this workspace. A
