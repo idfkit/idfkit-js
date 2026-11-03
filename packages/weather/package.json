@@ -10,7 +10,7 @@
     "url": "git+https://github.com/idfkit/idfkit-js.git",
     "directory": "packages/weather"
   },
-  "homepage": "https://js.idfkit.com/",
+  "homepage": "https://developers.idfkit.com/",
   "bugs": {
     "url": "https://github.com/idfkit/idfkit-js/issues"
   },
