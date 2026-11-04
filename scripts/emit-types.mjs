@@ -305,7 +305,7 @@ function tsconfig() {
 }
 
 /** The tag of the idfkit identity whose header this README carries (contract readme-header.md section 7). */
-const IDENTITY_TAG = 'identity-2026.4';
+const IDENTITY_TAG = 'identity-2026.5';
 const IDENTITY_MARKS = `https://raw.githubusercontent.com/idfkit/idfkit-brand/${IDENTITY_TAG}/marks`;
 
 function readme(version, packageName) {
