@@ -23,23 +23,35 @@ import { createEnergyPlus } from '@idfkit/engine';
 /**
  * Build a one-zone model, simulate it, and report what happened.
  *
- * @param {import('@idfkit/core').Schema} schema  a loaded schema for EnergyPlus 26.1
+ * @param {import('@idfkit/core').Schema} schema  a loaded schema for EnergyPlus 26.2
  * @param {string} epwText                        the weather file, as text
  * @param {string} assetBaseUrl                   where the engine's WebAssembly is served from
+ * @param {string} workerUrl                      where the engine's worker script is served from
  * @param {(message: string) => void} log         called with each step, for the page to show
  * @returns {Promise<import('@idfkit/engine').EngineRunResult>}
  */
-export async function run(schema, epwText, assetBaseUrl, log) {
+export async function run(schema, epwText, assetBaseUrl, workerUrl, log) {
   // 1. Build the model. Nothing here touches the network.
   const doc = new IdfDocument(schema);
-  doc.add('Version', null, { version_identifier: '26.1' });
+  doc.add('Version', null, { version_identifier: '26.2' });
   doc.add('Building', 'Live runner', { north_axis: 0, terrain: 'City' });
   doc.add('Timestep', null, { number_of_timesteps_per_hour: 4 });
+  doc.add('GlobalGeometryRules', null, {
+    starting_vertex_position: 'UpperLeftCorner',
+    vertex_entry_direction: 'Counterclockwise',
+    coordinate_system: 'Relative',
+  });
+  doc.add('RunPeriod', 'First week', {
+    begin_month: 1,
+    begin_day_of_month: 1,
+    end_month: 1,
+    end_day_of_month: 7,
+  });
   log(`Model built: ${doc.size} objects`);
 
-  // 2. Hand it over as IDF text. Loading compiles a ~28 MB binary, so the engine is created
+  // 2. Hand it over as IDF text. Loading compiles a ~37 MB binary, so the engine is created
   //    once and reused; this page creates it on activation and disposes it afterwards.
-  const ep = await createEnergyPlus({ assetBaseUrl });
+  const ep = await createEnergyPlus({ assetBaseUrl, workerUrl });
   log('Engine ready');
 
   // 3. A failed run is data, not an exception.
