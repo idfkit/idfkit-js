@@ -1,6 +1,6 @@
 import type { SlimField, SlimType } from '@idfkit/schemas';
 
-import { ExtensibleList } from './extensible.js';
+import { ExtensibleList, NoExtensibleGroup } from './extensible.js';
 import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
 import {
   choiceSpellingsFor,
@@ -280,10 +280,15 @@ export class IdfObject {
    * One spelling is not heard: replacing a whole repeat by index, `obj.extensible[0] = {...}`,
    * writes through the array's own index slot, which cannot be caught without charging every
    * vertex read. Writing the repeat's fields and `splice` both are heard. See `extensible.ts`.
+   *
+   * On a type with no extensible group the array is empty and refuses writes: `push`, `splice` and
+   * the other mutators throw a `TypeError` naming the type. `FenestrationSurface:Detailed`, for
+   * one, spells its vertices as fixed fields (`vertex_1_x_coordinate` and on), and a push there
+   * used to return 1 and keep nothing.
    */
   get extensible(): ExtensibleGroup[] {
     const key = this[SHAPE].extensibleKey;
-    if (key === undefined) return [];
+    if (key === undefined) return NoExtensibleGroup.for(this[SHAPE].typeName, this[SHAPE].fields);
     const held = this[DATA][key];
     if (held instanceof ExtensibleList) return held;
     if (this[OWNER]?.tracksExtensibleEdits() !== true) {
