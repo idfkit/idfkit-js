@@ -421,3 +421,74 @@ describe('regressions: in-place edits to a preserved document', () => {
     expect(xs(tail)).toEqual([0]);
   });
 });
+
+describe('regressions: writing a name that is not a field', () => {
+  it('refuses a misspelled field write instead of storing a value every writer drops', () => {
+    // Instances were extensible, so `zone.ceilng_height = 4` made an own data property: it read
+    // back as 4, and `writeIdf` and `writeEpJson` walk the schema's fields, so the save lost it.
+    // Every way an object comes to exist is covered, since each builds through `IdfObject.create`.
+    const { document } = parseIdf('Version, 26.1;\nZone, Parsed;\n', v26);
+    const doc = new IdfDocument(v26);
+    const added = doc.add('Zone', 'Office', {});
+    const objects = {
+      parsed: document.require('Zone', 'Parsed'),
+      added,
+      cloned: added.clone('Copy'),
+      removed: doc.add('Zone', 'Removed'),
+    };
+    doc.remove(objects.removed);
+
+    for (const [how, zone] of Object.entries(objects)) {
+      const target = zone as unknown as Record<string, unknown>;
+      expect(() => (target.ceilng_height = 4), how).toThrow(TypeError);
+      expect(Object.hasOwn(zone, 'ceilng_height'), how).toBe(false);
+      expect(target.ceilng_height, how).toBeUndefined();
+      expect(Object.isExtensible(zone), how).toBe(false);
+    }
+    // Real fields, the name and the internal slots all still write.
+    added.set('ceiling_height', 4);
+    (added as unknown as { multiplier: number }).multiplier = 2;
+    added.name = 'Renamed';
+    expect(writeIdf(doc)).toContain('Renamed');
+    expect(added.get('ceiling_height')).toBe(4);
+    expect(added.get('multiplier')).toBe(2);
+  });
+  it('ignores a misspelled field write in sloppy code rather than reading it back', () => {
+    // A non-strict function cannot throw on a write to a non-extensible object; the language
+    // drops it. What it must no longer do is hand the value back as if it had been kept.
+    const zone = new IdfDocument(v26).add('Zone', 'Office');
+    const sloppy = new Function('zone', 'zone.ceilng_height = 4; return zone.ceilng_height;') as (
+      z: unknown
+    ) => unknown;
+    expect(sloppy(zone)).toBeUndefined();
+  });
+  it('suggests the field a misspelled name most likely meant', () => {
+    const doc = new IdfDocument(v26);
+    const zone = doc.add('Zone', 'Office');
+    expect(() => zone.set('ceilng_height', 4)).toThrow(
+      '"ceilng_height" is not a field of Zone; did you mean "ceiling_height"?'
+    );
+    expect(() => doc.add('Zone', 'Z2', { Ceiling_Hieght: 4 })).toThrow(
+      'did you mean "ceiling_height"?'
+    );
+    expect(() => zone.update({ multiplyer: 2 })).toThrow(
+      '  - multiplyer: unknown (not a field of Zone; did you mean "multiplier"?)'
+    );
+    // The extensible key is a candidate too.
+    const surface = doc.add('BuildingSurface:Detailed', 'S');
+    expect(() => surface.set('vertice', [])).toThrow('did you mean "vertices"?');
+    // Nothing close: no guess.
+    expect(() => zone.set('bogus', 1)).toThrow(/^"bogus" is not a field of Zone$/);
+  });
+  it('points a name given as a field at the name property', () => {
+    const zone = new IdfDocument(v26).add('Zone', 'Office');
+    expect(() => zone.set('Name', 'Lobby')).toThrow(
+      '"Name" is not a field of Zone; the name is the name property, not a field'
+    );
+  });
+  it('reports a non-string field name from plain JavaScript instead of crashing on it', () => {
+    // The suggestion lowercases the name; a number from untyped code must not reach that as-is.
+    const zone = new IdfDocument(v26).add('Zone', 'Office');
+    expect(() => zone.set(5 as unknown as string, 1)).toThrow(/^"5" is not a field of Zone$/);
+  });
+});
