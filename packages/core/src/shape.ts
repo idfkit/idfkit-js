@@ -104,6 +104,48 @@ export function extensibleValueProblem(
   return undefined;
 }
 
+/**
+ * The field a misspelled name most likely meant, or `undefined` when nothing is close.
+ *
+ * Plain edit distance, compared case-insensitively, with a budget of a third of the name's length
+ * (at least one edit, at most three): `ceilng_height` finds `ceiling_height`, while `bogus` on a
+ * `Zone` finds nothing rather than an arbitrary short field. Ties go to the field that comes first
+ * in positional order. Only ever called on an error path, so it is written for clarity, not speed.
+ */
+export function closestField(field: string, candidates: Iterable<string>): string | undefined {
+  const wanted = field.toLowerCase();
+  const budget = Math.min(3, Math.max(1, Math.floor(wanted.length / 3)));
+  let best: string | undefined;
+  let bestDistance = budget + 1;
+  for (const candidate of candidates) {
+    const distance = editDistance(wanted, candidate.toLowerCase(), bestDistance);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+/** Levenshtein distance, giving up (returning `limit`) once every path costs at least `limit`. */
+function editDistance(a: string, b: string, limit: number): number {
+  if (Math.abs(a.length - b.length) >= limit) return limit;
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const value = Math.min(previous[j]! + 1, current[j - 1]! + 1, previous[j - 1]! + cost);
+      current.push(value);
+      if (value < rowMin) rowMin = value;
+    }
+    if (rowMin >= limit) return limit;
+    previous = current;
+  }
+  return Math.min(previous[b.length]!, limit);
+}
+
 function describe(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'an array';

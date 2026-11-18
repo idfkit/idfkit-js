@@ -56,3 +56,21 @@ stale on every write, which is a correctness problem rather than a performance
 one. Extensible groups are covered too: `ZoneList`, `Branch`, and the supply and
 return paths carry all of their references inside repeat groups, so a graph that
 ignored those would make `rename()` quietly produce a broken model.
+
+## What an accessor cannot catch
+
+An accessor exists only for a name the schema declares. An assignment to any
+other name, `zone.ceilng_height = 4`, finds nothing on the prototype chain, and
+JavaScript's default is to create a new property on the instance. The value
+would read back correctly and then vanish on save, because the writers walk the
+schema's fields, not the instance's keys.
+
+Catching an arbitrary name is exactly what a `Proxy` is for, so it is not
+available here. Instead every object is made non-extensible as it is built,
+after its internal slots exist. Strict code, which includes every ES module and
+all compiled TypeScript, gets a `TypeError` naming the property; a sloppy script
+has the write silently dropped, which at least reads back as `undefined` rather
+than as a value that will be lost. Neither message can name the object type, so
+`set()` and `update()`, which can, also suggest the field the name most likely
+meant. A non-extensible object keeps its hidden class, so this costs nothing on
+the read and write paths.
