@@ -431,6 +431,35 @@ describe('IdfCollection.add', () => {
     expect(doc.types()).toEqual([]);
   });
 
+  it('never stores a collection that belongs to another document', () => {
+    const other = new IdfDocument(v26);
+    const foreign = other.all('Zone');
+    // Unreachable through the typed API, which always passes the collection's own document.
+    const z = doc.createIn(foreign, 'Z1', {});
+
+    expect(doc.all('Zone')).not.toBe(foreign);
+    expect(doc.get('Zone', 'Z1')).toBe(z);
+    expect(foreign.size).toBe(0);
+    expect(other.types()).toEqual([]);
+  });
+
+  it('reaches an override of attach, as doc.add does', () => {
+    const seen: string[] = [];
+    class Watching extends IdfDocument {
+      override attach(obj: IdfObject): IdfObject {
+        seen.push(obj.name);
+        return super.attach(obj);
+      }
+    }
+    const watched = new Watching(v26);
+    watched.add('Zone', 'A');
+    watched.all('Zone').add('B');
+    watched.all('Lights').add('L1', { zone_or_zonelist_or_space_or_spacelist_name: 'A' });
+
+    expect(seen).toEqual(['A', 'B', 'L1']);
+    expect(watched.all('Lights').size).toBe(1);
+  });
+
   it('refuses on a collection that belongs to no document', () => {
     const orphan = new IdfCollection('Zone');
     expect(() => orphan.add('Office')).toThrow(TypeError);

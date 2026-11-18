@@ -39,7 +39,10 @@ deprecates `doc.add()` in its favour, because a Python type checker cannot map
 a type-name string to an object type without one signature per type. TypeScript
 can, so `doc.add('Zone', 'Office', { ... })` is
 [already fully checked](generated-types.md) and stays the primary form here,
-not deprecated; `collection.add` is a convenience with the same checks.
+not deprecated; `collection.add` is a convenience with the same checks. Those
+checks differ from Python's in one respect: Python validates every value as the
+object is created, while here, through either method, an unknown field name is
+refused and values are left to `validateObject`.
 
 ## The drift problem
 

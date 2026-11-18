@@ -243,19 +243,22 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
       throw new Error(`Object type "${type}" is not defined in EnergyPlus ${this.version}`);
     }
     const definition = this.schema.require(canonical);
-    const collection = this.collection(canonical);
+    const existing = this.#collections.get(canonical);
 
     const key = name ?? ` anon:${this.#anonCounter++}`;
-    if (name !== null && collection.has(name)) {
+    if (name !== null && existing?.has(name) === true) {
       throw new Error(`A ${canonical} named "${name}" already exists`);
     }
-    if (definition.s === 1 && collection.size > 0) {
+    if (definition.s === 1 && (existing?.size ?? 0) > 0) {
       throw new Error(`${canonical} is a singleton and is already present`);
     }
 
     const obj = IdfObject.create(canonical, definition, name ?? '', values);
     obj[KEY] = key;
-    this.#attach(obj, adopt);
+    // Stored only once the object exists, so a refused field leaves no empty type behind. Then
+    // through the public `attach`, which finds this collection, so an override still sees every add.
+    if (adopt !== undefined) this.#collectionForWrite(canonical, adopt);
+    this.attach(obj);
     return obj;
   }
 
@@ -269,10 +272,6 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    * mis-maps every field on reload instead of failing.
    */
   attach(obj: IdfObject): IdfObject {
-    return this.#attach(obj, undefined);
-  }
-
-  #attach(obj: IdfObject, adopt: IdfCollection | undefined): IdfObject {
     if (obj[OWNER] !== undefined && obj[OWNER] !== this) {
       throw new Error(`${obj} already belongs to another document`);
     }
@@ -287,7 +286,7 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
       );
     }
 
-    const collection = this.#collectionForWrite(canonical, adopt);
+    const collection = this.#collectionForWrite(canonical);
     if (collection.get(obj.key) === obj) return obj;
     if (definition.s === 1 && collection.size > 0) {
       throw new Error(`${canonical} is a singleton and is already present`);
