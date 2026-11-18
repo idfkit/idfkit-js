@@ -76,10 +76,20 @@ export class ExtensibleList extends Array<ExtensibleGroup> {
     deleteCount?: number,
     ...groups: ExtensibleGroup[]
   ): ExtensibleGroup[] {
+    // Forward what was passed, not what was defined. `splice(start)` empties from `start`, but
+    // `splice()` removes nothing, and `splice(start, undefined, ...groups)` removes nothing and
+    // inserts, exactly as on a plain array. Testing `deleteCount === undefined` alone turned both
+    // of those into "empty from here" and dropped the inserted repeats.
     const removed =
-      deleteCount === undefined
-        ? super.splice(start)
-        : super.splice(start, deleteCount, ...groups.map((g) => arm(g, this.fields, this.changed)));
+      arguments.length === 0
+        ? super.splice(0, 0)
+        : arguments.length === 1
+          ? super.splice(start)
+          : super.splice(
+              start,
+              deleteCount ?? 0,
+              ...groups.map((g) => arm(g, this.fields, this.changed))
+            );
     this.changed();
     return removed;
   }
@@ -92,6 +102,18 @@ export class ExtensibleList extends Array<ExtensibleGroup> {
 
   override sort(compare?: (a: ExtensibleGroup, b: ExtensibleGroup) => number): this {
     super.sort(compare);
+    this.changed();
+    return this;
+  }
+
+  override fill(group: ExtensibleGroup, start?: number, end?: number): this {
+    super.fill(arm(group, this.fields, this.changed), start, end);
+    this.changed();
+    return this;
+  }
+
+  override copyWithin(target: number, start: number, end?: number): this {
+    super.copyWithin(target, start, end);
     this.changed();
     return this;
   }
@@ -165,3 +187,113 @@ function define(
 
 /** Marks a repeat that already carries its accessors, so arming one twice is free. */
 const ARMED = Symbol('idfkit.armed');
+
+/**
+ * What `extensible` returns on a type that has no extensible group: an empty array that refuses to
+ * be written.
+ *
+ * It used to be a fresh `[]`, so `win.extensible.push(vertex)` on a `FenestrationSurface:Detailed`
+ * returned 1 and kept nothing. That type spells its four vertices as fixed fields, the push was the
+ * natural thing to try after `BuildingSurface:Detailed`, and the loss surfaced only as a missing
+ * required field at simulation time. Every mutator now throws, naming the type and, where the type
+ * has numbered fields, the first one to set instead.
+ *
+ * Frozen as well, so an index write (`list[0] = vertex`) fails rather than vanishing; that one
+ * spelling throws a generic `TypeError`, and only in strict mode, because no method is called.
+ * Reading is unchanged: it is empty, `Array.isArray` is true, and `map` and `slice` hand back plain
+ * arrays.
+ *
+ * @internal
+ */
+export class NoExtensibleGroup extends Array<ExtensibleGroup> {
+  static override get [Symbol.species](): ArrayConstructor {
+    return Array;
+  }
+
+  /**
+   * Why a write is refused, built once per type. Absent on an instance made through the inherited
+   * constructor (`new list.constructor(0)`, as some deep-clone helpers do), hence the fallback.
+   */
+  declare readonly refusal: string | undefined;
+
+  /** The frozen empty list for a type, shared by every object of that type. */
+  static for(typeName: string, fields: readonly string[]): NoExtensibleGroup {
+    let list = REFUSING.get(fields);
+    if (list === undefined) {
+      list = new NoExtensibleGroup();
+      const numbered = firstNumberedField(fields);
+      const advice =
+        numbered === undefined ? 'set its fields directly' : `set ${numbered} ... directly`;
+      Object.defineProperty(list, 'refusal', {
+        value: `${typeName} has no extensible group; ${advice}`,
+        enumerable: false,
+      });
+      Object.freeze(list);
+      REFUSING.set(fields, list);
+    }
+    return list;
+  }
+
+  private refuse(): never {
+    throw new TypeError(this.refusal ?? 'This object type has no extensible group');
+  }
+
+  override push(..._groups: ExtensibleGroup[]): number {
+    return this.refuse();
+  }
+
+  override pop(): ExtensibleGroup | undefined {
+    return this.refuse();
+  }
+
+  override shift(): ExtensibleGroup | undefined {
+    return this.refuse();
+  }
+
+  override unshift(..._groups: ExtensibleGroup[]): number {
+    return this.refuse();
+  }
+
+  override splice(_start: number, _deleteCount?: number, ..._groups: ExtensibleGroup[]): never {
+    return this.refuse();
+  }
+
+  override reverse(): never {
+    return this.refuse();
+  }
+
+  override sort(_compare?: (a: ExtensibleGroup, b: ExtensibleGroup) => number): never {
+    return this.refuse();
+  }
+
+  override fill(_value: ExtensibleGroup, _start?: number, _end?: number): never {
+    return this.refuse();
+  }
+
+  override copyWithin(_target: number, _start: number, _end?: number): never {
+    return this.refuse();
+  }
+}
+
+/**
+ * One refusing list per type, keyed by its shape's field list. There is one shape per type
+ * definition, shared across versions where the definition is, so the key needs no version.
+ */
+const REFUSING = new WeakMap<readonly string[], NoExtensibleGroup>();
+
+/**
+ * The first field numbered 1 that has a field numbered 2 beside it, such as
+ * `vertex_1_x_coordinate` beside `vertex_2_x_coordinate`.
+ *
+ * The sibling is what makes it a numbered run rather than a field that happens to end in 1:
+ * without it, `Coil:Cooling:DX:MultiSpeed` advised setting
+ * `apply_part_load_fraction_to_speeds_greater_than_1` and
+ * `Coil:Cooling:WaterToAirHeatPump:VariableSpeedEquationFit` `flag_for_using_hot_gas_reheat_0_or_1`.
+ */
+function firstNumberedField(fields: readonly string[]): string | undefined {
+  const known = new Set(fields);
+  return fields.find((field) => {
+    const at = /_1(?=_|$)/.exec(field)?.index;
+    return at !== undefined && known.has(`${field.slice(0, at)}_2${field.slice(at + 2)}`);
+  });
+}

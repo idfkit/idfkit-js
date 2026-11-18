@@ -311,3 +311,113 @@ WeatherProperty:SkyTemperature,
     expect(doc.references.isReferenced('B1')).toBe(true);
   });
 });
+
+describe('regressions: extensible on a type with no extensible group', () => {
+  it('refuses a write through extensible on a type that has no extensible group', () => {
+    // FenestrationSurface:Detailed spells its four vertices as fixed fields. `extensible` handed
+    // back a fresh `[]`, so a push in the BuildingSurface:Detailed style returned 1 and kept nothing;
+    // the loss surfaced only as a missing vertex_1_x_coordinate when EnergyPlus ran.
+    const doc = new IdfDocument(v26);
+    const win = doc.add('FenestrationSurface:Detailed', 'S Win', {
+      surface_type: 'Window',
+      construction_name: 'Win',
+      building_surface_name: 'S',
+    });
+    const vertex = { vertex_x_coordinate: 1, vertex_y_coordinate: 0, vertex_z_coordinate: 2.5 };
+
+    expect(win.extensible).toHaveLength(0);
+    expect(Array.isArray(win.extensible)).toBe(true);
+    expect(win.extensible.map((g) => g)).toEqual([]);
+
+    expect(() => win.extensible.push(vertex)).toThrow(
+      'FenestrationSurface:Detailed has no extensible group; set vertex_1_x_coordinate ... directly'
+    );
+    expect(() => win.extensible.splice(0, 0, vertex)).toThrow(/no extensible group/);
+    expect(() => win.extensible.unshift(vertex)).toThrow(/no extensible group/);
+    expect(() => win.extensible.pop()).toThrow(/no extensible group/);
+    expect(() => win.extensible.shift()).toThrow(/no extensible group/);
+    expect(() => win.extensible.reverse()).toThrow(/no extensible group/);
+    expect(() => win.extensible.sort()).toThrow(/no extensible group/);
+    expect(() => win.extensible.fill(vertex)).toThrow(/no extensible group/);
+    expect(() => win.extensible.copyWithin(0, 0)).toThrow(/no extensible group/);
+    expect(() => {
+      win.extensible[0] = vertex;
+    }).toThrow(TypeError);
+
+    expect(win.extensible).toHaveLength(0);
+    expect(win.toJSON()).not.toHaveProperty('vertices');
+
+    // A type with a group is untouched.
+    const wall = doc.add('BuildingSurface:Detailed', 'S');
+    expect(wall.extensible.push(vertex)).toBe(1);
+    expect(wall.extensible).toHaveLength(1);
+  });
+
+  it('names a numbered field only when it starts a numbered run', () => {
+    // `/_1(_|$)/` alone matched `apply_part_load_fraction_to_speeds_greater_than_1`, which comes
+    // before the type's `speed_1_...` run and is not one of a series.
+    const doc = new IdfDocument(v26);
+    const coil = doc.add('Coil:Cooling:DX:MultiSpeed', 'C');
+    expect(() => coil.extensible.push({})).toThrow(
+      'Coil:Cooling:DX:MultiSpeed has no extensible group; set speed_1_gross_rated_total_cooling_capacity ... directly'
+    );
+
+    // A type with no numbered run gets the general advice.
+    const zone = doc.add('Zone', 'Z');
+    expect(() => zone.extensible.push({})).toThrow(
+      'Zone has no extensible group; set its fields directly'
+    );
+  });
+});
+
+describe('regressions: in-place edits to a preserved document', () => {
+  const surfaceText = [
+    'Version, 26.1;',
+    'BuildingSurface:Detailed,',
+    '  S1, Wall, C, Z, , Outdoors, , SunExposed, WindExposed, , ,',
+    '  0.0, 0.0, 0.0,',
+    '  1.0, 0.0, 0.0,',
+    '  2.0, 0.0, 0.0;',
+    '',
+  ].join('\n');
+  const read = () =>
+    parseIdf(surfaceText, v26, { strict: false, preserveFormatting: true }).document;
+  const xs = (document: IdfDocument) =>
+    document
+      .require('BuildingSurface:Detailed', 'S1')
+      .extensible.map((group) => group['vertex_x_coordinate']);
+
+  it('hears fill and copyWithin, which a preserving write used to discard', () => {
+    // Neither method passed through the wrapper, so the object stayed untouched and writeIdf
+    // emitted the original vertices from the retained source.
+    const filled = read();
+    filled
+      .require('BuildingSurface:Detailed', 'S1')
+      .extensible.fill({ vertex_x_coordinate: 7, vertex_y_coordinate: 0, vertex_z_coordinate: 0 });
+    expect(xs(parseIdf(writeIdf(filled), v26, { strict: false }).document)).toEqual([7, 7, 7]);
+
+    const copied = read();
+    copied.require('BuildingSurface:Detailed', 'S1').extensible.copyWithin(0, 2);
+    expect(xs(parseIdf(writeIdf(copied), v26, { strict: false }).document)).toEqual([2, 1, 2]);
+  });
+
+  it('gives splice the arguments it was given', () => {
+    // `deleteCount === undefined` stood for "no deleteCount", so `splice()` emptied the list and
+    // `splice(1, undefined, g)` removed every repeat from 1 on and dropped `g`.
+    const bare = read();
+    const list = bare.require('BuildingSurface:Detailed', 'S1').extensible;
+    // The lib typing requires `start`; plain JavaScript may still call it bare.
+    expect(Reflect.apply(list.splice, list, [])).toEqual([]);
+    expect(xs(bare)).toEqual([0, 1, 2]);
+
+    const inserted = read();
+    inserted
+      .require('BuildingSurface:Detailed', 'S1')
+      .extensible.splice(1, undefined as unknown as number, { vertex_x_coordinate: 5 });
+    expect(xs(inserted)).toEqual([0, 5, 1, 2]);
+
+    const tail = read();
+    expect(tail.require('BuildingSurface:Detailed', 'S1').extensible.splice(1)).toHaveLength(2);
+    expect(xs(tail)).toEqual([0]);
+  });
+});
