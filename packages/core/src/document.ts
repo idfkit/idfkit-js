@@ -8,7 +8,7 @@ import { derivedOf, renderStatement } from './preserve/write.js';
 import { ReferenceGraph } from './references.js';
 import type { Region } from './syntax/region.js';
 import { preservingOptions, type WriteIdfOptions } from './write/idf.js';
-import type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
+import type { AnyTypeMap, TypeNameOf, TypedObject, UntypedMap, ValuesOf } from './typemap.js';
 
 /**
  * An EnergyPlus model.
@@ -130,8 +130,8 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    * `idfkit` resolves and declines to store on exactly the same terms, in
    * `IDFDocument.__getitem__`.
    */
-  all<K extends TypeNameOf<M>>(type: K): IdfCollection<IdfObject & ObjectOf<M, K>> {
-    return this.collection(type) as IdfCollection<IdfObject & ObjectOf<M, K>>;
+  all<K extends TypeNameOf<M>>(type: K): IdfCollection<TypedObject<M, K>> {
+    return this.collection(type) as IdfCollection<TypedObject<M, K>>;
   }
 
   /**
@@ -172,13 +172,13 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
   }
 
   /** One object by type and name. */
-  get<K extends TypeNameOf<M>>(type: K, name: string): (IdfObject & ObjectOf<M, K>) | undefined {
-    return this.collection(type).get(name) as (IdfObject & ObjectOf<M, K>) | undefined;
+  get<K extends TypeNameOf<M>>(type: K, name: string): TypedObject<M, K> | undefined {
+    return this.collection(type).get(name) as TypedObject<M, K> | undefined;
   }
 
   /** One object by type and name, throwing if absent. */
-  require<K extends TypeNameOf<M>>(type: K, name: string): IdfObject & ObjectOf<M, K> {
-    return this.collection(type).require(name) as IdfObject & ObjectOf<M, K>;
+  require<K extends TypeNameOf<M>>(type: K, name: string): TypedObject<M, K> {
+    return this.collection(type).require(name) as TypedObject<M, K>;
   }
 
   /** Whether any object of this type exists. */
@@ -196,8 +196,8 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
     type: K,
     name: string | null,
     values: ValuesOf<M, K> = {} as ValuesOf<M, K>
-  ): IdfObject & ObjectOf<M, K> {
-    return this.addRaw(type, name, values as FieldValues) as IdfObject & ObjectOf<M, K>;
+  ): TypedObject<M, K> {
+    return this.addRaw(type, name, values as FieldValues) as TypedObject<M, K>;
   }
 
   /**

@@ -1,9 +1,14 @@
 import { beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
 
 import { IdfDocument } from '@idfkit/core';
+import type { AnyTypeMap, ExtensibleGroup, IdfObject } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
-import type { TypeMap } from '@idfkit/types-v26-1';
+import type {
+  BuildingSurface_Detailed_Extensible,
+  Schedule_Compact_Extensible,
+  TypeMap,
+} from '@idfkit/types-v26-1';
 import type { TypeMap as TypeMapV9 } from '@idfkit/types-v9-4';
 import { schema } from './helpers.js';
 
@@ -80,5 +85,166 @@ describe('typed documents', () => {
 
     expect(typed.toJSON()).toEqual(untyped.toJSON());
     expect(Object.getPrototypeOf(typed)).toBe(Object.getPrototypeOf(untyped));
+  });
+});
+
+/**
+ * Extensible groups carry generated row types, so the half of a model that
+ * lives in repeats (vertices, compact-schedule fields, equipment rows) is
+ * checked like the fixed fields. Each `@ts-expect-error` is only an assertion
+ * when `npx tsc -p tsconfig.test.json` runs; vitest strips them unchecked.
+ */
+describe('typed extensible groups', () => {
+  it('types a repeat by the row of its owning type', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    const wall = doc.add('BuildingSurface:Detailed', 'N', {});
+
+    expectTypeOf(wall.extensible).toEqualTypeOf<BuildingSurface_Detailed_Extensible[]>();
+    wall.extensible.push({
+      vertex_x_coordinate: 0,
+      vertex_y_coordinate: 0,
+      vertex_z_coordinate: 3,
+    });
+
+    const first = wall.extensible[0];
+    expectTypeOf(first!.vertex_z_coordinate).toEqualTypeOf<number>();
+    expect(first?.vertex_z_coordinate).toBe(3);
+  });
+
+  it('rejects a misspelled row field', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    const wall = doc.add('BuildingSurface:Detailed', 'N', {});
+
+    // @ts-expect-error `vertex_x_coordinat` is not a field of the vertex row.
+    wall.extensible.push({ vertex_x_coordinat: 0 });
+    wall.extensible.push({
+      // @ts-expect-error a typo is caught even when the rest of the row is complete.
+      vertex_x_coordinat: 0,
+      vertex_y_coordinate: 0,
+      vertex_z_coordinate: 0,
+    });
+  });
+
+  it('rejects a string in a numeric row field', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    const wall = doc.add('BuildingSurface:Detailed', 'N', {});
+
+    // @ts-expect-error vertex coordinates are numbers.
+    wall.extensible.push({ vertex_x_coordinate: 'abc' });
+    wall.extensible.push({
+      // @ts-expect-error caught on its own, not only because the row is incomplete.
+      vertex_x_coordinate: 'abc',
+      vertex_y_coordinate: 0,
+      vertex_z_coordinate: 0,
+    });
+  });
+
+  it('checks rows passed to add()', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+
+    // Compile time only: at run time a row is not checked for unknown keys.
+    // @ts-expect-error `foo` is not a field of the vertex row.
+    doc.add('BuildingSurface:Detailed', 'S', { vertices: [{ foo: 1 }] });
+
+    const ok = doc.add('BuildingSurface:Detailed', 'S2', {
+      vertices: [
+        { vertex_x_coordinate: 0, vertex_y_coordinate: 0, vertex_z_coordinate: 0 },
+        { vertex_x_coordinate: 1, vertex_y_coordinate: 0, vertex_z_coordinate: 0 },
+        { vertex_x_coordinate: 1, vertex_y_coordinate: 0, vertex_z_coordinate: 1 },
+      ],
+    });
+    expect(ok.extensible).toHaveLength(3);
+  });
+
+  it('admits both text and numbers in Schedule:Compact rows', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    const rows: Schedule_Compact_Extensible[] = [
+      { field: 'Through: 12/31' },
+      { field: 'For: AllDays' },
+      { field: 'Until: 24:00' },
+      { field: 1 },
+    ];
+    const schedule = doc.add('Schedule:Compact', 'Always On', { data: rows });
+
+    expectTypeOf(schedule.extensible).toEqualTypeOf<Schedule_Compact_Extensible[]>();
+    schedule.extensible.push({ field: 'Until: 24:00' }, { field: 0.5 });
+    expect(schedule.extensible).toHaveLength(6);
+    // @ts-expect-error the compact-schedule row has one field, `field`.
+    schedule.extensible.push({ value: 1 });
+  });
+
+  it('types the group of a type that has none as empty', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    const zone = doc.add('Zone', 'Z1');
+
+    expectTypeOf(zone.extensible).toEqualTypeOf<never[]>();
+    // Rejected twice: at compile time here, and at run time by the frozen
+    // empty array the getter returns for a type with no group.
+    expect(() =>
+      // @ts-expect-error `Zone` has no extensible group.
+      zone.extensible.push({ anything: 1 })
+    ).toThrow(TypeError);
+  });
+
+  it('stays permissive for untyped documents and unknown names', () => {
+    const untyped = new IdfDocument(v26);
+    const wall = untyped.add('BuildingSurface:Detailed', 'N', {});
+    expectTypeOf(wall.extensible).toEqualTypeOf<ExtensibleGroup[]>();
+    wall.extensible.push({
+      vertex_x_coordinate: 0,
+      vertex_y_coordinate: 0,
+      vertex_z_coordinate: 0,
+    });
+
+    const typed = new IdfDocument<TypeMap>(v26);
+    const typeName: string = 'BuildingSurface:Detailed';
+    const dynamic = typed.add(typeName, 'S', { vertices: [{ vertex_x_coordinate: 1 }] });
+    expectTypeOf(dynamic.extensible).toEqualTypeOf<ExtensibleGroup[]>();
+
+    // Version-generic code that takes a plain `IdfObject` accepts a typed one.
+    const count = (obj: IdfObject): number => obj.extensible.length;
+    const surface = typed.add('BuildingSurface:Detailed', 'T', {});
+    surface.extensible.push({
+      vertex_x_coordinate: 0,
+      vertex_y_coordinate: 0,
+      vertex_z_coordinate: 0,
+    });
+    expect(count(surface)).toBe(1);
+    expect(count(wall)).toBe(1);
+  });
+
+  it('admits a variable name where the schema takes any number or any text', () => {
+    // Regression: these fields were typed as numbers plus the autosize
+    // keywords, which rejected the variable names the schema accepts.
+    const doc = new IdfDocument<TypeMap>(v26);
+    const tariff = doc.add('UtilityCost:Tariff', 'T', {
+      monthly_charge_or_variable_name: 'MonthlyChargeVariable',
+    });
+    expectTypeOf(tariff.monthly_charge_or_variable_name).toEqualTypeOf<
+      number | string | undefined
+    >();
+    // An integer field with an Autosize branch admits the keyword too.
+    doc.add('AirTerminal:SingleDuct:ConstantVolume:CooledBeam', 'B', {
+      number_of_beams: 'Autosize',
+    });
+  });
+
+  it('lets a helper generic over the map push onto a group named at run time', () => {
+    const push = <M extends AnyTypeMap>(
+      doc: IdfDocument<M>,
+      type: string,
+      name: string
+    ): number => {
+      const obj = doc.require(type, name);
+      obj.extensible.push({
+        vertex_x_coordinate: 0,
+        vertex_y_coordinate: 0,
+        vertex_z_coordinate: 0,
+      });
+      return obj.extensible.length;
+    };
+    const doc = new IdfDocument<TypeMap>(v26);
+    doc.add('BuildingSurface:Detailed', 'S', {});
+    expect(push(doc, 'BuildingSurface:Detailed', 'S')).toBe(1);
   });
 });

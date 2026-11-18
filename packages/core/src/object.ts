@@ -56,7 +56,7 @@ export interface ObjectOwner {
  * identifiers and valid TS interface keys, so using them directly means the
  * on-disk name, the runtime key, and the static type all agree.
  */
-export class IdfObject {
+export class IdfObject<X extends ExtensibleGroup = ExtensibleGroup> {
   declare readonly [DATA]: Record<string, StoredValue>;
   declare readonly [SHAPE]: ObjectShape;
   declare [OWNER]: ObjectOwner | undefined;
@@ -287,16 +287,21 @@ export class IdfObject {
    * one, spells its vertices as fixed fields (`vertex_1_x_coordinate` and on), and a push there
    * used to return 1 and keep nothing.
    */
-  get extensible(): ExtensibleGroup[] {
+  get extensible(): X[] {
     const key = this[SHAPE].extensibleKey;
-    if (key === undefined) return NoExtensibleGroup.for(this[SHAPE].typeName, this[SHAPE].fields);
+    if (key === undefined) {
+      return NoExtensibleGroup.for(
+        this[SHAPE].typeName,
+        this[SHAPE].fields
+      ) as ExtensibleGroup[] as X[];
+    }
     const held = this[DATA][key];
-    if (held instanceof ExtensibleList) return held;
+    if (held instanceof ExtensibleList) return held as ExtensibleGroup[] as X[];
     if (this[OWNER]?.tracksExtensibleEdits() !== true) {
-      if (Array.isArray(held)) return held;
+      if (Array.isArray(held)) return held as X[];
       const empty: ExtensibleGroup[] = [];
       this[DATA][key] = empty;
-      return empty;
+      return empty as X[];
     }
 
     const list = ExtensibleList.adopt(
@@ -308,7 +313,7 @@ export class IdfObject {
       }
     );
     this[DATA][key] = list;
-    return list;
+    return list as ExtensibleGroup[] as X[];
   }
 
   /**

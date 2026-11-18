@@ -17,7 +17,7 @@
  * build time, and the argument really is just a string.
  */
 
-import type { FieldValues } from './object.js';
+import type { ExtensibleGroup, FieldValues, IdfObject } from './object.js';
 
 /** Base constraint: any map from object type name to its field interface. */
 export type AnyTypeMap = Record<string, object>;
@@ -52,3 +52,25 @@ export type ObjectOf<M extends AnyTypeMap, K extends string> = K extends keyof M
 export type ValuesOf<M extends AnyTypeMap, K extends string> = K extends keyof M
   ? Partial<M[K]>
   : FieldValues;
+
+/**
+ * Row type of `K`'s extensible group: `never` when it has none, and
+ * `ExtensibleGroup` when `K` or `M` is not known. See "Generated types".
+ */
+export type ExtensibleOf<M extends AnyTypeMap, K extends string> = string extends K
+  ? ExtensibleGroup
+  : string extends keyof M
+    ? ExtensibleGroup
+    : K extends keyof M
+      ? {
+          [P in keyof M[K]]-?: NonNullable<M[K][P]> extends ReadonlyArray<infer R>
+            ? R extends ExtensibleGroup
+              ? R
+              : ExtensibleGroup
+            : never;
+        }[keyof M[K]]
+      : ExtensibleGroup;
+
+/** What `add`, `all`, `get` and `require` return. */
+export type TypedObject<M extends AnyTypeMap, K extends string> = IdfObject<ExtensibleOf<M, K>> &
+  ObjectOf<M, K>;

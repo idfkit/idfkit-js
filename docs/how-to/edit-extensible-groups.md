@@ -97,11 +97,33 @@ for you; see [The hazards of a positional
 format](../explanation/positional-format-hazards.md) for what it would otherwise
 cost.
 
-## Types are not generated for group fields
+## Check group fields at compile time
 
-The generated interfaces cover the fixed fields. `extensible` is typed as
-`ExtensibleGroup[]`, i.e. `Record<string, string | number>[]`, so field names
-inside a group are not checked or completed. Get them from the schema:
+On a document parameterized with a generated `TypeMap`, each repeat is typed by
+its type's row, named after the type's interface with `_Extensible` appended
+(`BuildingSurface_Detailed_Extensible`). A misspelled
+field, a string in a numeric field, or a push onto a type with no group is a
+compile error:
+
+```ts
+import { loadIdf } from '@idfkit/core/node';
+import type { BuildingSurface_Detailed_Extensible, TypeMap } from '@idfkit/types-v26-1';
+
+const doc = await loadIdf<TypeMap>('model.idf');
+const wall = doc.require('BuildingSurface:Detailed', 'Wall-1');
+
+const corners: BuildingSurface_Detailed_Extensible[] = wall.extensible;
+wall.extensible.push({ vertex_x_coordinat: 0 }); // compile error: typo
+doc.add('BuildingSurface:Detailed', 'S', { vertices: [{ foo: 1 }] }); // compile error
+doc.require('Zone', 'Z1').extensible.push({}); // compile error: Zone has no group
+```
+
+The check is compile-time only. At run time a repeat given to `add` is not
+checked for unknown fields; `validateObject` reports them. On an untyped
+document, or for a type name held in a `string`, `extensible` stays
+`ExtensibleGroup[]`, i.e. `Record<string, string | number>[]`, and nothing
+inside a repeat is checked. To list a group's fields without the types, ask the
+schema:
 
 ```ts
 doc.schema.get('BuildingSurface:Detailed').x?.fields;
