@@ -81,7 +81,9 @@ This is a real constraint on the generator, not a style preference.
 so TypeScript's excess-property check fires on a misspelled field in an object
 literal. `all()` returns objects typed with `ObjectOf`, which resolves to the interface for known
 names and a permissive empty object otherwise, so version-generic code and
-untyped documents still work.
+untyped documents still work. The collection `all()` returns also carries
+`ValuesOf`, so `doc.all('Zone').add('Z1', { celing_height: 3 })` is the same
+compile error as the `doc.add` call above.
 
 Using one helper for both would force a choice between catching typos and
 allowing dynamic field names. Using two costs nothing and gives both.

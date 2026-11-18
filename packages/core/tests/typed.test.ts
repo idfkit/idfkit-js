@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
 
 import { IdfDocument } from '@idfkit/core';
-import type { AnyTypeMap, ExtensibleGroup, IdfObject } from '@idfkit/core';
+import type { AnyTypeMap, ExtensibleGroup, IdfCollection, IdfObject } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import type {
@@ -246,5 +246,83 @@ describe('typed extensible groups', () => {
     const doc = new IdfDocument<TypeMap>(v26);
     doc.add('BuildingSurface:Detailed', 'S', {});
     expect(push(doc, 'BuildingSurface:Detailed', 'S')).toBe(1);
+  });
+});
+
+describe('collection.add typing', () => {
+  it('types collection.add exactly like doc.add', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    const zones = doc.all('Zone');
+    const office = zones.add('Office', { ceiling_height: 3 });
+
+    expectTypeOf(office.ceiling_height).toEqualTypeOf<
+      number | 'Autosize' | 'Autocalculate' | undefined
+    >();
+    expect(office.ceiling_height).toBe(3);
+
+    expect(() => {
+      // @ts-expect-error `ceilng_height` is a typo, caught as an excess property.
+      zones.add('Bad', { ceilng_height: 3 });
+    }).toThrow('"ceilng_height" is not a field of Zone');
+
+    // @ts-expect-error `ceiling_height` takes a number or a keyword, not any string. Like
+    // `doc.add`, the runtime does not check value types on creation; `validateObject` does.
+    zones.add('Tall', { ceiling_height: 'tall' });
+
+    // @ts-expect-error `Sunny` is not one of the permitted choices.
+    doc.all('BuildingSurface:Detailed').add('S1', { sun_exposure: 'Sunny' });
+
+    // Anonymous types take null, and the values are still checked.
+    doc.all('Version').add(null, { version_identifier: '26.1' });
+    // @ts-expect-error `version` is not a field of Version.
+    expect(() => doc.all('Timestep').add(null, { version: '26.1' })).toThrow();
+
+    expect(zones.names()).toEqual(['Office', 'Tall']);
+  });
+
+  it('returns the same object type as doc.add, extensible rows included', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    const wall = doc.all('BuildingSurface:Detailed').add('W', { surface_type: 'Wall' });
+
+    expectTypeOf(wall.extensible).toEqualTypeOf<BuildingSurface_Detailed_Extensible[]>();
+    wall.extensible.push({
+      vertex_x_coordinate: 1,
+      vertex_y_coordinate: 0,
+      vertex_z_coordinate: 0,
+    });
+    wall.extensible.push({
+      // @ts-expect-error `vertex_x_coordinat` is not a field of the vertex row.
+      vertex_x_coordinat: 1,
+      vertex_y_coordinate: 0,
+      vertex_z_coordinate: 0,
+    });
+
+    // Locked like any created object: a misspelled field cannot become an own property.
+    expect(() => {
+      // @ts-expect-error `ceilng_height` is not a field of Zone.
+      doc.all('Zone').add('Z1').ceilng_height = 4;
+    }).toThrow(TypeError);
+
+    expect(doc.remove(wall)).toBe(true);
+    expect(doc.all('BuildingSurface:Detailed').size).toBe(0);
+  });
+
+  it('keeps a typed collection assignable to a plain one', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    const plain: IdfCollection = doc.all('BuildingSurface:Detailed');
+    const generic = <K extends string>(type: K): IdfCollection<IdfObject> => doc.all(type);
+    expect(plain.typeName).toBe('BuildingSurface:Detailed');
+    expect(generic('Zone').typeName).toBe('Zone');
+  });
+
+  it('leaves collection.add permissive on untyped documents and unknown names', () => {
+    const untyped = new IdfDocument(v26);
+    untyped.all('Zone').add('Z1', { ceiling_height: 3 });
+
+    const typed = new IdfDocument<TypeMap>(v26);
+    const typeName: string = 'Zone';
+    typed.all(typeName).add('Z1', { ceiling_height: 3 });
+
+    expect(untyped.toJSON()).toEqual(typed.toJSON());
   });
 });

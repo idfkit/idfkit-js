@@ -15,6 +15,7 @@ This release moves to `conformance-2026.19`. The corpus adds five cases for the 
 
 ### Added
 
+- `IdfCollection.add(name, values)` creates an object of the collection's type through its document: `doc.all('Zone').add('Office', { ceiling_height: 3 })` is `doc.add('Zone', 'Office', { ceiling_height: 3 })`, with the same checks, reference-graph update and typing, so a misspelled field is a compile error on a typed document. Anonymous types take `null` for the name. The empty collection `all()` returns for a type with no objects is stored by the first `add` through it, so the handle and later `all()` calls are the same collection. A collection constructed directly belongs to no document, and its `add` throws a `TypeError`. `doc.add` is not deprecated and remains the primary form; the Python library's `IDFCollection.add(name, **fields)` is the counterpart.
 - The README opens with the idfkit identity header at `identity-2026.5`: the mark, the
   repository's one sentence, the family links and the badge row. The `Identity` workflow
   (`.github/workflows/check-identity.yml`) holds the header to that tag on every pull request.

@@ -84,7 +84,9 @@ alternative for a reason that is not visible from the code alone.
    have no implicit index signature and cannot satisfy `Record<string, object>`.
    `add()` takes `ValuesOf` (exact interface, so typos are caught) while `all()`
    returns `ObjectOf` (inside `TypedObject`) — keeping these separate is what
-   preserves both excess-property checking and version-generic usage. Extensible
+   preserves both excess-property checking and version-generic usage. The
+   collection `all()` returns carries `ValuesOf` as its second type parameter,
+   so `collection.add` checks values exactly as `doc.add` does. Extensible
    rows (`<Type>_Extensible`) are `type` aliases for the same reason, and reach
    `obj.extensible` through `IdfObject`'s type parameter, not an intersection,
    which would leave the permissive `push` overload in place.
