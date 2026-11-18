@@ -310,4 +310,38 @@ WeatherProperty:SkyTemperature,
     expect(list.toJSON()).toEqual({ branches: [{ branch_name: 'B1' }] });
     expect(doc.references.isReferenced('B1')).toBe(true);
   });
+  it('refuses a write through extensible on a type that has no extensible group', () => {
+    // FenestrationSurface:Detailed spells its four vertices as fixed fields. `extensible` handed
+    // back a fresh `[]`, so a push in the BuildingSurface:Detailed style returned 1 and kept nothing;
+    // the loss surfaced only as a missing vertex_1_x_coordinate when EnergyPlus ran.
+    const doc = new IdfDocument(v26);
+    const win = doc.add('FenestrationSurface:Detailed', 'S Win', {
+      surface_type: 'Window',
+      construction_name: 'Win',
+      building_surface_name: 'S',
+    });
+    const vertex = { vertex_x_coordinate: 1, vertex_y_coordinate: 0, vertex_z_coordinate: 2.5 };
+
+    expect(win.extensible).toHaveLength(0);
+    expect(Array.isArray(win.extensible)).toBe(true);
+    expect(win.extensible.map((g) => g)).toEqual([]);
+
+    expect(() => win.extensible.push(vertex)).toThrow(
+      'FenestrationSurface:Detailed has no extensible group; set vertex_1_x_coordinate ... directly'
+    );
+    expect(() => win.extensible.splice(0, 0, vertex)).toThrow(/no extensible group/);
+    expect(() => win.extensible.unshift(vertex)).toThrow(/no extensible group/);
+    expect(() => win.extensible.pop()).toThrow(/no extensible group/);
+    expect(() => {
+      win.extensible[0] = vertex;
+    }).toThrow(TypeError);
+
+    expect(win.extensible).toHaveLength(0);
+    expect(win.toJSON()).not.toHaveProperty('vertices');
+
+    // A type with a group is untouched.
+    const wall = doc.add('BuildingSurface:Detailed', 'S');
+    expect(wall.extensible.push(vertex)).toBe(1);
+    expect(wall.extensible).toHaveLength(1);
+  });
 });

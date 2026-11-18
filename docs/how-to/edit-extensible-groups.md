@@ -14,7 +14,11 @@ surface.extensible[0]; // { vertex_x_coordinate: 0, vertex_y_coordinate: 0, ... 
 ```
 
 Each entry is a plain object keyed by the group's field names, in IDF order. For
-a type with no extensible section, `extensible` is an empty array.
+a type with no extensible section, `extensible` is an empty array that refuses
+writes: `push`, `splice` and the other mutators throw a `TypeError` naming the
+type. Some types that look like they repeat do not.
+`FenestrationSurface:Detailed` spells its vertices as fixed fields, so set
+`vertex_1_x_coordinate` and the rest directly.
 
 ## Add and remove
 
