@@ -17,7 +17,7 @@
  * build time, and the argument really is just a string.
  */
 
-import type { FieldValues } from './object.js';
+import type { ExtensibleGroup, FieldValues, IdfObject } from './object.js';
 
 /** Base constraint: any map from object type name to its field interface. */
 export type AnyTypeMap = Record<string, object>;
@@ -52,3 +52,44 @@ export type ObjectOf<M extends AnyTypeMap, K extends string> = K extends keyof M
 export type ValuesOf<M extends AnyTypeMap, K extends string> = K extends keyof M
   ? Partial<M[K]>
   : FieldValues;
+
+/**
+ * The row type of one repeat of a type's extensible group.
+ *
+ * Read off the field interface rather than from a second map: the generated
+ * interface types its group key (`vertices`, `data`, `equipment`) as an array
+ * of the row, and no other field is an array, so the element type of whichever
+ * property is one *is* the row. A known type with no group yields `never`,
+ * which makes `obj.extensible.push(...)` a compile error on a type that would
+ * drop the repeat. Unknown names, untyped documents and the open
+ * `AnyTypeMap` keep the permissive `ExtensibleGroup`, on the same terms as
+ * `ValuesOf`.
+ *
+ * The `string extends K` arm comes first and tests only the name, so a type
+ * name held in a `string` resolves to `ExtensibleGroup` even inside a function
+ * generic over `M`, where every test on `M` is deferred. Without it a helper
+ * written as `<M extends AnyTypeMap>(doc: IdfDocument<M>, type: string)` could
+ * not push a repeat at all. A literal name in such a helper still defers; widen
+ * the object to `IdfObject` there.
+ */
+export type ExtensibleOf<M extends AnyTypeMap, K extends string> = string extends K
+  ? ExtensibleGroup
+  : string extends keyof M
+    ? ExtensibleGroup
+    : K extends keyof M
+      ? {
+          [P in keyof M[K]]-?: NonNullable<M[K][P]> extends ReadonlyArray<infer R>
+            ? R extends ExtensibleGroup
+              ? R
+              : ExtensibleGroup
+            : never;
+        }[keyof M[K]]
+      : ExtensibleGroup;
+
+/**
+ * What `add`, `all`, `get` and `require` hand back for a type name: an
+ * `IdfObject` whose `extensible` is narrowed to the type's row, joined with the
+ * type's field interface.
+ */
+export type TypedObject<M extends AnyTypeMap, K extends string> = IdfObject<ExtensibleOf<M, K>> &
+  ObjectOf<M, K>;

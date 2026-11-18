@@ -93,7 +93,7 @@ npm install @idfkit/core @idfkit/schemas
 ```
 
 Static per-version field types are opt-in and installed by name, so nobody pays
-2.5 to 2.8 MB of declarations per EnergyPlus version to parse a file. Everything
+2.6 to 2.9 MB of declarations per EnergyPlus version to parse a file. Everything
 below works without them, untyped.
 
 ```bash

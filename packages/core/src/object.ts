@@ -1,9 +1,10 @@
 import type { SlimField, SlimType } from '@idfkit/schemas';
 
-import { ExtensibleList } from './extensible.js';
+import { ExtensibleList, NoExtensibleGroup } from './extensible.js';
 import { DATA, KEY, NAME, ORIGIN, OWNER, SHAPE, SOURCE } from './internal.js';
 import {
   choiceSpellingsFor,
+  closestField,
   extensibleValueProblem,
   shapeFor,
   spellChoice,
@@ -55,7 +56,7 @@ export interface ObjectOwner {
  * identifiers and valid TS interface keys, so using them directly means the
  * on-disk name, the runtime key, and the static type all agree.
  */
-export class IdfObject {
+export class IdfObject<X extends ExtensibleGroup = ExtensibleGroup> {
   declare readonly [DATA]: Record<string, StoredValue>;
   declare readonly [SHAPE]: ObjectShape;
   declare [OWNER]: ObjectOwner | undefined;
@@ -92,6 +93,20 @@ export class IdfObject {
     // it is a different object from the one the characters describe.
     Object.defineProperty(obj, SOURCE, { value: undefined, writable: true });
     Object.defineProperty(obj, ORIGIN, { value: undefined, writable: true });
+    // Locked once every slot above exists, so a field name the type does not have cannot become an
+    // own property. Without this, `zone.ceilng_height = 4` stored the 4 on the instance, read it
+    // back, and every writer dropped it, because writers walk the schema's fields and never the
+    // instance's keys. The accessors live on the frozen prototype and the symbol slots above are
+    // already own properties, so nothing the library does afterwards adds a property here.
+    //
+    // Not a setter and not a `Proxy`: an assignment to a name found nowhere on the prototype chain
+    // reaches no setter, so only a `Proxy` could intercept it, and design decision 2 rules that
+    // out. The cost is the wording. In strict code (every ES module, every class body, compiled
+    // TypeScript) the write throws the engine's own TypeError, which never names the type and, in
+    // Safari, not even the property; in a sloppy script it is silently ignored, so the read back is
+    // `undefined` rather than a value the save will lose. `set` and `update` give the full message
+    // with a suggestion.
+    Object.preventExtensions(obj);
 
     for (const [field, value] of Object.entries(values)) {
       if (value === undefined || value === null) continue;
@@ -100,7 +115,7 @@ export class IdfObject {
       // their value back correctly and then loses it on save. `set()` already
       // throws on the same input; this keeps the two paths in agreement.
       if (!Object.hasOwn(type.p, field) && field !== shape.extensibleKey) {
-        throw new Error(`"${field}" is not a field of ${typeName}`);
+        throw new Error(`"${field}" is ${notAField(shape, field)}`);
       }
       obj[DATA][field] = value;
     }
@@ -168,7 +183,7 @@ export class IdfObject {
   /** Write a field by name, going through the same hooks as property access. */
   set(field: string, value: StoredValue | null | undefined): void {
     if (!this.hasField(field)) {
-      throw new Error(`"${field}" is not a field of ${this.typeName}`);
+      throw new Error(`"${field}" is ${notAField(this[SHAPE], field)}`);
     }
     // Route through the accessor so reference tracking fires exactly once.
     (this as unknown as Record<string, unknown>)[field] = value ?? undefined;
@@ -200,7 +215,7 @@ export class IdfObject {
         const problem = extensibleValueProblem(value, shape.type.x?.fields ?? []);
         if (problem !== undefined) refused.push(`  - ${field}: wrapper-value (${problem})`);
       } else if (!Object.hasOwn(shape.type.p, field)) {
-        refused.push(`  - ${field}: unknown (not a field of ${this.typeName})`);
+        refused.push(`  - ${field}: unknown (${notAField(shape, field)})`);
       }
     }
     if (refused.length > 0) {
@@ -266,17 +281,30 @@ export class IdfObject {
    * One spelling is not heard: replacing a whole repeat by index, `obj.extensible[0] = {...}`,
    * writes through the array's own index slot, which cannot be caught without charging every
    * vertex read. Writing the repeat's fields and `splice` both are heard. See `extensible.ts`.
+   *
+   * On a type with no extensible group the array is empty and refuses writes: `push`, `splice` and
+   * the other mutators throw a `TypeError` naming the type. `FenestrationSurface:Detailed`, for
+   * one, spells its vertices as fixed fields (`vertex_1_x_coordinate` and on), and a push there
+   * used to return 1 and keep nothing.
    */
-  get extensible(): ExtensibleGroup[] {
+  get extensible(): X[] {
+    // `X` exists only in the type system. Every repeat is an `ExtensibleGroup`
+    // at run time; a typed document narrows it to the generated row type, and
+    // the casts below are the only place that narrowing is asserted.
     const key = this[SHAPE].extensibleKey;
-    if (key === undefined) return [];
+    if (key === undefined) {
+      return NoExtensibleGroup.for(
+        this[SHAPE].typeName,
+        this[SHAPE].fields
+      ) as ExtensibleGroup[] as X[];
+    }
     const held = this[DATA][key];
-    if (held instanceof ExtensibleList) return held;
+    if (held instanceof ExtensibleList) return held as ExtensibleGroup[] as X[];
     if (this[OWNER]?.tracksExtensibleEdits() !== true) {
-      if (Array.isArray(held)) return held;
+      if (Array.isArray(held)) return held as X[];
       const empty: ExtensibleGroup[] = [];
       this[DATA][key] = empty;
-      return empty;
+      return empty as X[];
     }
 
     const list = ExtensibleList.adopt(
@@ -288,7 +316,7 @@ export class IdfObject {
       }
     );
     this[DATA][key] = list;
-    return list;
+    return list as ExtensibleGroup[] as X[];
   }
 
   /**
@@ -393,6 +421,28 @@ export class IdfObject {
   toString(): string {
     return `${this.typeName}(${this[NAME]})`;
   }
+}
+
+/**
+ * `not a field of Zone`, with the nearest field name appended when one is close enough.
+ *
+ * The prefix is what `create`, `set` and `update` have always said, so a caller matching on it
+ * still matches. The shared conformance corpus reads only the `  - <entry>:` head of an `update`
+ * refusal line and never its wording, so the suggestion inside the parentheses is free to vary.
+ */
+function notAField(shape: ObjectShape, field: string): string {
+  // The name is not a field, and `set` cannot write it, but it is the one name with a property of
+  // its own; say so rather than leave the caller thinking the object has none.
+  if (String(field).toLowerCase() === 'name') {
+    return `not a field of ${shape.typeName}; the name is the name property, not a field`;
+  }
+  const key = shape.extensibleKey;
+  const candidates =
+    key === undefined || shape.fields.includes(key) ? shape.fields : [...shape.fields, key];
+  const near = closestField(field, candidates);
+  return near === undefined
+    ? `not a field of ${shape.typeName}`
+    : `not a field of ${shape.typeName}; did you mean "${near}"?`;
 }
 
 /**
