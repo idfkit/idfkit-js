@@ -542,7 +542,30 @@ function numericBranchFailure(value: number, fieldSchema: SlimField): Failure | 
 function stringBranchFailure(value: string, fieldSchema: SlimField): Failure | undefined {
   const allowed = fieldSchema.se;
   if (allowed === undefined || satisfiesEnum(allowed, value)) return undefined;
-  return enumFailure(allowed, value);
+  return { code: 'E004', message: anyOfExpectation(fieldSchema.t, allowed, value) };
+}
+
+/**
+ * The message for a string that fails both branches of a number-or-word field.
+ *
+ * The value is not a number, and it is not one of the words the string branch
+ * allows, so the message names both: "Expected a number or 'Autocalculate',
+ * got 'tall'". Listing the string branch's enum alone reads as though the field
+ * were a choice field and hides that a number is what the slot is for.
+ *
+ * The blank choice `''` is left out: it stands for "leave the field unset",
+ * which is not something a user types. The code stays `E004`, as the Python
+ * library reports it; only the wording differs, which `ValidationError` allows.
+ */
+function anyOfExpectation(kind: SlimField['t'], allowed: readonly string[], value: string): string {
+  const article = kind === 'i' ? 'an' : 'a';
+  const words = allowed.filter((choice) => choice !== '').map((choice) => `'${choice}'`);
+  const options = [`${article} ${jsonTypeName(kind)}`, ...words];
+  const expected =
+    options.length === 1
+      ? options[0]
+      : `${options.slice(0, -1).join(', ')} or ${options[options.length - 1]}`;
+  return `Expected ${expected}, got '${value}'`;
 }
 
 /**

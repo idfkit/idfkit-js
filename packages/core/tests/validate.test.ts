@@ -264,9 +264,7 @@ describe('anyOf fields: a number, or a string the branch allows', () => {
 
     const findings = validateObject(zone, v26);
     expect(codes(findings)).toEqual(['E004']);
-    expect(findings[0]?.message).toBe(
-      "Value 'Autosize' not in allowed values: ['', 'Autocalculate']"
-    );
+    expect(findings[0]?.message).toBe("Expected a number or 'Autocalculate', got 'Autosize'");
   });
 
   it('accepts a number in the same field', () => {
@@ -281,6 +279,28 @@ describe('anyOf fields: a number, or a string the branch allows', () => {
     // string.
     const zone = doc.add('Zone', 'Z1', { ceiling_height: 'Bogus' });
     expect(codes(validateObject(zone, v26))).toEqual(['E004']);
+  });
+
+  it('words a non-numeric string as a missing number, not a bad choice (E004)', () => {
+    // The value fails both branches: it is not a number, and it is not the one
+    // word the string branch allows. Listing only the string branch's enum
+    // reads as though the field were a choice field, and hides that a number
+    // is what the slot is for. The code stays E004, as in the Python library.
+    const zone = doc.add('Zone', 'Z1');
+    zone.set('ceiling_height', 'tall');
+
+    const findings = validateObject(zone, v26);
+    expect(codes(findings)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe("Expected a number or 'Autocalculate', got 'tall'");
+  });
+
+  it('words a parsed non-numeric token the same way', () => {
+    const { document: parsed } = parseIdf('Version, 26.1;\nZone, A, 0,0,0,0,1,1,abc;', v26, {
+      strict: false,
+    });
+    const findings = validateDocument(parsed).errors.filter((f) => f.field === 'ceiling_height');
+    expect(codes(findings)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe("Expected a number or 'Autocalculate', got 'abc'");
   });
 
   it('accepts any string where the string branch declares no enum', () => {
