@@ -288,9 +288,6 @@ export class IdfObject<X extends ExtensibleGroup = ExtensibleGroup> {
    * used to return 1 and keep nothing.
    */
   get extensible(): X[] {
-    // `X` exists only in the type system. Every repeat is an `ExtensibleGroup`
-    // at run time; a typed document narrows it to the generated row type, and
-    // the casts below are the only place that narrowing is asserted.
     const key = this[SHAPE].extensibleKey;
     if (key === undefined) {
       return NoExtensibleGroup.for(

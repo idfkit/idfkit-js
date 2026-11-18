@@ -54,23 +54,8 @@ export type ValuesOf<M extends AnyTypeMap, K extends string> = K extends keyof M
   : FieldValues;
 
 /**
- * The row type of one repeat of a type's extensible group.
- *
- * Read off the field interface rather than from a second map: the generated
- * interface types its group key (`vertices`, `data`, `equipment`) as an array
- * of the row, and no other field is an array, so the element type of whichever
- * property is one *is* the row. A known type with no group yields `never`,
- * which makes `obj.extensible.push(...)` a compile error on a type that would
- * drop the repeat. Unknown names, untyped documents and the open
- * `AnyTypeMap` keep the permissive `ExtensibleGroup`, on the same terms as
- * `ValuesOf`.
- *
- * The `string extends K` arm comes first and tests only the name, so a type
- * name held in a `string` resolves to `ExtensibleGroup` even inside a function
- * generic over `M`, where every test on `M` is deferred. Without it a helper
- * written as `<M extends AnyTypeMap>(doc: IdfDocument<M>, type: string)` could
- * not push a repeat at all. A literal name in such a helper still defers; widen
- * the object to `IdfObject` there.
+ * Row type of `K`'s extensible group: `never` when it has none, and
+ * `ExtensibleGroup` when `K` or `M` is not known. See "Generated types".
  */
 export type ExtensibleOf<M extends AnyTypeMap, K extends string> = string extends K
   ? ExtensibleGroup
@@ -86,10 +71,6 @@ export type ExtensibleOf<M extends AnyTypeMap, K extends string> = string extend
         }[keyof M[K]]
       : ExtensibleGroup;
 
-/**
- * What `add`, `all`, `get` and `require` hand back for a type name: an
- * `IdfObject` whose `extensible` is narrowed to the type's row, joined with the
- * type's field interface.
- */
+/** What `add`, `all`, `get` and `require` return. */
 export type TypedObject<M extends AnyTypeMap, K extends string> = IdfObject<ExtensibleOf<M, K>> &
   ObjectOf<M, K>;
