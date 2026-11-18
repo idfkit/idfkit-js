@@ -310,6 +310,9 @@ WeatherProperty:SkyTemperature,
     expect(list.toJSON()).toEqual({ branches: [{ branch_name: 'B1' }] });
     expect(doc.references.isReferenced('B1')).toBe(true);
   });
+});
+
+describe('regressions: extensible on a type with no extensible group', () => {
   it('refuses a write through extensible on a type that has no extensible group', () => {
     // FenestrationSurface:Detailed spells its four vertices as fixed fields. `extensible` handed
     // back a fresh `[]`, so a push in the BuildingSurface:Detailed style returned 1 and kept nothing;
