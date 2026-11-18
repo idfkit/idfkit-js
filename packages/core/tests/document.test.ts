@@ -502,11 +502,15 @@ describe('type-name lookup', () => {
 
   it('adds no collection when an absent or unknown type is read', () => {
     const before = doc.types();
+    const size = doc.size;
+    const written = writeIdf(doc);
     for (const name of ['Lights', 'People', 'Zoen', 'NotAThing', 'zone', 'ZONE']) {
       doc.all(name);
       doc.has(name);
     }
     expect(doc.types()).toEqual(before);
+    expect(doc.size).toBe(size);
+    expect(writeIdf(doc)).toBe(written);
   });
 
   it('hands back a detached collection for an absent type', () => {

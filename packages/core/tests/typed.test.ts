@@ -55,6 +55,35 @@ describe('typed documents', () => {
     expect(doc.all('Zone').size).toBe(0);
   });
 
+  it('keeps unknown type names usable but untyped', () => {
+    const doc = new IdfDocument<TypeMap>(v26);
+    // Version-generic code passes a runtime string and still works.
+    const typeName: string = 'Zone';
+    const collection = doc.all(typeName);
+    expect(collection.typeName).toBe('Zone');
+  });
+
+  it('describes each version separately', () => {
+    // `Space` exists in 26.1 but not 9.4, and the types say so.
+    expectTypeOf<TypeMap>().toHaveProperty('Space');
+    expectTypeOf<TypeMapV9>().not.toHaveProperty('Space');
+  });
+
+  it('costs nothing at runtime', () => {
+    // A typed document and an untyped one are the same object graph; the map
+    // exists only in the type system.
+    const typed = new IdfDocument<TypeMap>(v26);
+    const untyped = new IdfDocument(v26);
+
+    typed.add('Zone', 'Z1', { x_origin: 1 });
+    untyped.add('Zone', 'Z1', { x_origin: 1 });
+
+    expect(typed.toJSON()).toEqual(untyped.toJSON());
+    expect(Object.getPrototypeOf(typed)).toBe(Object.getPrototypeOf(untyped));
+  });
+});
+
+describe('collection.add typing', () => {
   it('types collection.add exactly like doc.add', () => {
     const doc = new IdfDocument<TypeMap>(v26);
     const zones = doc.all('Zone');
@@ -102,32 +131,5 @@ describe('typed documents', () => {
     typed.all(typeName).add('Z1', { ceiling_height: 3 });
 
     expect(untyped.toJSON()).toEqual(typed.toJSON());
-  });
-
-  it('keeps unknown type names usable but untyped', () => {
-    const doc = new IdfDocument<TypeMap>(v26);
-    // Version-generic code passes a runtime string and still works.
-    const typeName: string = 'Zone';
-    const collection = doc.all(typeName);
-    expect(collection.typeName).toBe('Zone');
-  });
-
-  it('describes each version separately', () => {
-    // `Space` exists in 26.1 but not 9.4, and the types say so.
-    expectTypeOf<TypeMap>().toHaveProperty('Space');
-    expectTypeOf<TypeMapV9>().not.toHaveProperty('Space');
-  });
-
-  it('costs nothing at runtime', () => {
-    // A typed document and an untyped one are the same object graph; the map
-    // exists only in the type system.
-    const typed = new IdfDocument<TypeMap>(v26);
-    const untyped = new IdfDocument(v26);
-
-    typed.add('Zone', 'Z1', { x_origin: 1 });
-    untyped.add('Zone', 'Z1', { x_origin: 1 });
-
-    expect(typed.toJSON()).toEqual(untyped.toJSON());
-    expect(Object.getPrototypeOf(typed)).toBe(Object.getPrototypeOf(untyped));
   });
 });
