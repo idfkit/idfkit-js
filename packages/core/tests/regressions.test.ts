@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { IdfDocument, parseIdf, writeIdf } from '@idfkit/core';
+import { IdfDocument, parseIdf, validateDocument, writeIdf } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import { schema } from './helpers.js';
@@ -309,5 +309,19 @@ WeatherProperty:SkyTemperature,
     expect(() => list.update({ branches: [null] as unknown as undefined })).toThrow(/refused/);
     expect(list.toJSON()).toEqual({ branches: [{ branch_name: 'B1' }] });
     expect(doc.references.isReferenced('B1')).toBe(true);
+  });
+});
+
+describe('validation wording for a number-or-sentinel field', () => {
+  it('reports a non-numeric token as a missing number, not a bad choice', () => {
+    // Reported as `E004: Value 'abc' not in allowed values: ['', 'Autocalculate']`,
+    // which reads as though `ceiling_height` were a choice field. The code is
+    // still E004, as in the Python library; the message names the number.
+    const { document } = parseIdf('Version, 26.1;\nZone, A, 0,0,0,0,1,1,abc;', v26, {
+      strict: false,
+    });
+    const findings = validateDocument(document).errors.filter((f) => f.field === 'ceiling_height');
+    expect(findings.map((f) => f.code)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe("Expected a number or 'Autocalculate', got 'abc'");
   });
 });

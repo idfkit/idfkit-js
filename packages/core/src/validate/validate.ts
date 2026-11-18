@@ -542,7 +542,45 @@ function numericBranchFailure(value: number, fieldSchema: SlimField): Failure | 
 function stringBranchFailure(value: string, fieldSchema: SlimField): Failure | undefined {
   const allowed = fieldSchema.se;
   if (allowed === undefined || satisfiesEnum(allowed, value)) return undefined;
-  return enumFailure(allowed, value);
+  return { code: 'E004', message: anyOfExpectation(fieldSchema, allowed, value) };
+}
+
+/**
+ * The message for a string that fails both branches of a number-or-word field.
+ *
+ * The value is not a number, and it is not one of the words the string branch
+ * allows, so the message names both: "Expected a number or 'Autocalculate',
+ * got 'tall'". Listing the string branch's enum alone reads as though the field
+ * were a choice field and hides that a number is what the slot is for.
+ *
+ * The number side is "a number" (or "an integer"), unless the numeric branch
+ * carries its own enum, as 68 fields do: then only those numbers are legal and
+ * the message lists them, "Expected one of 0, 1, 2, 3 or 5, got 'fine'".
+ *
+ * The blank choice `''` is left out: it stands for "leave the field unset",
+ * which is not something a user types. A string that spells a number, `'2.7'`
+ * from a form input, is called a string, or "Expected a number, got '2.7'"
+ * would read as a contradiction. The code stays `E004`, as the Python library
+ * reports it; only the wording differs, which `ValidationError` allows.
+ */
+function anyOfExpectation(
+  fieldSchema: SlimField,
+  allowed: readonly string[],
+  value: string
+): string {
+  const words = allowed.filter((choice) => choice !== '').map((choice) => `'${choice}'`);
+  const numbers = fieldSchema.e;
+  const options =
+    numbers === undefined
+      ? [`${fieldSchema.t === 'i' ? 'an' : 'a'} ${jsonTypeName(fieldSchema.t)}`, ...words]
+      : [...numbers.map(String), ...words];
+  const list =
+    options.length === 1
+      ? options[0]
+      : `${options.slice(0, -1).join(', ')} or ${options[options.length - 1]}`;
+  const expected = numbers === undefined ? list : `one of ${list}`;
+  const spellsNumber = value.trim() !== '' && Number.isFinite(Number(value));
+  return `Expected ${expected}, got ${spellsNumber ? 'the string ' : ''}'${value}'`;
 }
 
 /**

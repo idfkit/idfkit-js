@@ -264,9 +264,7 @@ describe('anyOf fields: a number, or a string the branch allows', () => {
 
     const findings = validateObject(zone, v26);
     expect(codes(findings)).toEqual(['E004']);
-    expect(findings[0]?.message).toBe(
-      "Value 'Autosize' not in allowed values: ['', 'Autocalculate']"
-    );
+    expect(findings[0]?.message).toBe("Expected a number or 'Autocalculate', got 'Autosize'");
   });
 
   it('accepts a number in the same field', () => {
@@ -281,6 +279,50 @@ describe('anyOf fields: a number, or a string the branch allows', () => {
     // string.
     const zone = doc.add('Zone', 'Z1', { ceiling_height: 'Bogus' });
     expect(codes(validateObject(zone, v26))).toEqual(['E004']);
+  });
+
+  it('words a non-numeric string as a missing number, not a bad choice (E004)', () => {
+    // The value fails both branches: it is not a number, and it is not the one
+    // word the string branch allows. Listing only the string branch's enum
+    // reads as though the field were a choice field, and hides that a number
+    // is what the slot is for. The code stays E004, as in the Python library.
+    const zone = doc.add('Zone', 'Z1');
+    zone.set('ceiling_height', 'tall');
+
+    const findings = validateObject(zone, v26);
+    expect(codes(findings)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe("Expected a number or 'Autocalculate', got 'tall'");
+  });
+
+  it('lists the numeric choices when the number branch carries an enum (E004)', () => {
+    // One of the 68 fields whose string branch admits only the blank: "a
+    // number" would invite a 7 that the field refuses.
+    const screen = doc.add('WindowMaterial:Screen', 'SC1');
+    screen.set('angle_of_resolution_for_screen_transmittance_output_map', 'fine');
+
+    const findings = validateObject(screen, v26, { checkRequired: false });
+    expect(codes(findings)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe("Expected one of 0, 1, 2, 3 or 5, got 'fine'");
+  });
+
+  it('says "an integer" where the number branch is an integer (E004)', () => {
+    const beam = doc.add('AirTerminal:SingleDuct:ConstantVolume:CooledBeam', 'CB1');
+    beam.set('number_of_beams', 'many');
+
+    const findings = validateObject(beam, v26, { checkRequired: false });
+    expect(codes(findings)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe("Expected an integer or 'Autosize', got 'many'");
+  });
+
+  it('calls a string that spells a number a string (E004)', () => {
+    // A value read from a form input arrives as '2.7'. "Expected a number,
+    // got '2.7'" would contradict itself.
+    const zone = doc.add('Zone', 'Z1');
+    zone.set('ceiling_height', '2.7');
+
+    const findings = validateObject(zone, v26);
+    expect(codes(findings)).toEqual(['E004']);
+    expect(findings[0]?.message).toBe("Expected a number or 'Autocalculate', got the string '2.7'");
   });
 
   it('accepts any string where the string branch declares no enum', () => {
