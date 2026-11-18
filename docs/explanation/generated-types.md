@@ -54,8 +54,8 @@ codebase that is otherwise loosely typed.
 
 ## It costs nothing, installed or not
 
-The maps are big. EnergyPlus 26.1 is 2.7 MB of declarations and 9.4 is another
-2.4 MB, against roughly 170 KB for the whole of `@idfkit/core`. That is why they
+The maps are big. EnergyPlus 26.1 is 2.8 MB of declarations and 9.4 is another
+2.6 MB, against roughly 170 KB for the whole of `@idfkit/core`. That is why they
 are separate packages rather than a subpath of core: install neither and you
 have a complete, working library and zero bytes of either map on disk.
 
@@ -69,7 +69,7 @@ everything still works, untyped:
 const doc = await loadIdf('model.idf'); // fine, just no completion
 ```
 
-## Two design details that are easy to get wrong
+## Three design details that are easy to get wrong
 
 **`TypeMap` must be emitted as a `type` alias, never an `interface`.** Interfaces
 have no implicit index signature, so an interface cannot satisfy
@@ -90,6 +90,19 @@ allowing dynamic field names. Using two costs nothing and gives both.
 literal completion alive while still accepting arbitrary strings. Without it
 TypeScript widens the parameter to `string` and the 858 suggestions disappear.
 
+**Extensible rows are `type` aliases too, and `extensible` is narrowed on the
+class, not by intersection.** Each type with a repeating group gets a row type,
+`BuildingSurface_Detailed_Extensible`, and its group key is typed as an array
+of it. A row has to be a `type` for the reason `TypeMap` does: only then is it
+assignable to `ExtensibleGroup`, and a typed object to a plain `IdfObject`.
+What `add()` and `all()` return is `IdfObject<ExtensibleOf<M, K>> & ObjectOf<M, K>`,
+with the row passed as `IdfObject`'s type parameter. Intersecting an override
+onto `IdfObject` instead would leave the permissive `push` overload in place, and
+a misspelled vertex field would still compile. `ExtensibleOf` falls back to
+`ExtensibleGroup` wherever `ValuesOf` falls back to `FieldValues`, and resolves
+to `never` for a known type with no group, so a push that would be dropped does
+not compile.
+
 ## Declarations only, and it is checked
 
 A type package holds one `index.d.ts` and nothing else. No `main`, no
@@ -101,10 +114,9 @@ in the working tree and in what `npm pack` would ship, and fails the build on
 one byte of it — or on an exported value, which a declaration file will accept
 and then emit nothing for, leaving an export that crashes whoever imports it.
 
-`@idfkit/core` is a peer range rather than an exact version. The map borrows
-exactly one type from core, `ExtensibleGroup`, and neither package carries
-runtime, so a skew between the two is a type error at your build and never a
-failure at run time.
+`@idfkit/core` is a peer range rather than an exact version. The map imports
+nothing from core and neither package carries runtime, so a skew between the
+two is at worst a type error at your build and never a failure at run time.
 
 ## How this is kept honest
 

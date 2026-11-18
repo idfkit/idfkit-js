@@ -68,8 +68,8 @@ if (versions.length === 0) versions.push('26.1.0', '9.4.0');
  * placeholder can honestly state; `.github/workflows/publish.yml` stamps the
  * released floor in its place at publish time.
  *
- * The range is deliberately open above. A generated package borrows exactly one
- * type from core, `ExtensibleGroup`, and carries no runtime, so skew between
+ * The range is deliberately open above. A generated package imports nothing
+ * from core and carries no runtime, so skew between
  * the two surfaces as a type error at the consumer's build and never as a
  * runtime failure (contracts/distribution.md, "Generated types, split out").
  */
@@ -115,6 +115,13 @@ function fieldType(def) {
   if (Array.isArray(def.anyOf)) {
     const numeric = def.anyOf.find((b) => b.type === 'number');
     if (numeric) {
+      // A string branch with no `enum` admits any text, not only the autosize
+      // keywords: `Schedule:Compact` rows hold `Through: 12/31` and numbers in
+      // the same slot, and `UtilityCost:Tariff` charges take a number or a
+      // variable name. Narrowing those to the keywords rejects valid models.
+      if (def.anyOf.some((b) => b.type === 'string' && b.enum === undefined)) {
+        return 'number | string';
+      }
       effective = { ...numeric, enum: def.enum };
       auto = true;
     } else {
@@ -146,6 +153,66 @@ function docComment(indent, lines) {
   return `${indent}/**\n${kept.map((l) => `${indent} * ${escapeComment(l)}`).join('\n')}\n${indent} */\n`;
 }
 
+/**
+ * Name of the interface for one repeat of a type's extensible group.
+ *
+ * `BuildingSurface:Detailed` -> `BuildingSurface_Detailed_Extensible`. Derived
+ * from the owning type alone, never from the group's key (`vertices`, `data`,
+ * `equipment`), so a reader can name it from the type and a schema that renames
+ * a group key does not rename the interface. A type has at most one extensible
+ * group, so the name is unique per type; `declarations` still refuses a clash
+ * with another type's identifier.
+ */
+function rowIdentifier(typeName) {
+  return `${identifier(typeName)}_Extensible`;
+}
+
+/**
+ * The row interface for a type's extensible group, or `undefined` when it has
+ * none. Its fields are typed by `fieldType`, the same rule as top-level fields,
+ * from the schema's `items.properties`, and are required exactly where the
+ * schema's `items.required` says so.
+ */
+function extensibleRow(typeName, raw) {
+  const legacy = raw.legacy_idd ?? {};
+  if (!legacy.extension || !legacy.extensibles?.length) return undefined;
+  const body = Object.values(raw.patternProperties ?? {})[0] ?? {};
+  const items = body.properties?.[legacy.extension]?.items ?? {};
+  const props = items.properties ?? {};
+  const required = new Set(items.required ?? []);
+  const fieldInfo = legacy.field_info ?? {};
+  const id = rowIdentifier(typeName);
+
+  const lines = [];
+  lines.push(
+    docComment('', [
+      `One repeat of ${typeName}'s \`${legacy.extension}\` group, as \`obj.extensible\` holds it.`,
+    ]).trimEnd()
+  );
+  // A `type`, not an `interface`, for the reason `TypeMap` is one: only a type
+  // alias has the implicit index signature that makes a row assignable to
+  // core's `ExtensibleGroup`, and so a typed object assignable to `IdfObject`.
+  lines.push(`export type ${id} = {`);
+  for (const field of legacy.extensibles) {
+    const def = props[field];
+    // A group field the schema does not describe is still a slot in the row;
+    // type it as loosely as the runtime stores it rather than drop it.
+    const rendered = def === undefined ? 'string | number' : (fieldType(def) ?? 'string | number');
+    const info = fieldInfo[field] ?? {};
+    const comment = docComment('  ', [
+      info.field_name,
+      WITH_NOTES && def ? def.note : undefined,
+      def?.units ? `Units: ${def.units}` : undefined,
+      def?.default !== undefined ? `Default: ${JSON.stringify(def.default)}` : undefined,
+    ]);
+    const optional = required.has(field) ? '' : '?';
+    lines.push(`${comment}  ${propertyKey(field)}${optional}: ${rendered};`);
+  }
+  lines.push('};');
+  lines.push('');
+  return { id, lines };
+}
+
 /** The declaration file: one interface per object type, plus the map. */
 function declarations(version, packageName) {
   const path = join(SCHEMA_SRC, versionDir(version), 'Energy+.schema.epJSON.gz');
@@ -161,15 +228,24 @@ function declarations(version, packageName) {
   out.push('// Types and interfaces only: an exported value here would be a phantom export,');
   out.push('// and `npm run check:type-packages` fails the build on one.');
   out.push('');
-  out.push("import type { ExtensibleGroup } from '@idfkit/core';");
-  out.push('');
 
   const exported = new Map();
+  // Every exported identifier and what it declares. A row interface's name is
+  // built from its owner's, so it could in principle land on another type's
+  // identifier; this fails the run rather than emitting two declarations that
+  // TypeScript would silently merge into one interface.
+  const claimed = new Map();
+  const claim = (id, what) => {
+    const prior = claimed.get(id);
+    if (prior !== undefined) throw new Error(`${id} would declare both ${prior} and ${what}`);
+    claimed.set(id, what);
+  };
 
   for (const [typeName, raw] of Object.entries(types)) {
     const id = identifier(typeName);
     if (exported.has(id)) continue;
     exported.set(id, typeName);
+    claim(id, typeName);
 
     const legacy = raw.legacy_idd ?? {};
     const fieldInfo = legacy.field_info ?? {};
@@ -204,13 +280,19 @@ function declarations(version, packageName) {
       out.push(`${comment}  ${propertyKey(field)}${optional}: ${rendered};`);
     }
 
-    if (legacy.extension && legacy.extensibles?.length) {
+    const row = extensibleRow(typeName, raw);
+    if (row !== undefined) {
       const comment = docComment('  ', [`Repeating group: ${legacy.extensibles.join(', ')}`]);
-      out.push(`${comment}  ${propertyKey(legacy.extension)}?: ExtensibleGroup[];`);
+      out.push(`${comment}  ${propertyKey(legacy.extension)}?: ${row.id}[];`);
     }
 
     out.push('}');
     out.push('');
+
+    if (row !== undefined) {
+      out.push(...row.lines);
+      claim(row.id, `the repeating group of ${typeName}`);
+    }
   }
 
   // The map is the only thing a caller needs to import. It is a type, so it
@@ -222,7 +304,9 @@ function declarations(version, packageName) {
   out.push(' * ```ts');
   out.push(` * import type { TypeMap } from '${packageName}';`);
   out.push(' * const doc = await loadIdf<TypeMap>(path);');
-  out.push(" * doc.all('Zone').first?.ceiling_height;  // number | 'Autosize' | 'Autocalculate' | undefined");
+  out.push(
+    " * doc.all('Zone').first?.ceiling_height;  // number | 'Autosize' | 'Autocalculate' | undefined"
+  );
   out.push(' * ```');
   out.push(' */');
   out.push('export type TypeMap = {');
@@ -348,8 +432,8 @@ appears in it (\`npm run check:type-packages\`).
 
 ## Versioning
 
-\`@idfkit/core\` is a **peer range**, not a pin. The map borrows one type from
-core, \`ExtensibleGroup\`, and carries no runtime, so a version skew between the
+\`@idfkit/core\` is a **peer range**, not a pin. The map imports nothing from
+core and carries no runtime, so a version skew between the
 two is a type error at your build and never a failure at run time. Pick the
 package whose version tag matches the EnergyPlus release you are reading; the
 core you install alongside it does not have to match anything.

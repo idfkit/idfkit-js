@@ -6,8 +6,6 @@
 // Types and interfaces only: an exported value here would be a phantom export,
 // and `npm run check:type-packages` fails the build on one.
 
-import type { ExtensibleGroup } from '@idfkit/core';
-
 /**
  * Version
  * Specifies the EnergyPlus version of the IDF file.
@@ -239,8 +237,17 @@ export interface ShadowCalculation {
    */
   disable_self_shading_from_shading_zone_groups_to_other_zones?: "No" | "Yes";
   /** Repeating group: shading_zone_group_zonelist_name */
-  shading_zone_groups?: ExtensibleGroup[];
+  shading_zone_groups?: ShadowCalculation_Extensible[];
 }
+
+/** One repeat of ShadowCalculation's `shading_zone_groups` group, as `obj.extensible` holds it. */
+export type ShadowCalculation_Extensible = {
+  /**
+   * Shading Zone Group ZoneList Name
+   * Specifies a group of zones which are controlled by the Disable Self-Shading fields.
+   */
+  shading_zone_group_zonelist_name?: string;
+};
 
 /**
  * SurfaceConvectionAlgorithm:Inside
@@ -1948,8 +1955,19 @@ export interface Site_SpectrumData {
   /** Spectrum */
   spectrum_2?: number;
   /** Repeating group: wavelength, spectrum */
-  extensions?: ExtensibleGroup[];
+  extensions?: Site_SpectrumData_Extensible[];
 }
+
+/** One repeat of Site:SpectrumData's `extensions` group, as `obj.extensible` holds it. */
+export type Site_SpectrumData_Extensible = {
+  /**
+   * Wavelength
+   * Units: micron
+   */
+  wavelength?: number;
+  /** Spectrum */
+  spectrum?: number;
+};
 
 /**
  * ScheduleTypeLimits
@@ -2125,8 +2143,20 @@ export interface Schedule_Day_Interval {
    */
   interpolate_to_timestep?: "Average" | "Linear" | "No";
   /** Repeating group: time, value_until_time */
-  data?: ExtensibleGroup[];
+  data?: Schedule_Day_Interval_Extensible[];
 }
+
+/** One repeat of Schedule:Day:Interval's `data` group, as `obj.extensible` holds it. */
+export type Schedule_Day_Interval_Extensible = {
+  /**
+   * Time
+   * "until" includes the time entered.
+   * Units: hh:mm
+   */
+  time?: string;
+  /** Value Until Time */
+  value_until_time?: number;
+};
 
 /**
  * Schedule:Day:List
@@ -2148,8 +2178,17 @@ export interface Schedule_Day_List {
    */
   minutes_per_item?: number;
   /** Repeating group: value */
-  extensions?: ExtensibleGroup[];
+  extensions?: Schedule_Day_List_Extensible[];
 }
+
+/** One repeat of Schedule:Day:List's `extensions` group, as `obj.extensible` holds it. */
+export type Schedule_Day_List_Extensible = {
+  /**
+   * Value
+   * Default: 0
+   */
+  value?: number;
+};
 
 /**
  * Schedule:Week:Daily
@@ -2190,8 +2229,19 @@ export interface Schedule_Week_Daily {
  */
 export interface Schedule_Week_Compact {
   /** Repeating group: daytype_list, schedule_day_name */
-  data?: ExtensibleGroup[];
+  data?: Schedule_Week_Compact_Extensible[];
 }
+
+/** One repeat of Schedule:Week:Compact's `data` group, as `obj.extensible` holds it. */
+export type Schedule_Week_Compact_Extensible = {
+  /**
+   * DayType List
+   * "For" is an optional prefix/start of the For fields. Choices can be combined on single line if separated by spaces. i.e. "Holiday Weekends" Should have a space after For, if it is included. i.e. "For Alldays"
+   */
+  daytype_list: string;
+  /** Schedule:Day Name */
+  schedule_day_name: string;
+};
 
 /**
  * Schedule:Year
@@ -2202,8 +2252,22 @@ export interface Schedule_Year {
   /** Schedule Type Limits Name */
   schedule_type_limits_name?: string;
   /** Repeating group: schedule_week_name, start_month, start_day, end_month, end_day */
-  schedule_weeks?: ExtensibleGroup[];
+  schedule_weeks?: Schedule_Year_Extensible[];
 }
+
+/** One repeat of Schedule:Year's `schedule_weeks` group, as `obj.extensible` holds it. */
+export type Schedule_Year_Extensible = {
+  /** Schedule:Week Name */
+  schedule_week_name: string;
+  /** Start Month */
+  start_month: number;
+  /** Start Day */
+  start_day: number;
+  /** End Month */
+  end_month: number;
+  /** End Day */
+  end_day: number;
+};
 
 /**
  * Schedule:Compact
@@ -2214,8 +2278,14 @@ export interface Schedule_Compact {
   /** Schedule Type Limits Name */
   schedule_type_limits_name?: string;
   /** Repeating group: field */
-  data?: ExtensibleGroup[];
+  data?: Schedule_Compact_Extensible[];
 }
+
+/** One repeat of Schedule:Compact's `data` group, as `obj.extensible` holds it. */
+export type Schedule_Compact_Extensible = {
+  /** Field */
+  field?: number | string;
+};
 
 /**
  * Schedule:Constant
@@ -2320,8 +2390,32 @@ export interface Schedule_Week_Rule {
    */
   apply_saturday?: "No" | "Yes";
   /** Repeating group: start_month, start_day, end_month, end_day */
-  date_ranges?: ExtensibleGroup[];
+  date_ranges?: Schedule_Week_Rule_Extensible[];
 }
+
+/** One repeat of Schedule:Week:Rule's `date_ranges` group, as `obj.extensible` holds it. */
+export type Schedule_Week_Rule_Extensible = {
+  /**
+   * Start Month
+   * Default: 1
+   */
+  start_month?: number;
+  /**
+   * Start Day
+   * Default: 1
+   */
+  start_day?: number;
+  /**
+   * End Month
+   * Default: 12
+   */
+  end_month?: number;
+  /**
+   * End Day
+   * Default: 31
+   */
+  end_day?: number;
+};
 
 /**
  * Schedule:File:Shading
@@ -2765,8 +2859,19 @@ export interface WindowMaterial_Glazing {
  */
 export interface WindowMaterial_GlazingGroup_Thermochromic {
   /** Repeating group: optical_data_temperature, window_material_glazing_name */
-  temperature_data?: ExtensibleGroup[];
+  temperature_data?: WindowMaterial_GlazingGroup_Thermochromic_Extensible[];
 }
+
+/** One repeat of WindowMaterial:GlazingGroup:Thermochromic's `temperature_data` group, as `obj.extensible` holds it. */
+export type WindowMaterial_GlazingGroup_Thermochromic_Extensible = {
+  /**
+   * Optical Data Temperature
+   * Units: C
+   */
+  optical_data_temperature: number;
+  /** Window Material Glazing Name */
+  window_material_glazing_name: string;
+};
 
 /**
  * WindowMaterial:Glazing:RefractionExtinctionMethod
@@ -4195,8 +4300,24 @@ export interface MaterialProperty_PhaseChange {
    */
   temperature_coefficient_for_thermal_conductivity?: number;
   /** Repeating group: temperature, enthalpy */
-  values?: ExtensibleGroup[];
+  values?: MaterialProperty_PhaseChange_Extensible[];
 }
+
+/** One repeat of MaterialProperty:PhaseChange's `values` group, as `obj.extensible` holds it. */
+export type MaterialProperty_PhaseChange_Extensible = {
+  /**
+   * Temperature
+   * for Temperature-enthalpy function
+   * Units: C
+   */
+  temperature: number;
+  /**
+   * Enthalpy
+   * for Temperature-enthalpy function corresponding to temperature 1
+   * Units: J/kg
+   */
+  enthalpy: number;
+};
 
 /**
  * MaterialProperty:PhaseChangeHysteresis
@@ -4291,8 +4412,24 @@ export interface MaterialProperty_PhaseChangeHysteresis {
  */
 export interface MaterialProperty_VariableThermalConductivity {
   /** Repeating group: temperature, thermal_conductivity */
-  values?: ExtensibleGroup[];
+  values?: MaterialProperty_VariableThermalConductivity_Extensible[];
 }
+
+/** One repeat of MaterialProperty:VariableThermalConductivity's `values` group, as `obj.extensible` holds it. */
+export type MaterialProperty_VariableThermalConductivity_Extensible = {
+  /**
+   * Temperature
+   * for Temperature-Thermal Conductivity function
+   * Units: C
+   */
+  temperature: number;
+  /**
+   * Thermal Conductivity
+   * for Temperature-Thermal Conductivity function corresponding to temperature 1
+   * Units: W/m-K
+   */
+  thermal_conductivity: number;
+};
 
 /**
  * MaterialProperty:VariableAbsorptance
@@ -5823,8 +5960,23 @@ export interface MaterialProperty_GlazingSpectralData {
   /** Back Reflectance 4 */
   back_reflectance_4?: number;
   /** Repeating group: wavelength, transmittance, front_reflectance, back_reflectance */
-  extensions?: ExtensibleGroup[];
+  extensions?: MaterialProperty_GlazingSpectralData_Extensible[];
 }
+
+/** One repeat of MaterialProperty:GlazingSpectralData's `extensions` group, as `obj.extensible` holds it. */
+export type MaterialProperty_GlazingSpectralData_Extensible = {
+  /**
+   * Wavelength
+   * Units: micron
+   */
+  wavelength?: number;
+  /** Transmittance */
+  transmittance?: number;
+  /** Front Reflectance */
+  front_reflectance?: number;
+  /** Back Reflectance */
+  back_reflectance?: number;
+};
 
 /**
  * Construction
@@ -6353,8 +6505,17 @@ export interface Space {
    */
   construction_assignment_set_name?: string;
   /** Repeating group: tag */
-  tags?: ExtensibleGroup[];
+  tags?: Space_Extensible[];
 }
+
+/** One repeat of Space's `tags` group, as `obj.extensible` holds it. */
+export type Space_Extensible = {
+  /**
+   * Tag
+   * Optional reporting tag
+   */
+  tag?: string;
+};
 
 /**
  * SpaceList
@@ -6363,8 +6524,14 @@ export interface Space {
  */
 export interface SpaceList {
   /** Repeating group: space_name */
-  spaces?: ExtensibleGroup[];
+  spaces?: SpaceList_Extensible[];
 }
+
+/** One repeat of SpaceList's `spaces` group, as `obj.extensible` holds it. */
+export type SpaceList_Extensible = {
+  /** Space Name */
+  space_name: string;
+};
 
 /**
  * Zone
@@ -6451,8 +6618,14 @@ export interface Zone {
  */
 export interface ZoneList {
   /** Repeating group: zone_name */
-  zones?: ExtensibleGroup[];
+  zones?: ZoneList_Extensible[];
 }
+
+/** One repeat of ZoneList's `zones` group, as `obj.extensible` holds it. */
+export type ZoneList_Extensible = {
+  /** Zone Name */
+  zone_name: string;
+};
 
 /**
  * ZoneGroup
@@ -6522,8 +6695,27 @@ export interface BuildingSurface_Detailed {
    */
   number_of_vertices?: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: vertex_x_coordinate, vertex_y_coordinate, vertex_z_coordinate */
-  vertices?: ExtensibleGroup[];
+  vertices?: BuildingSurface_Detailed_Extensible[];
 }
+
+/** One repeat of BuildingSurface:Detailed's `vertices` group, as `obj.extensible` holds it. */
+export type BuildingSurface_Detailed_Extensible = {
+  /**
+   * Vertex X-coordinate
+   * Units: m
+   */
+  vertex_x_coordinate: number;
+  /**
+   * Vertex Y-coordinate
+   * Units: m
+   */
+  vertex_y_coordinate: number;
+  /**
+   * Vertex Z-coordinate
+   * Units: m
+   */
+  vertex_z_coordinate: number;
+};
 
 /**
  * Wall:Detailed
@@ -6576,8 +6768,27 @@ export interface Wall_Detailed {
    */
   number_of_vertices?: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: vertex_x_coordinate, vertex_y_coordinate, vertex_z_coordinate */
-  vertices?: ExtensibleGroup[];
+  vertices?: Wall_Detailed_Extensible[];
 }
+
+/** One repeat of Wall:Detailed's `vertices` group, as `obj.extensible` holds it. */
+export type Wall_Detailed_Extensible = {
+  /**
+   * Vertex X-coordinate
+   * Units: m
+   */
+  vertex_x_coordinate: number;
+  /**
+   * Vertex Y-coordinate
+   * Units: m
+   */
+  vertex_y_coordinate: number;
+  /**
+   * Vertex Z-coordinate
+   * Units: m
+   */
+  vertex_z_coordinate: number;
+};
 
 /**
  * RoofCeiling:Detailed
@@ -6630,8 +6841,27 @@ export interface RoofCeiling_Detailed {
    */
   number_of_vertices?: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: vertex_x_coordinate, vertex_y_coordinate, vertex_z_coordinate */
-  vertices?: ExtensibleGroup[];
+  vertices?: RoofCeiling_Detailed_Extensible[];
 }
+
+/** One repeat of RoofCeiling:Detailed's `vertices` group, as `obj.extensible` holds it. */
+export type RoofCeiling_Detailed_Extensible = {
+  /**
+   * Vertex X-coordinate
+   * Units: m
+   */
+  vertex_x_coordinate: number;
+  /**
+   * Vertex Y-coordinate
+   * Units: m
+   */
+  vertex_y_coordinate: number;
+  /**
+   * Vertex Z-coordinate
+   * Units: m
+   */
+  vertex_z_coordinate: number;
+};
 
 /**
  * Floor:Detailed
@@ -6684,8 +6914,27 @@ export interface Floor_Detailed {
    */
   number_of_vertices?: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: vertex_x_coordinate, vertex_y_coordinate, vertex_z_coordinate */
-  vertices?: ExtensibleGroup[];
+  vertices?: Floor_Detailed_Extensible[];
 }
+
+/** One repeat of Floor:Detailed's `vertices` group, as `obj.extensible` holds it. */
+export type Floor_Detailed_Extensible = {
+  /**
+   * Vertex X-coordinate
+   * Units: m
+   */
+  vertex_x_coordinate: number;
+  /**
+   * Vertex Y-coordinate
+   * Units: m
+   */
+  vertex_y_coordinate: number;
+  /**
+   * Vertex Z-coordinate
+   * Units: m
+   */
+  vertex_z_coordinate: number;
+};
 
 /**
  * Wall:Exterior
@@ -7826,8 +8075,17 @@ export interface WindowShadingControl {
    */
   multiple_surface_control_type?: "Group" | "Sequential";
   /** Repeating group: fenestration_surface_name */
-  fenestration_surfaces?: ExtensibleGroup[];
+  fenestration_surfaces?: WindowShadingControl_Extensible[];
 }
+
+/** One repeat of WindowShadingControl's `fenestration_surfaces` group, as `obj.extensible` holds it. */
+export type WindowShadingControl_Extensible = {
+  /**
+   * Fenestration Surface Name
+   * When Multiple Surface Control Type is set to Sequential the shades will be deployed for the referenced surface objects in order. When that field is set to Group the entire list is controlled simultaneously.
+   */
+  fenestration_surface_name: string;
+};
 
 /**
  * WindowProperty:FrameAndDivider
@@ -8210,8 +8468,27 @@ export interface Shading_Site_Detailed {
    */
   number_of_vertices?: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: vertex_x_coordinate, vertex_y_coordinate, vertex_z_coordinate */
-  vertices?: ExtensibleGroup[];
+  vertices?: Shading_Site_Detailed_Extensible[];
 }
+
+/** One repeat of Shading:Site:Detailed's `vertices` group, as `obj.extensible` holds it. */
+export type Shading_Site_Detailed_Extensible = {
+  /**
+   * Vertex X-coordinate
+   * Units: m
+   */
+  vertex_x_coordinate: number;
+  /**
+   * Vertex Y-coordinate
+   * Units: m
+   */
+  vertex_y_coordinate: number;
+  /**
+   * Vertex Z-coordinate
+   * Units: m
+   */
+  vertex_z_coordinate: number;
+};
 
 /**
  * Shading:Building:Detailed
@@ -8231,8 +8508,27 @@ export interface Shading_Building_Detailed {
    */
   number_of_vertices?: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: vertex_x_coordinate, vertex_y_coordinate, vertex_z_coordinate */
-  vertices?: ExtensibleGroup[];
+  vertices?: Shading_Building_Detailed_Extensible[];
 }
+
+/** One repeat of Shading:Building:Detailed's `vertices` group, as `obj.extensible` holds it. */
+export type Shading_Building_Detailed_Extensible = {
+  /**
+   * Vertex X-coordinate
+   * Units: m
+   */
+  vertex_x_coordinate: number;
+  /**
+   * Vertex Y-coordinate
+   * Units: m
+   */
+  vertex_y_coordinate: number;
+  /**
+   * Vertex Z-coordinate
+   * Units: m
+   */
+  vertex_z_coordinate: number;
+};
 
 /**
  * Shading:Overhang
@@ -8456,8 +8752,27 @@ export interface Shading_Zone_Detailed {
    */
   number_of_vertices?: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: vertex_x_coordinate, vertex_y_coordinate, vertex_z_coordinate */
-  vertices?: ExtensibleGroup[];
+  vertices?: Shading_Zone_Detailed_Extensible[];
 }
+
+/** One repeat of Shading:Zone:Detailed's `vertices` group, as `obj.extensible` holds it. */
+export type Shading_Zone_Detailed_Extensible = {
+  /**
+   * Vertex X-coordinate
+   * Units: m
+   */
+  vertex_x_coordinate: number;
+  /**
+   * Vertex Y-coordinate
+   * Units: m
+   */
+  vertex_y_coordinate: number;
+  /**
+   * Vertex Z-coordinate
+   * Units: m
+   */
+  vertex_z_coordinate: number;
+};
 
 /**
  * ShadingProperty:Reflectance
@@ -8531,8 +8846,14 @@ export interface SurfaceProperty_HeatTransferAlgorithm_SurfaceList {
    */
   algorithm?: "CombinedHeatAndMoistureFiniteElement" | "ConductionFiniteDifference" | "ConductionTransferFunction" | "MoisturePenetrationDepthConductionTransferFunction";
   /** Repeating group: surface_name */
-  surface?: ExtensibleGroup[];
+  surface?: SurfaceProperty_HeatTransferAlgorithm_SurfaceList_Extensible[];
 }
+
+/** One repeat of SurfaceProperty:HeatTransferAlgorithm:SurfaceList's `surface` group, as `obj.extensible` holds it. */
+export type SurfaceProperty_HeatTransferAlgorithm_SurfaceList_Extensible = {
+  /** Surface Name */
+  surface_name: string;
+};
 
 /**
  * SurfaceProperty:HeatTransferAlgorithm:Construction
@@ -8793,8 +9114,32 @@ export interface Foundation_Kiva {
    */
   footing_depth?: number;
   /** Repeating group: custom_block_material_name, custom_block_depth, custom_block_x_position, custom_block_z_position */
-  blocks?: ExtensibleGroup[];
+  blocks?: Foundation_Kiva_Extensible[];
 }
+
+/** One repeat of Foundation:Kiva's `blocks` group, as `obj.extensible` holds it. */
+export type Foundation_Kiva_Extensible = {
+  /** Custom Block Material Name */
+  custom_block_material_name?: string;
+  /**
+   * Custom Block Depth
+   * Top-to-bottom dimension of the block downward.
+   * Units: m
+   */
+  custom_block_depth?: number;
+  /**
+   * Custom Block X Position
+   * Position outward (+) or inward (-) relative to the foundation wall interior
+   * Units: m
+   */
+  custom_block_x_position?: number;
+  /**
+   * Custom Block Z Position
+   * Position downward (+) relative to the foundation wall top
+   * Units: m
+   */
+  custom_block_z_position?: number;
+};
 
 /**
  * Foundation:Kiva:Settings
@@ -8899,8 +9244,18 @@ export interface SurfaceProperty_ExposedFoundationPerimeter {
    */
   exposed_perimeter_fraction?: number;
   /** Repeating group: surface_segment_exposed */
-  surfaces?: ExtensibleGroup[];
+  surfaces?: SurfaceProperty_ExposedFoundationPerimeter_Extensible[];
 }
+
+/** One repeat of SurfaceProperty:ExposedFoundationPerimeter's `surfaces` group, as `obj.extensible` holds it. */
+export type SurfaceProperty_ExposedFoundationPerimeter_Extensible = {
+  /**
+   * Surface Segment Exposed
+   * Surface Segment N is the perimeter between the Nth and (N+1)th vertices
+   * Default: "Yes"
+   */
+  surface_segment_exposed?: "No" | "Yes";
+};
 
 /**
  * SurfaceConvectionAlgorithm:Inside:AdaptiveModelSelections
@@ -9729,8 +10084,14 @@ export interface SurfaceProperty_ExteriorNaturalVentedCavity {
    */
   discharge_coefficient_for_openings_with_respect_to_buoyancy_driven_flow?: number;
   /** Repeating group: surface_name */
-  surface?: ExtensibleGroup[];
+  surface?: SurfaceProperty_ExteriorNaturalVentedCavity_Extensible[];
 }
+
+/** One repeat of SurfaceProperty:ExteriorNaturalVentedCavity's `surface` group, as `obj.extensible` holds it. */
+export type SurfaceProperty_ExteriorNaturalVentedCavity_Extensible = {
+  /** Surface Name */
+  surface_name: string;
+};
 
 /**
  * SurfaceProperty:SolarIncidentInside
@@ -9853,8 +10214,24 @@ export interface SurfaceProperty_SurroundingSurfaces {
    */
   ground_temperature_schedule_name?: string;
   /** Repeating group: surrounding_surface_name, surrounding_surface_view_factor, surrounding_surface_temperature_schedule_name */
-  surfaces?: ExtensibleGroup[];
+  surfaces?: SurfaceProperty_SurroundingSurfaces_Extensible[];
 }
+
+/** One repeat of SurfaceProperty:SurroundingSurfaces's `surfaces` group, as `obj.extensible` holds it. */
+export type SurfaceProperty_SurroundingSurfaces_Extensible = {
+  /** Surrounding Surface Name */
+  surrounding_surface_name: string;
+  /**
+   * Surrounding Surface View Factor
+   * Default: 0
+   */
+  surrounding_surface_view_factor: number;
+  /**
+   * Surrounding Surface Temperature Schedule Name
+   * Schedule values are real numbers, -100.0 to 100.0, units C
+   */
+  surrounding_surface_temperature_schedule_name: string;
+};
 
 /**
  * SurfaceProperty:GroundSurfaces
@@ -9863,8 +10240,29 @@ export interface SurfaceProperty_SurroundingSurfaces {
  */
 export interface SurfaceProperty_GroundSurfaces {
   /** Repeating group: ground_surface_name, ground_surface_view_factor, ground_surface_temperature_schedule_name, ground_surface_reflectance_schedule_name */
-  ground_surfaces?: ExtensibleGroup[];
+  ground_surfaces?: SurfaceProperty_GroundSurfaces_Extensible[];
 }
+
+/** One repeat of SurfaceProperty:GroundSurfaces's `ground_surfaces` group, as `obj.extensible` holds it. */
+export type SurfaceProperty_GroundSurfaces_Extensible = {
+  /** Ground Surface Name */
+  ground_surface_name: string;
+  /**
+   * Ground Surface View Factor
+   * Units: dimensionless
+   */
+  ground_surface_view_factor?: number;
+  /**
+   * Ground Surface Temperature Schedule Name
+   * Schedule values are real numbers, -100.0 to 100.0, units C
+   */
+  ground_surface_temperature_schedule_name?: string;
+  /**
+   * Ground Surface Reflectance Schedule Name
+   * Schedule values are fraction, 0.0 to 1.0, units dimensionless
+   */
+  ground_surface_reflectance_schedule_name?: string;
+};
 
 /**
  * ComplexFenestrationProperty:SolarAbsorbedLayers
@@ -9915,8 +10313,21 @@ export interface ZoneProperty_UserViewFactors_BySurfaceName {
    */
   zone_or_zonelist_or_space_or_spacelist_name?: string;
   /** Repeating group: from_surface, to_surface, view_factor */
-  view_factors?: ExtensibleGroup[];
+  view_factors?: ZoneProperty_UserViewFactors_BySurfaceName_Extensible[];
 }
+
+/** One repeat of ZoneProperty:UserViewFactors:BySurfaceName's `view_factors` group, as `obj.extensible` holds it. */
+export type ZoneProperty_UserViewFactors_BySurfaceName_Extensible = {
+  /** From Surface */
+  from_surface?: string;
+  /** To Surface */
+  to_surface?: string;
+  /**
+   * View Factor
+   * This value is the view factor value From Surface => To Surface
+   */
+  view_factor?: number;
+};
 
 /**
  * ZoneMRTCalculation
@@ -9930,8 +10341,19 @@ export interface ZoneMRTCalculation {
    */
   zone_name: string;
   /** Repeating group: people_name, mrt_weighting_factor */
-  people_names?: ExtensibleGroup[];
+  people_names?: ZoneMRTCalculation_Extensible[];
 }
+
+/** One repeat of ZoneMRTCalculation's `people_names` group, as `obj.extensible` holds it. */
+export type ZoneMRTCalculation_Extensible = {
+  /**
+   * People Name
+   * A People object assigned directly to a Space retains its input name. A People object expanded across multiple Spaces must use an expanded instance name formed as "<Space Name> <People Name>"; its original input name is not accepted. People instances in automatically generated remainder Spaces are not supported.
+   */
+  people_name: string;
+  /** MRT Weighting Factor */
+  mrt_weighting_factor: number;
+};
 
 /**
  * GroundHeatTransfer:Control
@@ -11069,8 +11491,19 @@ export interface RoomAir_TemperaturePattern_NondimensionalHeight {
    */
   exhaust_air_offset?: number;
   /** Repeating group: pair_zeta_nondimensional_height, pair_delta_adjacent_air_temperature */
-  pairs?: ExtensibleGroup[];
+  pairs?: RoomAir_TemperaturePattern_NondimensionalHeight_Extensible[];
 }
+
+/** One repeat of RoomAir:TemperaturePattern:NondimensionalHeight's `pairs` group, as `obj.extensible` holds it. */
+export type RoomAir_TemperaturePattern_NondimensionalHeight_Extensible = {
+  /** Pair Zeta Nondimensional Height */
+  pair_zeta_nondimensional_height: number;
+  /**
+   * Pair Delta Adjacent Air Temperature
+   * Units: deltaC
+   */
+  pair_delta_adjacent_air_temperature: number;
+};
 
 /**
  * RoomAir:TemperaturePattern:SurfaceMapping
@@ -11102,8 +11535,19 @@ export interface RoomAir_TemperaturePattern_SurfaceMapping {
    */
   exhaust_air_offset?: number;
   /** Repeating group: surface_name_pair, delta_adjacent_air_temperature_pair */
-  surface_deltas?: ExtensibleGroup[];
+  surface_deltas?: RoomAir_TemperaturePattern_SurfaceMapping_Extensible[];
 }
+
+/** One repeat of RoomAir:TemperaturePattern:SurfaceMapping's `surface_deltas` group, as `obj.extensible` holds it. */
+export type RoomAir_TemperaturePattern_SurfaceMapping_Extensible = {
+  /** Surface Name Pair */
+  surface_name_pair: string;
+  /**
+   * Delta Adjacent Air Temperature Pair
+   * Units: deltaC
+   */
+  delta_adjacent_air_temperature_pair: number;
+};
 
 /**
  * RoomAir:Node
@@ -11469,8 +11913,14 @@ export interface RoomAir_Node_AirflowNetwork {
  */
 export interface RoomAir_Node_AirflowNetwork_AdjacentSurfaceList {
   /** Repeating group: surface_name */
-  surfaces?: ExtensibleGroup[];
+  surfaces?: RoomAir_Node_AirflowNetwork_AdjacentSurfaceList_Extensible[];
 }
+
+/** One repeat of RoomAir:Node:AirflowNetwork:AdjacentSurfaceList's `surfaces` group, as `obj.extensible` holds it. */
+export type RoomAir_Node_AirflowNetwork_AdjacentSurfaceList_Extensible = {
+  /** Surface Name */
+  surface_name?: string;
+};
 
 /**
  * RoomAir:Node:AirflowNetwork:InternalGains
@@ -11479,8 +11929,21 @@ export interface RoomAir_Node_AirflowNetwork_AdjacentSurfaceList {
  */
 export interface RoomAir_Node_AirflowNetwork_InternalGains {
   /** Repeating group: internal_gain_object_type, internal_gain_object_name, fraction_of_gains_to_node */
-  gains?: ExtensibleGroup[];
+  gains?: RoomAir_Node_AirflowNetwork_InternalGains_Extensible[];
 }
+
+/** One repeat of RoomAir:Node:AirflowNetwork:InternalGains's `gains` group, as `obj.extensible` holds it. */
+export type RoomAir_Node_AirflowNetwork_InternalGains_Extensible = {
+  /** Internal Gain Object Type */
+  internal_gain_object_type?: "AirTerminal:SingleDuct:UserDefined" | "Coil:UserDefined" | "DaylightingDevice:Tubular" | "ElectricEquipment" | "ElectricLoadCenter:Inverter:FunctionOfPower" | "ElectricLoadCenter:Inverter:LookUpTable" | "ElectricLoadCenter:Inverter:Simple" | "ElectricLoadCenter:Storage:Battery" | "ElectricLoadCenter:Storage:Converter" | "ElectricLoadCenter:Storage:LiIonNMCBattery" | "ElectricLoadCenter:Storage:Simple" | "ElectricLoadCenter:Transformer" | "GasEquipment" | "Generator:FuelCell" | "Generator:MicroCHP" | "HeaderedPumps:ConstantSpeed" | "HeaderedPumps:VariableSpeed" | "HotWaterEquipment" | "Lights" | "OtherEquipment" | "People" | "Pipe:Indoor" | "PlantComponent:UserDefined" | "Pump:ConstantSpeed" | "Pump:VariableSpeed" | "Pump:VariableSpeed:Condensate" | "Refrigeration:Case" | "Refrigeration:CompressorRack" | "Refrigeration:SecondarySystem:Pipe" | "Refrigeration:SecondarySystem:Receiver" | "Refrigeration:System:Condenser:AirCooled" | "Refrigeration:System:SuctionPipe" | "Refrigeration:TranscriticalSystem:GasCooler:AirCooled" | "Refrigeration:TranscriticalSystem:SuctionPipeLT" | "Refrigeration:TranscriticalSystem:SuctionPipeMT" | "Refrigeration:WalkIn" | "SteamEquipment" | "ThermalStorage:ChilledWater:Mixed" | "ThermalStorage:ChilledWater:Stratified" | "WaterHeater:Mixed" | "WaterHeater:Stratified" | "WaterUse:Equipment" | "ZoneBaseboard:OutdoorTemperatureControlled" | "ZoneContaminantSourceAndSink:CarbonDioxide" | "ZoneContaminantSourceAndSink:GenericContaminant" | "ZoneHVAC:ForcedAir:UserDefined";
+  /** Internal Gain Object Name */
+  internal_gain_object_name?: string;
+  /**
+   * Fraction of Gains to Node
+   * fraction applies to sensible, latent, carbon dioxide, and generic contaminant gains or losses
+   */
+  fraction_of_gains_to_node?: number;
+};
 
 /**
  * RoomAir:Node:AirflowNetwork:HVACEquipment
@@ -11489,8 +11952,23 @@ export interface RoomAir_Node_AirflowNetwork_InternalGains {
  */
 export interface RoomAir_Node_AirflowNetwork_HVACEquipment {
   /** Repeating group: zonehvac_or_air_terminal_equipment_object_type, zonehvac_or_air_terminal_equipment_object_name, fraction_of_output_or_supply_air_from_hvac_equipment, fraction_of_input_or_return_air_to_hvac_equipment */
-  equipment_fractions?: ExtensibleGroup[];
+  equipment_fractions?: RoomAir_Node_AirflowNetwork_HVACEquipment_Extensible[];
 }
+
+/** One repeat of RoomAir:Node:AirflowNetwork:HVACEquipment's `equipment_fractions` group, as `obj.extensible` holds it. */
+export type RoomAir_Node_AirflowNetwork_HVACEquipment_Extensible = {
+  /** ZoneHVAC or Air Terminal Equipment Object Type */
+  zonehvac_or_air_terminal_equipment_object_type?: "AirLoopHVACReturnAir" | "AirTerminal:DualDuct:ConstantVolume" | "AirTerminal:DualDuct:VAV" | "AirTerminal:DualDuct:VAV:OutdoorAir" | "AirTerminal:SingleDuct:ConstantVolume:CooledBeam" | "AirTerminal:SingleDuct:ConstantVolume:FourPipeInduction" | "AirTerminal:SingleDuct:ConstantVolume:NoReheat" | "AirTerminal:SingleDuct:ConstantVolume:Reheat" | "AirTerminal:SingleDuct:ParallelPIU:Reheat" | "AirTerminal:SingleDuct:SeriesPIU:Reheat" | "AirTerminal:SingleDuct:VAV:HeatAndCool:NoReheat" | "AirTerminal:SingleDuct:VAV:HeatAndCool:Reheat" | "AirTerminal:SingleDuct:VAV:NoReheat" | "AirTerminal:SingleDuct:VAV:Reheat" | "AirTerminal:SingleDuct:VAV:Reheat:VariableSpeedFan" | "Fan:ZoneExhaust" | "WaterHeater:HeatPump:PumpedCondenser" | "WaterHeater:HeatPump:WrappedCondenser" | "ZoneHVAC:Baseboard:Convective:Electric" | "ZoneHVAC:Baseboard:Convective:Water" | "ZoneHVAC:Baseboard:RadiantConvective:Electric" | "ZoneHVAC:Baseboard:RadiantConvective:Steam" | "ZoneHVAC:Baseboard:RadiantConvective:Water" | "ZoneHVAC:Dehumidifier:DX" | "ZoneHVAC:EnergyRecoveryVentilator" | "ZoneHVAC:FourPipeFanCoil" | "ZoneHVAC:HighTemperatureRadiant" | "ZoneHVAC:IdealLoadsAirSystem" | "ZoneHVAC:OutdoorAirUnit" | "ZoneHVAC:PackagedTerminalAirConditioner" | "ZoneHVAC:PackagedTerminalHeatPump" | "ZoneHVAC:RefrigerationChillerSet" | "ZoneHVAC:TerminalUnit:VariableRefrigerantFlow" | "ZoneHVAC:UnitHeater" | "ZoneHVAC:UnitVentilator" | "ZoneHVAC:VentilatedSlab" | "ZoneHVAC:WaterToAirHeatPump" | "ZoneHVAC:WindowAirConditioner";
+  /**
+   * ZoneHVAC or Air Terminal Equipment Object Name
+   * for object type AirLoopHVACReturnAir, then enter zone return air node name
+   */
+  zonehvac_or_air_terminal_equipment_object_name?: string;
+  /** Fraction of Output or Supply Air from HVAC Equipment */
+  fraction_of_output_or_supply_air_from_hvac_equipment?: number;
+  /** Fraction of Input or Return Air to HVAC Equipment */
+  fraction_of_input_or_return_air_to_hvac_equipment?: number;
+};
 
 /**
  * RoomAirSettings:AirflowNetwork
@@ -11506,8 +11984,14 @@ export interface RoomAirSettings_AirflowNetwork {
   /** Control Point RoomAirflowNetwork:Node Name */
   control_point_roomairflownetwork_node_name?: string;
   /** Repeating group: roomairflownetwork_node_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: RoomAirSettings_AirflowNetwork_Extensible[];
 }
+
+/** One repeat of RoomAirSettings:AirflowNetwork's `nodes` group, as `obj.extensible` holds it. */
+export type RoomAirSettings_AirflowNetwork_Extensible = {
+  /** RoomAirflowNetwork:Node Name */
+  roomairflownetwork_node_name?: string;
+};
 
 /**
  * People
@@ -11836,8 +12320,16 @@ export interface People_Definition {
  */
 export interface ComfortViewFactorAngles {
   /** Repeating group: surface_name, angle_factor */
-  angles?: ExtensibleGroup[];
+  angles?: ComfortViewFactorAngles_Extensible[];
 }
+
+/** One repeat of ComfortViewFactorAngles's `angles` group, as `obj.extensible` holds it. */
+export type ComfortViewFactorAngles_Extensible = {
+  /** Surface Name */
+  surface_name?: string;
+  /** Angle Factor */
+  angle_factor?: number;
+};
 
 /**
  * Lights
@@ -13540,8 +14032,25 @@ export interface Daylighting_Controls {
    */
   delight_gridding_resolution?: number;
   /** Repeating group: daylighting_reference_point_name, fraction_of_lights_controlled_by_reference_point, illuminance_setpoint_at_reference_point */
-  control_data?: ExtensibleGroup[];
+  control_data?: Daylighting_Controls_Extensible[];
 }
+
+/** One repeat of Daylighting:Controls's `control_data` group, as `obj.extensible` holds it. */
+export type Daylighting_Controls_Extensible = {
+  /** Daylighting Reference Point Name */
+  daylighting_reference_point_name: string;
+  /**
+   * Fraction of Lights Controlled by Reference Point
+   * Default: 1
+   */
+  fraction_of_lights_controlled_by_reference_point?: number;
+  /**
+   * Illuminance Setpoint at Reference Point
+   * Units: lux
+   * Default: 500
+   */
+  illuminance_setpoint_at_reference_point?: number;
+};
 
 /**
  * Daylighting:ReferencePoint
@@ -13636,8 +14145,19 @@ export interface DaylightingDevice_Tubular {
    */
   effective_thermal_resistance?: number;
   /** Repeating group: transition_zone_name, transition_zone_length */
-  transition_lengths?: ExtensibleGroup[];
+  transition_lengths?: DaylightingDevice_Tubular_Extensible[];
 }
+
+/** One repeat of DaylightingDevice:Tubular's `transition_lengths` group, as `obj.extensible` holds it. */
+export type DaylightingDevice_Tubular_Extensible = {
+  /** Transition Zone Name */
+  transition_zone_name?: string;
+  /**
+   * Transition Zone Length
+   * Units: m
+   */
+  transition_zone_length?: number;
+};
 
 /**
  * DaylightingDevice:Shelf
@@ -16541,8 +17061,16 @@ export interface AirflowNetwork_Distribution_DuctViewFactors {
    */
   duct_surface_emittance?: number;
   /** Repeating group: surface_name, surface_view_factor */
-  surfaces?: ExtensibleGroup[];
+  surfaces?: AirflowNetwork_Distribution_DuctViewFactors_Extensible[];
 }
+
+/** One repeat of AirflowNetwork:Distribution:DuctViewFactors's `surfaces` group, as `obj.extensible` holds it. */
+export type AirflowNetwork_Distribution_DuctViewFactors_Extensible = {
+  /** Surface Name */
+  surface_name?: string;
+  /** Surface View Factor */
+  surface_view_factor?: number;
+};
 
 /**
  * AirflowNetwork:Distribution:DuctSizing
@@ -23355,8 +23883,16 @@ export interface DesignSpecification_OutdoorAir {
  */
 export interface DesignSpecification_OutdoorAir_SpaceList {
   /** Repeating group: space_name, space_design_specification_outdoor_air_object_name */
-  space_specs?: ExtensibleGroup[];
+  space_specs?: DesignSpecification_OutdoorAir_SpaceList_Extensible[];
 }
+
+/** One repeat of DesignSpecification:OutdoorAir:SpaceList's `space_specs` group, as `obj.extensible` holds it. */
+export type DesignSpecification_OutdoorAir_SpaceList_Extensible = {
+  /** Space Name */
+  space_name: string;
+  /** Space Design Specification Outdoor Air Object Name */
+  space_design_specification_outdoor_air_object_name: string;
+};
 
 /**
  * DesignSpecification:ZoneAirDistribution
@@ -26098,8 +26634,161 @@ export interface ZoneHVAC_HybridUnitaryHVAC {
    */
   mode_0_supply_air_mass_flow_rate_ratio?: number;
   /** Repeating group: mode_name, mode_supply_air_temperature_lookup_table_name, mode_supply_air_humidity_ratio_lookup_table_name, mode_system_electric_power_lookup_table_name, mode_supply_fan_electric_power_lookup_table_name, mode_external_static_pressure_lookup_table_name, mode_system_second_fuel_consumption_lookup_table_name, mode_system_third_fuel_consumption_lookup_table_name, mode_system_water_use_lookup_table_name, mode_minimum_outdoor_air_temperature, mode_maximum_outdoor_air_temperature, mode_minimum_outdoor_air_humidity_ratio, mode_maximum_outdoor_air_humidity_ratio, mode_minimum_outdoor_air_relative_humidity, mode_maximum_outdoor_air_relative_humidity, mode_minimum_return_air_temperature, mode_maximum_return_air_temperature, mode_minimum_return_air_humidity_ratio, mode_maximum_return_air_humidity_ratio, mode_minimum_return_air_relative_humidity, mode_maximum_return_air_relative_humidity, mode_minimum_outdoor_air_fraction, mode_maximum_outdoor_air_fraction, mode_minimum_supply_air_mass_flow_rate_ratio, mode_maximum_supply_air_mass_flow_rate_ratio */
-  modes?: ExtensibleGroup[];
+  modes?: ZoneHVAC_HybridUnitaryHVAC_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:HybridUnitaryHVAC's `modes` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_HybridUnitaryHVAC_Extensible = {
+  /**
+   * Mode Name
+   * Enter a name for Mode 1.
+   */
+  mode_name?: string;
+  /**
+   * Mode Supply Air Temperature Lookup Table Name
+   * Enter the name of the Supply Air Temperature Lookup Table for Mode 1. Units for lookup table values should be in C. If this field is blank, Mode 1 will not be considered for any time step that requires ventilation, heating, cooling, humidification, or dehumidification.
+   */
+  mode_supply_air_temperature_lookup_table_name?: string;
+  /**
+   * Mode Supply Air Humidity Ratio Lookup Table Name
+   * Enter the name of the Supply Air Humidity Ratio Lookup Table for Mode 1. Units for lookup table values should be in kgWater/kgDryAir. If this field is blank, Mode 1 will not be considered for any time step that requires ventilation, heating, cooling, humidification, or dehumidification.
+   */
+  mode_supply_air_humidity_ratio_lookup_table_name?: string;
+  /**
+   * Mode System Electric Power Lookup Table Name
+   * Enter the name of the Electric Power Lookup Table for Mode 1. Units for lookup table values should be in W. If this field is blank, Mode 1 does not use electricity
+   */
+  mode_system_electric_power_lookup_table_name?: string;
+  /**
+   * Mode Supply Fan Electric Power Lookup Table Name
+   * Enter the name of the Supply Fan Electric Power Lookup Table for Mode 1. Units for lookup table values should be in W. If this field is blank, Mode 1 does not use electricity for supply fan.
+   */
+  mode_supply_fan_electric_power_lookup_table_name?: string;
+  /**
+   * Mode External Static Pressure Lookup Table Name
+   * Enter the name of the External Static Pressure Lookup Table for Mode 1. Units for lookup table values should be in Pa. If this field is blank, external static pressure will not be reported for Mode 1.
+   */
+  mode_external_static_pressure_lookup_table_name?: string;
+  /**
+   * Mode System Second Fuel Consumption Lookup Table Name
+   * Enter the name of the System Second Fuel Consumption Lookup Table for Mode 1. Units for lookup table values should be in W. If this field is blank, Mode 1 does not consume a second fuel.
+   */
+  mode_system_second_fuel_consumption_lookup_table_name?: string;
+  /**
+   * Mode System Third Fuel Consumption Lookup Table Name
+   * Enter the name of the System Third Fuel Consumption Lookup Table for Mode 1. Units for lookup table values should be in W. If this field is blank, Mode 1 does not consume a third fuel.
+   */
+  mode_system_third_fuel_consumption_lookup_table_name?: string;
+  /**
+   * Mode System Water Use Lookup Table Name
+   * Enter the name of the System Water Use Lookup Table for Mode 1. Units for lookup table values should be in kg/s. If this field is blank, Mode 1 does not consume water.
+   */
+  mode_system_water_use_lookup_table_name?: string;
+  /**
+   * Mode Minimum Outdoor Air Temperature
+   * Enter the minimum outdoor air temperature allowed for Mode 1. Mode 1 will not be considered when outdoor air temperature is below the value in this field. If this field is blank, there will be no lower constraint on outdoor air temperature.
+   * Units: C
+   */
+  mode_minimum_outdoor_air_temperature?: number;
+  /**
+   * Mode Maximum Outdoor Air Temperature
+   * Enter the maximum outdoor air temperature allowed for Mode 1. Mode 1 will not be considered wen outdoor air temperature is above the value in this field. If this field is blank, there will be no upper constraint on outdoor air temperature.
+   * Units: C
+   */
+  mode_maximum_outdoor_air_temperature?: number;
+  /**
+   * Mode Minimum Outdoor Air Humidity Ratio
+   * Enter the minimum outdoor humidity ratio allowed for Mode 1. Mode 1 will not be considered when outdoor air absolute humidity is below the value in this field. If this field is blank, the lower constraint on outdoor air humidity ratio will be 0.00 kgWater/kgDryAir.
+   * Units: kgWater/kgDryAir
+   * Default: 0
+   */
+  mode_minimum_outdoor_air_humidity_ratio?: number;
+  /**
+   * Mode Maximum Outdoor Air Humidity Ratio
+   * Enter the maximum outdoor air humidity ratio allowed for Mode 1. Mode 1 will not be considered when outdoor air humidity ratio is above the value in this field. If this field is blank, the upper constraint on outdoor air humidity ratio will be 0.10 kgWater/kgDryAir.
+   * Units: kgWater/kgDryAir
+   * Default: 0.1
+   */
+  mode_maximum_outdoor_air_humidity_ratio?: number;
+  /**
+   * Mode Minimum Outdoor Air Relative Humidity
+   * Enter the minimum outdoor relative humidity allowed for Mode 1. Mode 1 will not be considered when the outdoor air relative humidity is below the value in this field. If this field is blank, the lower constraint on outdoor air relative humidity will be 0.00%.
+   * Units: percent
+   * Default: 0
+   */
+  mode_minimum_outdoor_air_relative_humidity?: number;
+  /**
+   * Mode Maximum Outdoor Air Relative Humidity
+   * Enter the maximum outdoor air relative humidity allowed for Mode 1. Relative humidity as percent from 0.00 to 100.00. Mode 1 will not be considered when the outdoor air relative humidity is above the value in this field. If this field is blank, the upper constraint on outdoor air relative humidity will be 100.00%.
+   * Units: percent
+   * Default: 100
+   */
+  mode_maximum_outdoor_air_relative_humidity?: number;
+  /**
+   * Mode Minimum Return Air Temperature
+   * Enter the minimum return air temperature allowed for Mode 1. Mode 1 will not be considered when the return air temperature is below the value in this field. If this field is blank, there will be no lower constraint on return air temperature.
+   * Units: C
+   */
+  mode_minimum_return_air_temperature?: number;
+  /**
+   * Mode Maximum Return Air Temperature
+   * Enter the maximum return air temperature allowed for Mode 1. Mode 1 will not be considered when the return air temperature is above the value in this field. If this field is blank, there will be no upper constraint on return air temperature.
+   * Units: C
+   */
+  mode_maximum_return_air_temperature?: number;
+  /**
+   * Mode Minimum Return Air Humidity Ratio
+   * Enter the minimum return air humidity ratio allowed for Mode 1. Mode 1 will not be considered when the return air humidity ratio is below the value in this field. If this field is blank, the lower constraint on return air humidity ratio will be 0.00 kgWater/kgDryAir.
+   * Units: kgWater/kgDryAir
+   * Default: 0
+   */
+  mode_minimum_return_air_humidity_ratio?: number;
+  /**
+   * Mode Maximum Return Air Humidity Ratio
+   * Enter the maximum return air humidity ratio allowed for Mode 1. Mode 1 will not be considered when the return air humidity ratio is above the value in this field. If this field is blank, the upper constraint on return air humidity ratio will be 0.10 kgWater/kgDryAir.
+   * Units: kgWater/kgDryAir
+   * Default: 0.1
+   */
+  mode_maximum_return_air_humidity_ratio?: number;
+  /**
+   * Mode Minimum Return Air Relative Humidity
+   * Enter the minimum return air relative humidity allowed for Mode 1. Relative humidity as percent from 0.00 to 100.00. Mode 1 will not be considered when the return air relative humidity is below the value in this field. If this field is blank, the lower constraint on return air relative humidity will be 0.00%.
+   * Units: percent
+   * Default: 0
+   */
+  mode_minimum_return_air_relative_humidity?: number;
+  /**
+   * Mode Maximum Return Air Relative Humidity
+   * Enter the maximum return air relative humidity allowed for Mode 1. Relative humidity as percent from 0.00 to 100.00. Mode 1 will not be considered when the return air relative humidity is above the value in this field. If this field is blank, the upper constraint on return air relative humidity will be 100%.
+   * Units: percent
+   * Default: 100
+   */
+  mode_maximum_return_air_relative_humidity?: number;
+  /**
+   * Mode Minimum Outdoor Air Fraction
+   * Enter the minimum outdoor air fraction allowed for Mode 1. Outdoor air fractions below this value will not be considered for operation in Mode 1. If this field is blank, the lower constraint on outdoor air fraction will be 0.00.
+   * Default: 0.1
+   */
+  mode_minimum_outdoor_air_fraction?: number;
+  /**
+   * Mode Maximum Outdoor Air Fraction
+   * Enter the maximum outdoor air fraction allowed for Mode 1. Outdoor air fractions above this value will not be considered for operation in Mode 1. If this field is blank, the upper constraint on outdoor air fraction will be 1.00.
+   * Default: 1
+   */
+  mode_maximum_outdoor_air_fraction?: number;
+  /**
+   * Mode Minimum Supply Air Mass Flow Rate Ratio
+   * Enter the minimum supply air mass flow rate ratio allowed for Mode 1. Supply air mass flow rate ratios below this value will not be considered for operation in Mode 1. Supply air mass flow rate ratio describes supply air mass flow rate as a fraction of mass flow rate associated with the value in field: "System Maximum Supply Air Flow Rate". If this field is blank, the lower constraint on supply air mass flow rate ratio will be 0.10.
+   * Default: 0.1
+   */
+  mode_minimum_supply_air_mass_flow_rate_ratio?: number;
+  /**
+   * Mode Maximum Supply Air Mass Flow Rate Ratio
+   * Enter the maximum supply air mass flow rate ratio allowed for Mode 1. Supply air mass flow rate ratios above this value will not be considered for operation in Mode 1. Supply air mass flow rate ratio describes supply air flow rate as a fraction of the value in field: "System Maximum Supply Air Flow Rate". If this field is blank, there upper constraint on supply air mass flow rate ratio will be 1.00.
+   * Default: 1
+   */
+  mode_maximum_supply_air_mass_flow_rate_ratio?: number;
+};
 
 /**
  * ZoneHVAC:OutdoorAirUnit
@@ -26480,8 +27169,19 @@ export interface ZoneHVAC_Baseboard_RadiantConvective_Water {
    */
   maximum_water_flow_rate: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: surface_name, fraction_of_radiant_energy_to_surface */
-  surface_fractions?: ExtensibleGroup[];
+  surface_fractions?: ZoneHVAC_Baseboard_RadiantConvective_Water_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:Baseboard:RadiantConvective:Water's `surface_fractions` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_Baseboard_RadiantConvective_Water_Extensible = {
+  /**
+   * Surface Name
+   * Radiant energy may be distributed to specific surfaces
+   */
+  surface_name?: string;
+  /** Fraction of Radiant Energy to Surface */
+  fraction_of_radiant_energy_to_surface?: number;
+};
 
 /**
  * ZoneHVAC:Baseboard:RadiantConvective:Steam:Design
@@ -26553,8 +27253,19 @@ export interface ZoneHVAC_Baseboard_RadiantConvective_Steam {
    */
   maximum_steam_flow_rate: number | 'Autosize' | 'Autocalculate';
   /** Repeating group: surface_name, fraction_of_radiant_energy_to_surface */
-  surface_fractions?: ExtensibleGroup[];
+  surface_fractions?: ZoneHVAC_Baseboard_RadiantConvective_Steam_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:Baseboard:RadiantConvective:Steam's `surface_fractions` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_Baseboard_RadiantConvective_Steam_Extensible = {
+  /**
+   * Surface Name
+   * Radiant energy may be distributed to specific surfaces
+   */
+  surface_name?: string;
+  /** Fraction of Radiant Energy to Surface */
+  fraction_of_radiant_energy_to_surface?: number;
+};
 
 /**
  * ZoneHVAC:Baseboard:RadiantConvective:Electric
@@ -26602,8 +27313,19 @@ export interface ZoneHVAC_Baseboard_RadiantConvective_Electric {
   /** Fraction of Radiant Energy Incident on People */
   fraction_of_radiant_energy_incident_on_people?: number;
   /** Repeating group: surface_name, fraction_of_radiant_energy_to_surface */
-  surface_fractions?: ExtensibleGroup[];
+  surface_fractions?: ZoneHVAC_Baseboard_RadiantConvective_Electric_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:Baseboard:RadiantConvective:Electric's `surface_fractions` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_Baseboard_RadiantConvective_Electric_Extensible = {
+  /**
+   * Surface Name
+   * Radiant energy may be distributed to specific surfaces
+   */
+  surface_name?: string;
+  /** Fraction of Radiant Energy to Surface */
+  fraction_of_radiant_energy_to_surface?: number;
+};
 
 /**
  * ZoneHVAC:CoolingPanel:RadiantConvective:Water
@@ -26693,8 +27415,19 @@ export interface ZoneHVAC_CoolingPanel_RadiantConvective_Water {
   /** Fraction of Radiant Energy Incident on People */
   fraction_of_radiant_energy_incident_on_people?: number;
   /** Repeating group: surface_name, fraction_of_radiant_energy_to_surface */
-  surface_fractions?: ExtensibleGroup[];
+  surface_fractions?: ZoneHVAC_CoolingPanel_RadiantConvective_Water_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:CoolingPanel:RadiantConvective:Water's `surface_fractions` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_CoolingPanel_RadiantConvective_Water_Extensible = {
+  /**
+   * Surface Name
+   * Radiant energy may be distributed to specific surfaces
+   */
+  surface_name?: string;
+  /** Fraction of Radiant Energy to Surface */
+  fraction_of_radiant_energy_to_surface?: number;
+};
 
 /**
  * ZoneHVAC:Baseboard:Convective:Water
@@ -27221,8 +27954,16 @@ export interface ZoneHVAC_LowTemperatureRadiant_Electric {
  */
 export interface ZoneHVAC_LowTemperatureRadiant_SurfaceGroup {
   /** Repeating group: surface_name, flow_fraction_for_surface */
-  surface_fractions?: ExtensibleGroup[];
+  surface_fractions?: ZoneHVAC_LowTemperatureRadiant_SurfaceGroup_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:LowTemperatureRadiant:SurfaceGroup's `surface_fractions` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_LowTemperatureRadiant_SurfaceGroup_Extensible = {
+  /** Surface Name */
+  surface_name: string;
+  /** Flow Fraction for Surface */
+  flow_fraction_for_surface: number;
+};
 
 /**
  * ZoneHVAC:HighTemperatureRadiant
@@ -27316,8 +28057,19 @@ export interface ZoneHVAC_HighTemperatureRadiant {
    */
   fraction_of_radiant_energy_incident_on_people?: number;
   /** Repeating group: surface_name, fraction_of_radiant_energy_to_surface */
-  surface_fractions?: ExtensibleGroup[];
+  surface_fractions?: ZoneHVAC_HighTemperatureRadiant_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:HighTemperatureRadiant's `surface_fractions` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_HighTemperatureRadiant_Extensible = {
+  /**
+   * Surface Name
+   * Radiant energy may be distributed to specific surfaces
+   */
+  surface_name?: string;
+  /** Fraction of Radiant Energy to Surface */
+  fraction_of_radiant_energy_to_surface?: number;
+};
 
 /**
  * ZoneHVAC:VentilatedSlab
@@ -27488,8 +28240,32 @@ export interface ZoneHVAC_VentilatedSlab {
  */
 export interface ZoneHVAC_VentilatedSlab_SlabGroup {
   /** Repeating group: zone_name, surface_name, core_diameter_for_surface, core_length_for_surface, core_numbers_for_surface, slab_inlet_node_name_for_surface, slab_outlet_node_name_for_surface */
-  data?: ExtensibleGroup[];
+  data?: ZoneHVAC_VentilatedSlab_SlabGroup_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:VentilatedSlab:SlabGroup's `data` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_VentilatedSlab_SlabGroup_Extensible = {
+  /** Zone Name */
+  zone_name: string;
+  /** Surface Name */
+  surface_name: string;
+  /**
+   * Core Diameter for Surface
+   * Units: m
+   */
+  core_diameter_for_surface: number;
+  /**
+   * Core Length for Surface
+   * Units: m
+   */
+  core_length_for_surface: number;
+  /** Core Numbers for Surface */
+  core_numbers_for_surface: number;
+  /** Slab Inlet Node Name for Surface */
+  slab_inlet_node_name_for_surface: string;
+  /** Slab Outlet Node Name for Surface */
+  slab_outlet_node_name_for_surface: string;
+};
 
 /**
  * AirTerminal:SingleDuct:ConstantVolume:Reheat
@@ -28745,8 +29521,36 @@ export interface ZoneHVAC_EquipmentList {
    */
   load_distribution_scheme?: "SequentialLoad" | "SequentialUniformPLR" | "UniformLoad" | "UniformPLR";
   /** Repeating group: zone_equipment_object_type, zone_equipment_name, zone_equipment_cooling_sequence, zone_equipment_heating_or_no_load_sequence, zone_equipment_sequential_cooling_fraction_schedule_name, zone_equipment_sequential_heating_fraction_schedule_name */
-  equipment?: ExtensibleGroup[];
+  equipment?: ZoneHVAC_EquipmentList_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:EquipmentList's `equipment` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_EquipmentList_Extensible = {
+  /** Zone Equipment Object Type */
+  zone_equipment_object_type: "AirLoopHVAC:UnitarySystem" | "Fan:ZoneExhaust" | "HeatExchanger:AirToAir:FlatPlate" | "WaterHeater:HeatPump:PumpedCondenser" | "WaterHeater:HeatPump:WrappedCondenser" | "ZoneHVAC:AirDistributionUnit" | "ZoneHVAC:Baseboard:Convective:Electric" | "ZoneHVAC:Baseboard:Convective:Water" | "ZoneHVAC:Baseboard:RadiantConvective:Electric" | "ZoneHVAC:Baseboard:RadiantConvective:Steam" | "ZoneHVAC:Baseboard:RadiantConvective:Water" | "ZoneHVAC:CoolingPanel:RadiantConvective:Water" | "ZoneHVAC:Dehumidifier:DX" | "ZoneHVAC:EnergyRecoveryVentilator" | "ZoneHVAC:EvaporativeCoolerUnit" | "ZoneHVAC:ForcedAir:UserDefined" | "ZoneHVAC:FourPipeFanCoil" | "ZoneHVAC:HighTemperatureRadiant" | "ZoneHVAC:HybridUnitaryHVAC" | "ZoneHVAC:IdealLoadsAirSystem" | "ZoneHVAC:LowTemperatureRadiant:ConstantFlow" | "ZoneHVAC:LowTemperatureRadiant:Electric" | "ZoneHVAC:LowTemperatureRadiant:VariableFlow" | "ZoneHVAC:OutdoorAirUnit" | "ZoneHVAC:PackagedTerminalAirConditioner" | "ZoneHVAC:PackagedTerminalHeatPump" | "ZoneHVAC:RefrigerationChillerSet" | "ZoneHVAC:TerminalUnit:VariableRefrigerantFlow" | "ZoneHVAC:UnitHeater" | "ZoneHVAC:UnitVentilator" | "ZoneHVAC:VentilatedSlab" | "ZoneHVAC:WaterToAirHeatPump" | "ZoneHVAC:WindowAirConditioner";
+  /** Zone Equipment Name */
+  zone_equipment_name: string;
+  /**
+   * Zone Equipment Cooling Sequence
+   * Specifies the zone equipment simulation order when the zone thermostat requests cooling
+   */
+  zone_equipment_cooling_sequence: number;
+  /**
+   * Zone Equipment Heating or No-Load Sequence
+   * Specifies the zone equipment simulation order when the zone thermostat requests heating or no load
+   */
+  zone_equipment_heating_or_no_load_sequence: number;
+  /**
+   * Zone Equipment Sequential Cooling Fraction Schedule Name
+   * The fraction of the remaining cooling load this equipment will attempt to serve if the load distribution scheme is SequentialLoad, otherwise ignored.
+   */
+  zone_equipment_sequential_cooling_fraction_schedule_name?: string;
+  /**
+   * Zone Equipment Sequential Heating Fraction Schedule Name
+   * The fraction of the remaining heating load this equipment will attempt to serve if the load distribution scheme is SequentialLoad, otherwise ignored.
+   */
+  zone_equipment_sequential_heating_fraction_schedule_name?: string;
+};
 
 /**
  * ZoneHVAC:EquipmentConnections
@@ -28847,8 +29651,26 @@ export interface SpaceHVAC_ZoneEquipmentSplitter {
    */
   space_fraction_method?: "DesignCoolingLoad" | "DesignHeatingLoad" | "FloorArea" | "PerimeterLength" | "Volume";
   /** Repeating group: space_name, space_fraction, space_supply_node_name */
-  spaces?: ExtensibleGroup[];
+  spaces?: SpaceHVAC_ZoneEquipmentSplitter_Extensible[];
 }
+
+/** One repeat of SpaceHVAC:ZoneEquipmentSplitter's `spaces` group, as `obj.extensible` holds it. */
+export type SpaceHVAC_ZoneEquipmentSplitter_Extensible = {
+  /** Space Name */
+  space_name: string;
+  /**
+   * Space Fraction
+   * Fraction of this zone equipment output or airflow distributed to this space.
+   * Units: dimensionless
+   * Default: "Autosize"
+   */
+  space_fraction?: number | 'Autosize' | 'Autocalculate';
+  /**
+   * Space Supply Node Name
+   * Only used for airflow equipment Matches a SpaceHVAC:EquipmentConnections Inlet Node Name
+   */
+  space_supply_node_name?: string;
+};
 
 /**
  * SpaceHVAC:ZoneEquipmentMixer
@@ -28873,8 +29695,26 @@ export interface SpaceHVAC_ZoneEquipmentMixer {
    */
   space_fraction_method?: "DesignCoolingLoad" | "DesignHeatingLoad" | "FloorArea" | "PerimeterLength" | "Volume";
   /** Repeating group: space_name, space_fraction, space_node_name */
-  spaces?: ExtensibleGroup[];
+  spaces?: SpaceHVAC_ZoneEquipmentMixer_Extensible[];
 }
+
+/** One repeat of SpaceHVAC:ZoneEquipmentMixer's `spaces` group, as `obj.extensible` holds it. */
+export type SpaceHVAC_ZoneEquipmentMixer_Extensible = {
+  /** Space Name */
+  space_name: string;
+  /**
+   * Space Fraction
+   * Fraction of the Zone Equipment Inlet Node airflow drawn from this space.
+   * Units: dimensionless
+   * Default: "Autosize"
+   */
+  space_fraction?: number | 'Autosize' | 'Autocalculate';
+  /**
+   * Space Node Name
+   * Matches a SpaceHVAC:EquipmentConnections Exhaust Node Name
+   */
+  space_node_name: string;
+};
 
 /**
  * SpaceHVAC:ZoneReturnMixer
@@ -28893,8 +29733,19 @@ export interface SpaceHVAC_ZoneReturnMixer {
    */
   zone_return_air_node_name: string;
   /** Repeating group: space_name, space_return_air_node_name */
-  spaces?: ExtensibleGroup[];
+  spaces?: SpaceHVAC_ZoneReturnMixer_Extensible[];
 }
+
+/** One repeat of SpaceHVAC:ZoneReturnMixer's `spaces` group, as `obj.extensible` holds it. */
+export type SpaceHVAC_ZoneReturnMixer_Extensible = {
+  /** Space Name */
+  space_name: string;
+  /**
+   * Space Return Air Node Name
+   * Matches a SpaceHVAC:EquipmentConnections Return Air Node Name
+   */
+  space_return_air_node_name: string;
+};
 
 /**
  * Fan:SystemModel
@@ -29009,8 +29860,19 @@ export interface Fan_SystemModel {
    */
   number_of_speeds?: number;
   /** Repeating group: speed_flow_fraction, speed_electric_power_fraction */
-  speed_fractions?: ExtensibleGroup[];
+  speed_fractions?: Fan_SystemModel_Extensible[];
 }
+
+/** One repeat of Fan:SystemModel's `speed_fractions` group, as `obj.extensible` holds it. */
+export type Fan_SystemModel_Extensible = {
+  /** Speed Flow Fraction */
+  speed_flow_fraction?: number;
+  /**
+   * Speed Electric Power Fraction
+   * if left blank then use Electric Power Function of Flow Fraction Curve
+   */
+  speed_electric_power_fraction?: number;
+};
 
 /**
  * Fan:ConstantVolume
@@ -39313,8 +40175,22 @@ export interface UnitarySystemPerformance_Multispeed {
    */
   no_load_supply_air_flow_rate_ratio?: number;
   /** Repeating group: heating_speed_supply_air_flow_ratio, cooling_speed_supply_air_flow_ratio */
-  flow_ratios?: ExtensibleGroup[];
+  flow_ratios?: UnitarySystemPerformance_Multispeed_Extensible[];
 }
+
+/** One repeat of UnitarySystemPerformance:Multispeed's `flow_ratios` group, as `obj.extensible` holds it. */
+export type UnitarySystemPerformance_Multispeed_Extensible = {
+  /**
+   * Heating Speed Supply Air Flow Ratio
+   * Used only for Multi speed coils Enter the lowest operating supply air flow ratio during heating operation or specify autosize. This value is the ratio of air flow at this speed to the maximum air flow rate.
+   */
+  heating_speed_supply_air_flow_ratio: number | 'Autosize' | 'Autocalculate';
+  /**
+   * Cooling Speed Supply Air Flow Ratio
+   * Used only for Multi speed coils Enter the lowest operating supply air flow ratio during cooling operation or specify autosize. This value is the ratio of air flow at this speed to the maximum air flow rate.
+   */
+  cooling_speed_supply_air_flow_ratio: number | 'Autosize' | 'Autocalculate';
+};
 
 /**
  * AirLoopHVAC:Unitary:Furnace:HeatOnly
@@ -40908,8 +41784,22 @@ export interface AirConditioner_VariableRefrigerantFlow_FluidTemperatureControl 
    */
   number_of_compressor_loading_index_entries?: number;
   /** Repeating group: compressor_speed_at_loading_index, loading_index_evaporative_capacity_multiplier_function_of_temperature_curve_name, loading_index_compressor_power_multiplier_function_of_temperature_curve_name */
-  loading_indices?: ExtensibleGroup[];
+  loading_indices?: AirConditioner_VariableRefrigerantFlow_FluidTemperatureControl_Extensible[];
 }
+
+/** One repeat of AirConditioner:VariableRefrigerantFlow:FluidTemperatureControl's `loading_indices` group, as `obj.extensible` holds it. */
+export type AirConditioner_VariableRefrigerantFlow_FluidTemperatureControl_Extensible = {
+  /**
+   * Compressor Speed at Loading Index
+   * Minimum compressor speed
+   * Units: rev/min
+   */
+  compressor_speed_at_loading_index: number;
+  /** Loading Index Evaporative Capacity Multiplier Function of Temperature Curve Name */
+  loading_index_evaporative_capacity_multiplier_function_of_temperature_curve_name: string;
+  /** Loading Index Compressor Power Multiplier Function of Temperature Curve Name */
+  loading_index_compressor_power_multiplier_function_of_temperature_curve_name: string;
+};
 
 /**
  * AirConditioner:VariableRefrigerantFlow:FluidTemperatureControl:HR
@@ -41285,8 +42175,22 @@ export interface AirConditioner_VariableRefrigerantFlow_FluidTemperatureControl_
    */
   number_of_compressor_loading_index_entries?: number;
   /** Repeating group: compressor_speed_at_loading_index, loading_index_evaporative_capacity_multiplier_function_of_temperature_curve_name, loading_index_compressor_power_multiplier_function_of_temperature_curve_name */
-  loading_indices?: ExtensibleGroup[];
+  loading_indices?: AirConditioner_VariableRefrigerantFlow_FluidTemperatureControl_HR_Extensible[];
 }
+
+/** One repeat of AirConditioner:VariableRefrigerantFlow:FluidTemperatureControl:HR's `loading_indices` group, as `obj.extensible` holds it. */
+export type AirConditioner_VariableRefrigerantFlow_FluidTemperatureControl_HR_Extensible = {
+  /**
+   * Compressor Speed at Loading Index
+   * Minimum compressor speed
+   * Units: rev/min
+   */
+  compressor_speed_at_loading_index: number;
+  /** Loading Index Evaporative Capacity Multiplier Function of Temperature Curve Name */
+  loading_index_evaporative_capacity_multiplier_function_of_temperature_curve_name: string;
+  /** Loading Index Compressor Power Multiplier Function of Temperature Curve Name */
+  loading_index_compressor_power_multiplier_function_of_temperature_curve_name: string;
+};
 
 /**
  * ZoneTerminalUnitList
@@ -41297,8 +42201,14 @@ export interface ZoneTerminalUnitList {
   /** Zone Terminal Unit List Name */
   zone_terminal_unit_list_name: string;
   /** Repeating group: zone_terminal_unit_name */
-  terminal_units?: ExtensibleGroup[];
+  terminal_units?: ZoneTerminalUnitList_Extensible[];
 }
+
+/** One repeat of ZoneTerminalUnitList's `terminal_units` group, as `obj.extensible` holds it. */
+export type ZoneTerminalUnitList_Extensible = {
+  /** Zone Terminal Unit Name */
+  zone_terminal_unit_name: string;
+};
 
 /**
  * Controller:WaterCoil
@@ -41509,8 +42419,27 @@ export interface Controller_MechanicalVentilation {
    */
   zone_maximum_outdoor_air_fraction?: number;
   /** Repeating group: zone_or_zonelist_name, design_specification_outdoor_air_object_name, design_specification_zone_air_distribution_object_name */
-  zone_specifications?: ExtensibleGroup[];
+  zone_specifications?: Controller_MechanicalVentilation_Extensible[];
 }
+
+/** One repeat of Controller:MechanicalVentilation's `zone_specifications` group, as `obj.extensible` holds it. */
+export type Controller_MechanicalVentilation_Extensible = {
+  /**
+   * Zone or ZoneList Name
+   * A zone name or a zone list name may be used here
+   */
+  zone_or_zonelist_name: string;
+  /**
+   * Design Specification Outdoor Air Object Name
+   * Specify the name of a DesignSpecification:OutdoorAir object to specify one set of requirements for the Zone. Use a DesignSpecification:OutdoorAir:SpaceList object name to specify different requirements for Spaces within the Zone. If left blank, the name will be taken from the Sizing:Zone object for this zone. If no specification is found for this zone, then the default of 0.00944 m3/s-person will be used.
+   */
+  design_specification_outdoor_air_object_name?: string;
+  /**
+   * Design Specification Zone Air Distribution Object Name
+   * If left blank, the name will be taken from the Sizing:Zone object for this zone. If no specification is found for this zone, then effectiveness will be 1.0 and and secondary recirculation will be zero.
+   */
+  design_specification_zone_air_distribution_object_name?: string;
+};
 
 /**
  * AirLoopHVAC:ControllerList
@@ -41711,8 +42640,14 @@ export interface AirLoopHVAC_ZoneSplitter {
   /** Inlet Node Name */
   inlet_node_name: string;
   /** Repeating group: outlet_node_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: AirLoopHVAC_ZoneSplitter_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:ZoneSplitter's `nodes` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_ZoneSplitter_Extensible = {
+  /** Outlet Node Name */
+  outlet_node_name: string;
+};
 
 /**
  * AirLoopHVAC:SupplyPlenum
@@ -41727,8 +42662,14 @@ export interface AirLoopHVAC_SupplyPlenum {
   /** Inlet Node Name */
   inlet_node_name: string;
   /** Repeating group: outlet_node_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: AirLoopHVAC_SupplyPlenum_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:SupplyPlenum's `nodes` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_SupplyPlenum_Extensible = {
+  /** Outlet Node Name */
+  outlet_node_name: string;
+};
 
 /**
  * AirLoopHVAC:SupplyPath
@@ -41739,8 +42680,19 @@ export interface AirLoopHVAC_SupplyPath {
   /** Supply Air Path Inlet Node Name */
   supply_air_path_inlet_node_name: string;
   /** Repeating group: component_object_type, component_name */
-  components?: ExtensibleGroup[];
+  components?: AirLoopHVAC_SupplyPath_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:SupplyPath's `components` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_SupplyPath_Extensible = {
+  /**
+   * Component Object Type
+   * Supply path components must be listed in flow order.
+   */
+  component_object_type: "AirLoopHVAC:SupplyPlenum" | "AirLoopHVAC:ZoneSplitter";
+  /** Component Name */
+  component_name: string;
+};
 
 /**
  * AirLoopHVAC:ZoneMixer
@@ -41751,8 +42703,14 @@ export interface AirLoopHVAC_ZoneMixer {
   /** Outlet Node Name */
   outlet_node_name: string;
   /** Repeating group: inlet_node_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: AirLoopHVAC_ZoneMixer_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:ZoneMixer's `nodes` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_ZoneMixer_Extensible = {
+  /** Inlet Node Name */
+  inlet_node_name: string;
+};
 
 /**
  * AirLoopHVAC:ReturnPlenum
@@ -41769,8 +42727,14 @@ export interface AirLoopHVAC_ReturnPlenum {
   /** Induced Air Outlet Node or NodeList Name */
   induced_air_outlet_node_or_nodelist_name?: string;
   /** Repeating group: inlet_node_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: AirLoopHVAC_ReturnPlenum_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:ReturnPlenum's `nodes` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_ReturnPlenum_Extensible = {
+  /** Inlet Node Name */
+  inlet_node_name: string;
+};
 
 /**
  * AirLoopHVAC:ReturnPath
@@ -41781,8 +42745,16 @@ export interface AirLoopHVAC_ReturnPath {
   /** Return Air Path Outlet Node Name */
   return_air_path_outlet_node_name: string;
   /** Repeating group: component_object_type, component_name */
-  components?: ExtensibleGroup[];
+  components?: AirLoopHVAC_ReturnPath_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:ReturnPath's `components` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_ReturnPath_Extensible = {
+  /** Component Object Type */
+  component_object_type: "AirLoopHVAC:ReturnPlenum" | "AirLoopHVAC:ZoneMixer";
+  /** Component Name */
+  component_name: string;
+};
 
 /**
  * AirLoopHVAC:ExhaustSystem
@@ -41853,8 +42825,17 @@ export interface AirLoopHVAC_DedicatedOutdoorAirSystem {
    */
   number_of_airloophvac: number;
   /** Repeating group: airloophvac_name */
-  airloophvacs?: ExtensibleGroup[];
+  airloophvacs?: AirLoopHVAC_DedicatedOutdoorAirSystem_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:DedicatedOutdoorAirSystem's `airloophvacs` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_DedicatedOutdoorAirSystem_Extensible = {
+  /**
+   * AirLoopHVAC Name
+   * The rest of fields are extensible. It requires AirLoopHVAC names served by an AirLoopHVAC:DedicatedOutdoorAirSystem.
+   */
+  airloophvac_name?: string;
+};
 
 /**
  * AirLoopHVAC:Mixer
@@ -41865,8 +42846,14 @@ export interface AirLoopHVAC_Mixer {
   /** Outlet Node Name */
   outlet_node_name: string;
   /** Repeating group: inlet_node_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: AirLoopHVAC_Mixer_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:Mixer's `nodes` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_Mixer_Extensible = {
+  /** Inlet Node Name */
+  inlet_node_name: string;
+};
 
 /**
  * AirLoopHVAC:Splitter
@@ -41877,8 +42864,14 @@ export interface AirLoopHVAC_Splitter {
   /** Inlet Node Name */
   inlet_node_name: string;
   /** Repeating group: outlet_node_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: AirLoopHVAC_Splitter_Extensible[];
 }
+
+/** One repeat of AirLoopHVAC:Splitter's `nodes` group, as `obj.extensible` holds it. */
+export type AirLoopHVAC_Splitter_Extensible = {
+  /** Outlet Node Name */
+  outlet_node_name: string;
+};
 
 /**
  * Branch
@@ -41892,8 +42885,20 @@ export interface Branch {
    */
   pressure_drop_curve_name?: string;
   /** Repeating group: component_object_type, component_name, component_inlet_node_name, component_outlet_node_name */
-  components?: ExtensibleGroup[];
+  components?: Branch_Extensible[];
 }
+
+/** One repeat of Branch's `components` group, as `obj.extensible` holds it. */
+export type Branch_Extensible = {
+  /** Component Object Type */
+  component_object_type: string;
+  /** Component Name */
+  component_name: string;
+  /** Component Inlet Node Name */
+  component_inlet_node_name: string;
+  /** Component Outlet Node Name */
+  component_outlet_node_name: string;
+};
 
 /**
  * BranchList
@@ -41902,8 +42907,14 @@ export interface Branch {
  */
 export interface BranchList {
   /** Repeating group: branch_name */
-  branches?: ExtensibleGroup[];
+  branches?: BranchList_Extensible[];
 }
+
+/** One repeat of BranchList's `branches` group, as `obj.extensible` holds it. */
+export type BranchList_Extensible = {
+  /** Branch Name */
+  branch_name: string;
+};
 
 /**
  * Connector:Splitter
@@ -41914,8 +42925,14 @@ export interface Connector_Splitter {
   /** Inlet Branch Name */
   inlet_branch_name: string;
   /** Repeating group: outlet_branch_name */
-  branches?: ExtensibleGroup[];
+  branches?: Connector_Splitter_Extensible[];
 }
+
+/** One repeat of Connector:Splitter's `branches` group, as `obj.extensible` holds it. */
+export type Connector_Splitter_Extensible = {
+  /** Outlet Branch Name */
+  outlet_branch_name: string;
+};
 
 /**
  * Connector:Mixer
@@ -41926,8 +42943,14 @@ export interface Connector_Mixer {
   /** Outlet Branch Name */
   outlet_branch_name: string;
   /** Repeating group: inlet_branch_name */
-  branches?: ExtensibleGroup[];
+  branches?: Connector_Mixer_Extensible[];
 }
+
+/** One repeat of Connector:Mixer's `branches` group, as `obj.extensible` holds it. */
+export type Connector_Mixer_Extensible = {
+  /** Inlet Branch Name */
+  inlet_branch_name: string;
+};
 
 /**
  * ConnectorList
@@ -41952,8 +42975,14 @@ export interface ConnectorList {
  */
 export interface NodeList {
   /** Repeating group: node_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: NodeList_Extensible[];
 }
+
+/** One repeat of NodeList's `nodes` group, as `obj.extensible` holds it. */
+export type NodeList_Extensible = {
+  /** Node Name */
+  node_name: string;
+};
 
 /**
  * OutdoorAir:Node
@@ -42014,8 +43043,14 @@ export interface OutdoorAir_Node {
  */
 export interface OutdoorAir_NodeList {
   /** Repeating group: node_or_nodelist_name */
-  nodes?: ExtensibleGroup[];
+  nodes?: OutdoorAir_NodeList_Extensible[];
 }
+
+/** One repeat of OutdoorAir:NodeList's `nodes` group, as `obj.extensible` holds it. */
+export type OutdoorAir_NodeList_Extensible = {
+  /** Node or NodeList Name */
+  node_or_nodelist_name: string;
+};
 
 /**
  * Pipe:Adiabatic
@@ -42286,8 +43321,17 @@ export interface PipingSystem_Underground_Domain {
   /** Number of Pipe Circuits Entered for this Domain */
   number_of_pipe_circuits_entered_for_this_domain: number;
   /** Repeating group: pipe_circuit */
-  pipe_circuits?: ExtensibleGroup[];
+  pipe_circuits?: PipingSystem_Underground_Domain_Extensible[];
 }
+
+/** One repeat of PipingSystem:Underground:Domain's `pipe_circuits` group, as `obj.extensible` holds it. */
+export type PipingSystem_Underground_Domain_Extensible = {
+  /**
+   * Pipe Circuit
+   * Name of a pipe circuit to be simulated in this domain
+   */
+  pipe_circuit: string;
+};
 
 /**
  * PipingSystem:Underground:PipeCircuit
@@ -42353,8 +43397,17 @@ export interface PipingSystem_Underground_PipeCircuit {
   /** Number of Pipe Segments Entered for this Pipe Circuit */
   number_of_pipe_segments_entered_for_this_pipe_circuit: number;
   /** Repeating group: pipe_segment */
-  pipe_segments?: ExtensibleGroup[];
+  pipe_segments?: PipingSystem_Underground_PipeCircuit_Extensible[];
 }
+
+/** One repeat of PipingSystem:Underground:PipeCircuit's `pipe_segments` group, as `obj.extensible` holds it. */
+export type PipingSystem_Underground_PipeCircuit_Extensible = {
+  /**
+   * Pipe Segment
+   * Name of a pipe segment to be included in this pipe circuit
+   */
+  pipe_segment: string;
+};
 
 /**
  * PipingSystem:Underground:PipeSegment
@@ -43538,8 +44591,14 @@ export interface SolarCollector_UnglazedTranspired {
    */
   discharge_coefficient_for_openings_with_respect_to_buoyancy_driven_flow?: number;
   /** Repeating group: surface_name */
-  surfaces?: ExtensibleGroup[];
+  surfaces?: SolarCollector_UnglazedTranspired_Extensible[];
 }
+
+/** One repeat of SolarCollector:UnglazedTranspired's `surfaces` group, as `obj.extensible` holds it. */
+export type SolarCollector_UnglazedTranspired_Extensible = {
+  /** Surface Name */
+  surface_name: string;
+};
 
 /**
  * SolarCollector:UnglazedTranspired:Multisystem
@@ -43553,8 +44612,20 @@ export interface SolarCollector_UnglazedTranspired_Multisystem {
    */
   solar_collector_name: string;
   /** Repeating group: outdoor_air_system_collector_inlet_node, outdoor_air_system_collector_outlet_node, outdoor_air_system_mixed_air_node, outdoor_air_system_zone_node */
-  systems?: ExtensibleGroup[];
+  systems?: SolarCollector_UnglazedTranspired_Multisystem_Extensible[];
 }
+
+/** One repeat of SolarCollector:UnglazedTranspired:Multisystem's `systems` group, as `obj.extensible` holds it. */
+export type SolarCollector_UnglazedTranspired_Multisystem_Extensible = {
+  /** Outdoor Air System Collector Inlet Node */
+  outdoor_air_system_collector_inlet_node?: string;
+  /** Outdoor Air System Collector Outlet Node */
+  outdoor_air_system_collector_outlet_node?: string;
+  /** Outdoor Air System Mixed Air Node */
+  outdoor_air_system_mixed_air_node?: string;
+  /** Outdoor Air System Zone Node */
+  outdoor_air_system_zone_node?: string;
+};
 
 /**
  * Boiler:HotWater
@@ -49325,8 +50396,14 @@ export interface GroundHeatExchanger_System {
   /** GHE:Vertical:Array Object Name */
   ghe_vertical_array_object_name?: string;
   /** Repeating group: ghe_vertical_single_object_name */
-  vertical_well_locations?: ExtensibleGroup[];
+  vertical_well_locations?: GroundHeatExchanger_System_Extensible[];
 }
+
+/** One repeat of GroundHeatExchanger:System's `vertical_well_locations` group, as `obj.extensible` holds it. */
+export type GroundHeatExchanger_System_Extensible = {
+  /** GHE:Vertical:Single Object Name */
+  ghe_vertical_single_object_name?: string;
+};
 
 /**
  * GroundHeatExchanger:Vertical:Sizing:Rectangle
@@ -49519,8 +50596,16 @@ export interface GroundHeatExchanger_ResponseFactors {
    */
   g_function_reference_ratio?: number;
   /** Repeating group: g_function_ln_t_ts_value, g_function_g_value */
-  g_functions?: ExtensibleGroup[];
+  g_functions?: GroundHeatExchanger_ResponseFactors_Extensible[];
 }
+
+/** One repeat of GroundHeatExchanger:ResponseFactors's `g_functions` group, as `obj.extensible` holds it. */
+export type GroundHeatExchanger_ResponseFactors_Extensible = {
+  /** g-Function Ln(T/Ts) Value */
+  g_function_ln_t_ts_value: number;
+  /** g-Function g Value */
+  g_function_g_value: number;
+};
 
 /**
  * GroundHeatExchanger:Pond
@@ -51911,8 +52996,16 @@ export interface CondenserLoop {
  */
 export interface PlantEquipmentList {
   /** Repeating group: equipment_object_type, equipment_name */
-  equipment?: ExtensibleGroup[];
+  equipment?: PlantEquipmentList_Extensible[];
 }
+
+/** One repeat of PlantEquipmentList's `equipment` group, as `obj.extensible` holds it. */
+export type PlantEquipmentList_Extensible = {
+  /** Equipment Object Type */
+  equipment_object_type?: string;
+  /** Equipment Name */
+  equipment_name?: string;
+};
 
 /**
  * CondenserEquipmentList
@@ -51921,8 +53014,16 @@ export interface PlantEquipmentList {
  */
 export interface CondenserEquipmentList {
   /** Repeating group: equipment_object_type, equipment_name */
-  equipment?: ExtensibleGroup[];
+  equipment?: CondenserEquipmentList_Extensible[];
 }
+
+/** One repeat of CondenserEquipmentList's `equipment` group, as `obj.extensible` holds it. */
+export type CondenserEquipmentList_Extensible = {
+  /** Equipment Object Type */
+  equipment_object_type?: string;
+  /** Equipment Name */
+  equipment_name?: string;
+};
 
 /**
  * PlantEquipmentOperation:Uncontrolled
@@ -53667,8 +54768,17 @@ export interface EnergyManagementSystem_ProgramCallingManager {
   /** EnergyPlus Model Calling Point */
   energyplus_model_calling_point?: "AfterComponentInputReadIn" | "AfterNewEnvironmentWarmUpIsComplete" | "AfterPredictorAfterHVACManagers" | "AfterPredictorBeforeHVACManagers" | "BeginNewEnvironment" | "BeginTimestepBeforePredictor" | "BeginZoneTimestepAfterInitHeatBalance" | "BeginZoneTimestepBeforeInitHeatBalance" | "BeginZoneTimestepBeforeSetCurrentWeather" | "EndOfSystemSizing" | "EndOfSystemTimestepAfterHVACReporting" | "EndOfSystemTimestepBeforeHVACReporting" | "EndOfZoneSizing" | "EndOfZoneTimestepAfterZoneReporting" | "EndOfZoneTimestepBeforeZoneReporting" | "InsideHVACSystemIterationLoop" | "UnitarySystemSizing" | "UserDefinedComponentModel";
   /** Repeating group: program_name */
-  programs?: ExtensibleGroup[];
+  programs?: EnergyManagementSystem_ProgramCallingManager_Extensible[];
 }
+
+/** One repeat of EnergyManagementSystem:ProgramCallingManager's `programs` group, as `obj.extensible` holds it. */
+export type EnergyManagementSystem_ProgramCallingManager_Extensible = {
+  /**
+   * Program Name
+   * no spaces allowed in name
+   */
+  program_name: string;
+};
 
 /**
  * EnergyManagementSystem:Program
@@ -53677,8 +54787,14 @@ export interface EnergyManagementSystem_ProgramCallingManager {
  */
 export interface EnergyManagementSystem_Program {
   /** Repeating group: program_line */
-  lines?: ExtensibleGroup[];
+  lines?: EnergyManagementSystem_Program_Extensible[];
 }
+
+/** One repeat of EnergyManagementSystem:Program's `lines` group, as `obj.extensible` holds it. */
+export type EnergyManagementSystem_Program_Extensible = {
+  /** Program Line */
+  program_line?: string;
+};
 
 /**
  * EnergyManagementSystem:Subroutine
@@ -53687,8 +54803,14 @@ export interface EnergyManagementSystem_Program {
  */
 export interface EnergyManagementSystem_Subroutine {
   /** Repeating group: program_line */
-  lines?: ExtensibleGroup[];
+  lines?: EnergyManagementSystem_Subroutine_Extensible[];
 }
+
+/** One repeat of EnergyManagementSystem:Subroutine's `lines` group, as `obj.extensible` holds it. */
+export type EnergyManagementSystem_Subroutine_Extensible = {
+  /** Program Line */
+  program_line?: string;
+};
 
 /**
  * EnergyManagementSystem:GlobalVariable
@@ -53697,8 +54819,17 @@ export interface EnergyManagementSystem_Subroutine {
  */
 export interface EnergyManagementSystem_GlobalVariable {
   /** Repeating group: erl_variable_name */
-  variables?: ExtensibleGroup[];
+  variables?: EnergyManagementSystem_GlobalVariable_Extensible[];
 }
+
+/** One repeat of EnergyManagementSystem:GlobalVariable's `variables` group, as `obj.extensible` holds it. */
+export type EnergyManagementSystem_GlobalVariable_Extensible = {
+  /**
+   * Erl Variable Name
+   * no spaces allowed in name
+   */
+  erl_variable_name: string;
+};
 
 /**
  * EnergyManagementSystem:OutputVariable
@@ -54781,8 +55912,16 @@ export interface AvailabilityManager_HybridVentilation {
  */
 export interface AvailabilityManagerAssignmentList {
   /** Repeating group: availability_manager_object_type, availability_manager_name */
-  managers?: ExtensibleGroup[];
+  managers?: AvailabilityManagerAssignmentList_Extensible[];
 }
+
+/** One repeat of AvailabilityManagerAssignmentList's `managers` group, as `obj.extensible` holds it. */
+export type AvailabilityManagerAssignmentList_Extensible = {
+  /** Availability Manager Object Type */
+  availability_manager_object_type: "AvailabilityManager:DifferentialThermostat" | "AvailabilityManager:HighTemperatureTurnOff" | "AvailabilityManager:HighTemperatureTurnOn" | "AvailabilityManager:LowTemperatureTurnOff" | "AvailabilityManager:LowTemperatureTurnOn" | "AvailabilityManager:NightCycle" | "AvailabilityManager:NightVentilation" | "AvailabilityManager:OptimumStart" | "AvailabilityManager:Scheduled" | "AvailabilityManager:ScheduledOff" | "AvailabilityManager:ScheduledOn";
+  /** Availability Manager Name */
+  availability_manager_name: string;
+};
 
 /**
  * SetpointManager:Scheduled
@@ -56238,8 +57377,17 @@ export interface Refrigeration_CompressorRack {
  */
 export interface Refrigeration_CaseAndWalkInList {
   /** Repeating group: case_or_walkin_name */
-  cases_and_walkins?: ExtensibleGroup[];
+  cases_and_walkins?: Refrigeration_CaseAndWalkInList_Extensible[];
 }
+
+/** One repeat of Refrigeration:CaseAndWalkInList's `cases_and_walkins` group, as `obj.extensible` holds it. */
+export type Refrigeration_CaseAndWalkInList_Extensible = {
+  /**
+   * Case or WalkIn Name
+   * Enter the name of a Refrigeration:Case or Refrigeration:WalkIn object.
+   */
+  case_or_walkin_name?: string;
+};
 
 /**
  * Refrigeration:Condenser:AirCooled
@@ -56708,8 +57856,17 @@ export interface Refrigeration_GasCooler_AirCooled {
  */
 export interface Refrigeration_TransferLoadList {
   /** Repeating group: cascade_condenser_name_or_secondary_system_name */
-  transfer_loads?: ExtensibleGroup[];
+  transfer_loads?: Refrigeration_TransferLoadList_Extensible[];
 }
+
+/** One repeat of Refrigeration:TransferLoadList's `transfer_loads` group, as `obj.extensible` holds it. */
+export type Refrigeration_TransferLoadList_Extensible = {
+  /**
+   * Cascade Condenser Name or Secondary System Name
+   * Enter the name of a Refrigeration:Condenser:Cascade object OR the name of a Refrigeration:SecondarySystem object.
+   */
+  cascade_condenser_name_or_secondary_system_name: string;
+};
 
 /**
  * Refrigeration:Subcooler
@@ -56818,8 +57975,17 @@ export interface Refrigeration_Compressor {
  */
 export interface Refrigeration_CompressorList {
   /** Repeating group: refrigeration_compressor_name */
-  compressors?: ExtensibleGroup[];
+  compressors?: Refrigeration_CompressorList_Extensible[];
 }
+
+/** One repeat of Refrigeration:CompressorList's `compressors` group, as `obj.extensible` holds it. */
+export type Refrigeration_CompressorList_Extensible = {
+  /**
+   * Refrigeration Compressor Name
+   * Enter the name of a Refrigeration:Compressor object.
+   */
+  refrigeration_compressor_name: string;
+};
 
 /**
  * Refrigeration:System
@@ -57233,8 +58399,84 @@ export interface Refrigeration_WalkIn {
    */
   insulated_floor_u_value?: number;
   /** Repeating group: zone_name, total_insulated_surface_area_facing_zone, insulated_surface_u_value_facing_zone, area_of_glass_reach_in_doors_facing_zone, height_of_glass_reach_in_doors_facing_zone, glass_reach_in_door_u_value_facing_zone, glass_reach_in_door_opening_schedule_name_facing_zone, area_of_stocking_doors_facing_zone, height_of_stocking_doors_facing_zone, stocking_door_u_value_facing_zone, stocking_door_opening_schedule_name_facing_zone, stocking_door_opening_protection_type_facing_zone */
-  zone_data?: ExtensibleGroup[];
+  zone_data?: Refrigeration_WalkIn_Extensible[];
 }
+
+/** One repeat of Refrigeration:WalkIn's `zone_data` group, as `obj.extensible` holds it. */
+export type Refrigeration_WalkIn_Extensible = {
+  /**
+   * Zone Name
+   * This must be a controlled zone and appear in a ZoneHVAC:EquipmentConnections object. The walk-in cooler can face multiple zones. The heat exchange with each zone must be input separately
+   */
+  zone_name: string;
+  /**
+   * Total Insulated Surface Area Facing Zone
+   * Area should include walls and ceilings, but not doors
+   * Units: m2
+   */
+  total_insulated_surface_area_facing_zone: number;
+  /**
+   * Insulated Surface U-Value Facing Zone
+   * The default value corresponds to R18 [ft2-F-hr/Btu] To convert other IP R-values to U, divide 5.678 by the R-value Some examples: R15 is U 0.3785 W/m2-K R5 is U 1.136 W/m2-K
+   * Units: W/m2-K
+   * Default: 0.3154
+   */
+  insulated_surface_u_value_facing_zone?: number;
+  /**
+   * Area of Glass Reach In Doors Facing Zone
+   * Units: m2
+   * Default: 0
+   */
+  area_of_glass_reach_in_doors_facing_zone?: number;
+  /**
+   * Height of Glass Reach In Doors Facing Zone
+   * Units: m
+   * Default: 1.5
+   */
+  height_of_glass_reach_in_doors_facing_zone?: number;
+  /**
+   * Glass Reach In Door U Value Facing Zone
+   * The default value corresponds to R5 [ft2-F-hr/Btu] To convert other IP R-values to U, divide 5.678 by the R-value
+   * Units: W/m2-K
+   * Default: 1.136
+   */
+  glass_reach_in_door_u_value_facing_zone?: number;
+  /**
+   * Glass Reach In Door Opening Schedule Name Facing Zone
+   * Schedule values should all be between 0.0 and 1.0. For example, if the door is open 30% of the time during working hours, then the schedule would hold the value 0.3 during working hours and 0 during other hours If no schedule name is entered, default is 5% open time during all hours
+   */
+  glass_reach_in_door_opening_schedule_name_facing_zone?: string;
+  /**
+   * Area of Stocking Doors Facing Zone
+   * Units: m2
+   * Default: 0
+   */
+  area_of_stocking_doors_facing_zone?: number;
+  /**
+   * Height of Stocking Doors Facing Zone
+   * Units: m
+   * Default: 3
+   */
+  height_of_stocking_doors_facing_zone?: number;
+  /**
+   * Stocking Door U Value Facing Zone
+   * The default value corresponds to R15 [ft2-F-hr/Btu] To convert other IP R-values to U, divide 5.678 by the R-value Some examples: R5 is U 1.136 W/m2-K R18 is U 0.3154 W/m2-K
+   * Units: W/m2-K
+   * Default: 0.3785
+   */
+  stocking_door_u_value_facing_zone?: number;
+  /**
+   * Stocking Door Opening Schedule Name Facing Zone
+   * Schedule values should all be between 0.0 and 1.0. For example, if the door is open 30% of the time during working hours, then the schedule would hold the value 0.3 during working hours and 0 during other hours If no schedule name is entered, default is 5% open time during all hours
+   */
+  stocking_door_opening_schedule_name_facing_zone?: string;
+  /**
+   * Stocking Door Opening Protection Type Facing Zone
+   * Use StripCurtain for hanging strips or airlock vestibules
+   * Default: "AirCurtain"
+   */
+  stocking_door_opening_protection_type_facing_zone?: "AirCurtain" | "None" | "StripCurtain";
+};
 
 /**
  * Refrigeration:AirChiller
@@ -57428,8 +58670,17 @@ export interface ZoneHVAC_RefrigerationChillerSet {
    */
   air_outlet_node_name?: string;
   /** Repeating group: air_chiller_name */
-  chillers?: ExtensibleGroup[];
+  chillers?: ZoneHVAC_RefrigerationChillerSet_Extensible[];
 }
+
+/** One repeat of ZoneHVAC:RefrigerationChillerSet's `chillers` group, as `obj.extensible` holds it. */
+export type ZoneHVAC_RefrigerationChillerSet_Extensible = {
+  /**
+   * Air Chiller Name
+   * This is the first chiller turned on to meet the zone load
+   */
+  air_chiller_name?: string;
+};
 
 /**
  * DemandManagerAssignmentList
@@ -57461,8 +58712,16 @@ export interface DemandManagerAssignmentList {
   /** Demand Manager Priority */
   demand_manager_priority: "All" | "Sequential";
   /** Repeating group: demandmanager_object_type, demandmanager_name */
-  manager_data?: ExtensibleGroup[];
+  manager_data?: DemandManagerAssignmentList_Extensible[];
 }
+
+/** One repeat of DemandManagerAssignmentList's `manager_data` group, as `obj.extensible` holds it. */
+export type DemandManagerAssignmentList_Extensible = {
+  /** DemandManager Object Type */
+  demandmanager_object_type?: "DemandManager:ElectricEquipment" | "DemandManager:ExteriorLights" | "DemandManager:Lights" | "DemandManager:Thermostats" | "DemandManager:Ventilation";
+  /** DemandManager Name */
+  demandmanager_name?: string;
+};
 
 /**
  * DemandManager:ExteriorLights
@@ -57499,8 +58758,17 @@ export interface DemandManager_ExteriorLights {
    */
   rotation_duration?: number;
   /** Repeating group: exterior_lights_name */
-  lights?: ExtensibleGroup[];
+  lights?: DemandManager_ExteriorLights_Extensible[];
 }
+
+/** One repeat of DemandManager:ExteriorLights's `lights` group, as `obj.extensible` holds it. */
+export type DemandManager_ExteriorLights_Extensible = {
+  /**
+   * Exterior Lights Name
+   * Enter the name of an Exterior:Lights object.
+   */
+  exterior_lights_name: string;
+};
 
 /**
  * DemandManager:Lights
@@ -57537,8 +58805,17 @@ export interface DemandManager_Lights {
    */
   rotation_duration?: number;
   /** Repeating group: lights_name */
-  lights?: ExtensibleGroup[];
+  lights?: DemandManager_Lights_Extensible[];
 }
+
+/** One repeat of DemandManager:Lights's `lights` group, as `obj.extensible` holds it. */
+export type DemandManager_Lights_Extensible = {
+  /**
+   * Lights Name
+   * Enter the name of an Lights object. if ZoneList option is used on the Lights object, a single lights object from that assignment can be selected by entering <Zone Name><space><Global Lights Object Name>.
+   */
+  lights_name: string;
+};
 
 /**
  * DemandManager:ElectricEquipment
@@ -57575,8 +58852,17 @@ export interface DemandManager_ElectricEquipment {
    */
   rotation_duration?: number;
   /** Repeating group: electric_equipment_name */
-  equipment?: ExtensibleGroup[];
+  equipment?: DemandManager_ElectricEquipment_Extensible[];
 }
+
+/** One repeat of DemandManager:ElectricEquipment's `equipment` group, as `obj.extensible` holds it. */
+export type DemandManager_ElectricEquipment_Extensible = {
+  /**
+   * Electric Equipment Name
+   * Enter the name of an ElectricEquipment object. if ZoneList option is used on the ElectricEquipment object, a single equipment object from that assignment can be selected by entering <Zone Name><space><Global ElectricEquipment Object Name>.
+   */
+  electric_equipment_name: string;
+};
 
 /**
  * DemandManager:Thermostats
@@ -57621,8 +58907,17 @@ export interface DemandManager_Thermostats {
    */
   rotation_duration?: number;
   /** Repeating group: thermostat_name */
-  thermostats?: ExtensibleGroup[];
+  thermostats?: DemandManager_Thermostats_Extensible[];
 }
+
+/** One repeat of DemandManager:Thermostats's `thermostats` group, as `obj.extensible` holds it. */
+export type DemandManager_Thermostats_Extensible = {
+  /**
+   * Thermostat Name
+   * Enter the name of a ZoneControl:Thermostat object. if ZoneList option is used on the ZoneControl:Thermostat object, a single thermostat object from that assignment can be selected by entering <Zone Name><space><Global Thermostat Object Name>.
+   */
+  thermostat_name: string;
+};
 
 /**
  * DemandManager:Ventilation
@@ -57671,8 +58966,17 @@ export interface DemandManager_Ventilation {
    */
   rotation_duration?: number;
   /** Repeating group: controller_outdoor_air_name */
-  controllers?: ExtensibleGroup[];
+  controllers?: DemandManager_Ventilation_Extensible[];
 }
+
+/** One repeat of DemandManager:Ventilation's `controllers` group, as `obj.extensible` holds it. */
+export type DemandManager_Ventilation_Extensible = {
+  /**
+   * Controller Outdoor Air Name
+   * Enter the name of a Controller:OutdoorAir object.
+   */
+  controller_outdoor_air_name: string;
+};
 
 /**
  * Generator:InternalCombustionEngine
@@ -58778,8 +60082,16 @@ export interface Generator_FuelCell_AirSupply {
   /** Number of UserDefined Constituents */
   number_of_userdefined_constituents?: number;
   /** Repeating group: constituent_name, molar_fraction */
-  constituent_fractions?: ExtensibleGroup[];
+  constituent_fractions?: Generator_FuelCell_AirSupply_Extensible[];
 }
+
+/** One repeat of Generator:FuelCell:AirSupply's `constituent_fractions` group, as `obj.extensible` holds it. */
+export type Generator_FuelCell_AirSupply_Extensible = {
+  /** Constituent Name */
+  constituent_name?: "Argon" | "CarbonDioxide" | "Nitrogen" | "Oxygen" | "Water";
+  /** Molar Fraction */
+  molar_fraction?: number;
+};
 
 /**
  * Generator:FuelCell:WaterSupply
@@ -59416,8 +60728,31 @@ export interface Generator_WindTurbine {
  */
 export interface ElectricLoadCenter_Generators {
   /** Repeating group: generator_name, generator_object_type, generator_rated_electric_power_output, generator_availability_schedule_name, generator_rated_thermal_to_electrical_power_ratio */
-  generator_outputs?: ExtensibleGroup[];
+  generator_outputs?: ElectricLoadCenter_Generators_Extensible[];
 }
+
+/** One repeat of ElectricLoadCenter:Generators's `generator_outputs` group, as `obj.extensible` holds it. */
+export type ElectricLoadCenter_Generators_Extensible = {
+  /** Generator Name */
+  generator_name: string;
+  /** Generator Object Type */
+  generator_object_type: "Generator:CombustionTurbine" | "Generator:FuelCell" | "Generator:InternalCombustionEngine" | "Generator:MicroCHP" | "Generator:MicroTurbine" | "Generator:PVWatts" | "Generator:Photovoltaic" | "Generator:WindTurbine";
+  /**
+   * Generator Rated Electric Power Output
+   * Units: W
+   */
+  generator_rated_electric_power_output?: number;
+  /**
+   * Generator Availability Schedule Name
+   * Availability schedule name for this generator. Schedule value > 0 means the generator is available. If this field is blank, the generator is always available.
+   */
+  generator_availability_schedule_name?: string;
+  /**
+   * Generator Rated Thermal to Electrical Power Ratio
+   * Required field when generator is used by an ElectricLoadCenter:Distribution object with Generator Operation Scheme set to FollowThermal or FollowThermalLimitElectrical
+   */
+  generator_rated_thermal_to_electrical_power_ratio?: number;
+};
 
 /**
  * ElectricLoadCenter:Inverter:Simple
@@ -59937,8 +61272,17 @@ export interface ElectricLoadCenter_Transformer {
    */
   consider_transformer_loss_for_utility_cost?: "No" | "Yes";
   /** Repeating group: meter_name */
-  meters?: ExtensibleGroup[];
+  meters?: ElectricLoadCenter_Transformer_Extensible[];
 }
+
+/** One repeat of ElectricLoadCenter:Transformer's `meters` group, as `obj.extensible` holds it. */
+export type ElectricLoadCenter_Transformer_Extensible = {
+  /**
+   * Meter Name
+   * Must be an electric meter (with electricity as the resource type) Only required when transformer is used for power in from the utility grid
+   */
+  meter_name?: string;
+};
 
 /**
  * ElectricLoadCenter:Distribution
@@ -60200,8 +61544,17 @@ export interface WaterUse_Connections {
    */
   drain_water_heat_exchanger_u_factor_times_area?: number;
   /** Repeating group: water_use_equipment_name */
-  connections?: ExtensibleGroup[];
+  connections?: WaterUse_Connections_Extensible[];
 }
+
+/** One repeat of WaterUse:Connections's `connections` group, as `obj.extensible` holds it. */
+export type WaterUse_Connections_Extensible = {
+  /**
+   * Water Use Equipment Name
+   * Enter the name of a WaterUse:Equipment object.
+   */
+  water_use_equipment_name: string;
+};
 
 /**
  * WaterUse:Storage
@@ -60360,8 +61713,14 @@ export interface WaterUse_RainCollector {
    */
   maximum_collection_rate?: number;
   /** Repeating group: collection_surface_name */
-  surfaces?: ExtensibleGroup[];
+  surfaces?: WaterUse_RainCollector_Extensible[];
 }
+
+/** One repeat of WaterUse:RainCollector's `surfaces` group, as `obj.extensible` holds it. */
+export type WaterUse_RainCollector_Extensible = {
+  /** Collection Surface Name */
+  collection_surface_name: string;
+};
 
 /**
  * FaultModel:TemperatureSensorOffset:OutdoorAir
@@ -60834,8 +62193,14 @@ export interface Matrix_TwoDimension {
   /** Number of Columns */
   number_of_columns: number;
   /** Repeating group: value */
-  values?: ExtensibleGroup[];
+  values?: Matrix_TwoDimension_Extensible[];
 }
+
+/** One repeat of Matrix:TwoDimension's `values` group, as `obj.extensible` holds it. */
+export type Matrix_TwoDimension_Extensible = {
+  /** Value */
+  value?: number;
+};
 
 /**
  * HybridModel:Zone
@@ -62022,8 +63387,14 @@ export interface Table_IndependentVariable {
   /** External File Starting Row Number */
   external_file_starting_row_number?: number;
   /** Repeating group: value */
-  values?: ExtensibleGroup[];
+  values?: Table_IndependentVariable_Extensible[];
 }
+
+/** One repeat of Table:IndependentVariable's `values` group, as `obj.extensible` holds it. */
+export type Table_IndependentVariable_Extensible = {
+  /** Value */
+  value?: number;
+};
 
 /**
  * Table:IndependentVariableList
@@ -62032,8 +63403,14 @@ export interface Table_IndependentVariable {
  */
 export interface Table_IndependentVariableList {
   /** Repeating group: independent_variable_name */
-  independent_variables?: ExtensibleGroup[];
+  independent_variables?: Table_IndependentVariableList_Extensible[];
 }
+
+/** One repeat of Table:IndependentVariableList's `independent_variables` group, as `obj.extensible` holds it. */
+export type Table_IndependentVariableList_Extensible = {
+  /** Independent Variable Name */
+  independent_variable_name: string;
+};
 
 /**
  * Table:Lookup
@@ -62069,8 +63446,14 @@ export interface Table_Lookup {
   /** External File Starting Row Number */
   external_file_starting_row_number?: number;
   /** Repeating group: output_value */
-  values?: ExtensibleGroup[];
+  values?: Table_Lookup_Extensible[];
 }
+
+/** One repeat of Table:Lookup's `values` group, as `obj.extensible` holds it. */
+export type Table_Lookup_Extensible = {
+  /** Output Value */
+  output_value?: number;
+};
 
 /**
  * FluidProperties:Name
@@ -65163,12 +66546,12 @@ export interface UtilityCost_Tariff {
    * Monthly Charge or Variable Name
    * The fixed monthly service charge that many utilities have. The entry may be numeric and gets added to the ServiceCharges variable or if a variable name is entered here its values for each month are used.
    */
-  monthly_charge_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  monthly_charge_or_variable_name?: number | string;
   /**
    * Minimum Monthly Charge or Variable Name
    * The minimum total charge for the tariff or if a variable name is entered here its values for each month are used.
    */
-  minimum_monthly_charge_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  minimum_monthly_charge_or_variable_name?: number | string;
   /**
    * Real Time Pricing Charge Schedule Name
    * Used with real time pricing rates. The name of a schedule that contains the cost of energy for that particular time period of the year. Real time rates can be modeled using a charge schedule with the actual real time prices entered in the schedule.
@@ -65222,7 +66605,7 @@ export interface UtilityCost_Qualify {
    * Threshold Value or Variable Name
    * The minimum or maximum value for the qualify. If the variable has values that are less than this value when the qualify type is minimum then the tariff may be disqualified. If the variable has values that are greater than this value when the qualify type is maximum then the tariff may be disqualified.
    */
-  threshold_value_or_variable_name: number | 'Autosize' | 'Autocalculate';
+  threshold_value_or_variable_name: number | string;
   /**
    * Season
    * If the UtilityCost:Qualify only applies to a season enter the season name. If this field is left blank it defaults to Annual.
@@ -65276,7 +66659,7 @@ export interface UtilityCost_Charge_Simple {
    * Cost per Unit Value or Variable Name
    * This field contains either a single number or the name of a variable. The number is multiplied with all of the energy or demand or other source that is specified in the source field. If a variable is used then the monthly values of the variable are multiplied against the variable specified in the source field. This field makes it easy to include a simple charge without specifying block sizes. This is a good way to include a tax or cost adjustment.
    */
-  cost_per_unit_value_or_variable_name: number | 'Autosize' | 'Autocalculate';
+  cost_per_unit_value_or_variable_name: number | string;
 }
 
 /**
@@ -65320,157 +66703,157 @@ export interface UtilityCost_Charge_Block {
    * Block Size Multiplier Value or Variable Name
    * The sizes of the blocks are usually used directly but if a value or a variable is entered here the block sizes entered in the rest of the charge are first multiplied by the entered value prior to being used. This is common for rates that are kWh/kW rates and in that case the variable that holds the monthly total electric demand would be entered. If no value is entered a default value of one is assumed so that the block sizes remain exactly as entered. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_size_multiplier_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_multiplier_value_or_variable_name?: number | string;
   /**
    * Block Size 1 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_1_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_1_value_or_variable_name?: number | string;
   /**
    * Block 1 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_1_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_1_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 2 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_2_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_2_value_or_variable_name?: number | string;
   /**
    * Block 2 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_2_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_2_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 3 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_3_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_3_value_or_variable_name?: number | string;
   /**
    * Block 3 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_3_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_3_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 4 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_4_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_4_value_or_variable_name?: number | string;
   /**
    * Block 4 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_4_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_4_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 5 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_5_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_5_value_or_variable_name?: number | string;
   /**
    * Block 5 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_5_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_5_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 6 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_6_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_6_value_or_variable_name?: number | string;
   /**
    * Block 6 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_6_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_6_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 7 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_7_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_7_value_or_variable_name?: number | string;
   /**
    * Block 7 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_7_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_7_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 8 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_8_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_8_value_or_variable_name?: number | string;
   /**
    * Block 8 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_8_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_8_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 9 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_9_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_9_value_or_variable_name?: number | string;
   /**
    * Block 9 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_9_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_9_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 10 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_10_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_10_value_or_variable_name?: number | string;
   /**
    * Block 10 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_10_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_10_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 11 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_11_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_11_value_or_variable_name?: number | string;
   /**
    * Block 11 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_11_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_11_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 12 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_12_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_12_value_or_variable_name?: number | string;
   /**
    * Block 12 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_12_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_12_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 13 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_13_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_13_value_or_variable_name?: number | string;
   /**
    * Block 13 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_13_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_13_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 14 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_14_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_14_value_or_variable_name?: number | string;
   /**
    * Block 14 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_14_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_14_cost_per_unit_value_or_variable_name?: number | string;
   /**
    * Block Size 15 Value or Variable Name
    * The size of the block of the charges is entered here. For most rates that use multiple blocks this will be the value for the block size. Using remaining may be used when the remaining amount should be included in that block. This field is unusual because it can be either a number or a name of a variable.
    */
-  block_size_15_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_size_15_value_or_variable_name?: number | string;
   /**
    * Block 15 Cost per Unit Value or Variable Name
    * The cost of the block. This field is unusual for the EnergyPlus syntax because it can be either a number or a name of a variable.
    */
-  block_15_cost_per_unit_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  block_15_cost_per_unit_value_or_variable_name?: number | string;
 }
 
 /**
@@ -65508,12 +66891,12 @@ export interface UtilityCost_Ratchet {
    * Multiplier Value or Variable Name
    * Often the ratchet has a clause such as "the current month demand or 90% of the summer month demand". For this case a value of 0.9 would be entered here as the multiplier. This value may be left blank if no multiplier is needed and a value of one will be used as a default.
    */
-  multiplier_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  multiplier_value_or_variable_name?: number | string;
   /**
    * Offset Value or Variable Name
    * A less common strategy is to say that the ratchet must be all demand greater than a value in this case an offset that is added to the demand may be entered here. If entered it is common for the offset value to be negative representing that the demand be reduced. If no value is entered it is assumed to be zero and not affect the ratchet.
    */
-  offset_value_or_variable_name?: number | 'Autosize' | 'Autocalculate';
+  offset_value_or_variable_name?: number | string;
 }
 
 /**
@@ -65817,8 +67200,17 @@ export interface LifeCycleCost_UsePriceEscalation {
    */
   escalation_start_month?: "April" | "August" | "December" | "February" | "January" | "July" | "June" | "March" | "May" | "November" | "October" | "September";
   /** Repeating group: year_escalation */
-  escalations?: ExtensibleGroup[];
+  escalations?: LifeCycleCost_UsePriceEscalation_Extensible[];
 }
+
+/** One repeat of LifeCycleCost:UsePriceEscalation's `escalations` group, as `obj.extensible` holds it. */
+export type LifeCycleCost_UsePriceEscalation_Extensible = {
+  /**
+   * Year Escalation
+   * The escalation in price of the energy or water use for the first year expressed as a decimal.
+   */
+  year_escalation?: number;
+};
 
 /**
  * LifeCycleCost:UseAdjustment
@@ -65829,8 +67221,17 @@ export interface LifeCycleCost_UseAdjustment {
   /** Resource */
   resource: "Coal" | "Diesel" | "DistrictCooling" | "DistrictHeatingSteam" | "DistrictHeatingWater" | "Electricity" | "ElectricityNet" | "ElectricityProduced" | "ElectricityPurchased" | "ElectricitySurplusSold" | "FuelOilNo1" | "FuelOilNo2" | "Gasoline" | "NaturalGas" | "OtherFuel1" | "OtherFuel2" | "Propane" | "Water";
   /** Repeating group: year_multiplier */
-  multipliers?: ExtensibleGroup[];
+  multipliers?: LifeCycleCost_UseAdjustment_Extensible[];
 }
+
+/** One repeat of LifeCycleCost:UseAdjustment's `multipliers` group, as `obj.extensible` holds it. */
+export type LifeCycleCost_UseAdjustment_Extensible = {
+  /**
+   * Year Multiplier
+   * The multiplier to be applied to the end-use cost for the first year in the service period. The total utility costs for the selected end-use is multiplied by this value. For no change enter 1.0.
+   */
+  year_multiplier?: number;
+};
 
 /**
  * Parametric:SetValueForRun
@@ -65839,8 +67240,14 @@ export interface LifeCycleCost_UseAdjustment {
  */
 export interface Parametric_SetValueForRun {
   /** Repeating group: value_for_run */
-  values?: ExtensibleGroup[];
+  values?: Parametric_SetValueForRun_Extensible[];
 }
+
+/** One repeat of Parametric:SetValueForRun's `values` group, as `obj.extensible` holds it. */
+export type Parametric_SetValueForRun_Extensible = {
+  /** Value for Run */
+  value_for_run?: string;
+};
 
 /**
  * Parametric:Logic
@@ -65849,8 +67256,14 @@ export interface Parametric_SetValueForRun {
  */
 export interface Parametric_Logic {
   /** Repeating group: parametric_logic_line */
-  lines?: ExtensibleGroup[];
+  lines?: Parametric_Logic_Extensible[];
 }
+
+/** One repeat of Parametric:Logic's `lines` group, as `obj.extensible` holds it. */
+export type Parametric_Logic_Extensible = {
+  /** Parametric Logic Line */
+  parametric_logic_line?: string;
+};
 
 /**
  * Parametric:RunControl
@@ -65859,8 +67272,17 @@ export interface Parametric_Logic {
  */
 export interface Parametric_RunControl {
   /** Repeating group: perform_run */
-  runs?: ExtensibleGroup[];
+  runs?: Parametric_RunControl_Extensible[];
 }
+
+/** One repeat of Parametric:RunControl's `runs` group, as `obj.extensible` holds it. */
+export type Parametric_RunControl_Extensible = {
+  /**
+   * Perform Run
+   * Default: "Yes"
+   */
+  perform_run?: "No" | "Yes";
+};
 
 /**
  * Parametric:FileNameSuffix
@@ -65869,8 +67291,14 @@ export interface Parametric_RunControl {
  */
 export interface Parametric_FileNameSuffix {
   /** Repeating group: suffix_for_file_name_in_run */
-  suffixes?: ExtensibleGroup[];
+  suffixes?: Parametric_FileNameSuffix_Extensible[];
 }
+
+/** One repeat of Parametric:FileNameSuffix's `suffixes` group, as `obj.extensible` holds it. */
+export type Parametric_FileNameSuffix_Extensible = {
+  /** Suffix for File Name in Run */
+  suffix_for_file_name_in_run?: string;
+};
 
 /**
  * Output:VariableDictionary
@@ -66088,8 +67516,14 @@ export interface OutputControl_SurfaceColorScheme {
  */
 export interface Output_Table_SummaryReports {
   /** Repeating group: report_name */
-  reports?: ExtensibleGroup[];
+  reports?: Output_Table_SummaryReports_Extensible[];
 }
+
+/** One repeat of Output:Table:SummaryReports's `reports` group, as `obj.extensible` holds it. */
+export type Output_Table_SummaryReports_Extensible = {
+  /** Report Name */
+  report_name?: string;
+};
 
 /**
  * Output:Table:TimeBins
@@ -66144,8 +67578,22 @@ export interface Output_Table_Monthly {
    */
   digits_after_decimal?: number;
   /** Repeating group: variable_or_meter_name, aggregation_type_for_variable_or_meter */
-  variable_details?: ExtensibleGroup[];
+  variable_details?: Output_Table_Monthly_Extensible[];
 }
+
+/** One repeat of Output:Table:Monthly's `variable_details` group, as `obj.extensible` holds it. */
+export type Output_Table_Monthly_Extensible = {
+  /**
+   * Variable or Meter Name
+   * The name of an output variable or  meter that is available in the RDD file.
+   */
+  variable_or_meter_name?: string;
+  /**
+   * Aggregation Type for Variable or Meter
+   * The method of aggregation for the selected variable or meter. SumOrAverage adds up the values for every timestep in the month if the variable is a sum variable. If the variable is an average variable it reports the average value. This is probably the most common Aggregation Type option to choose. Maximum and Minimum find the maximum and minimum value for the month and report it along with the time that it first occurred. When Maximum or Minimum are selected a column is automatically shown in the output report for the time that it occurred. When Maximum or Minimum are used with an average variable the value is divided by the length of the timestep. ValueWhenMaxMin looks at the previous variable in the report that sets a maximum or minimum and displays the value of the current variable at that same timestep. Order of the variables in the report is important when using ValueWhenMaxMin. This can be used when an outdoor temperature should be reported for the time of the maximum cooling load. HoursNonZero adds up the elapsed time during the month that this variable is non-zero and would be appropriate to determine the number of hour that a fan operates. HoursZero - The HoursZero option adds up the elapsed time during the month that this variable has a zero value and would be appropriate to determine the number of hour that a fan does not operate. HoursPositive - The HoursPositive option adds up the elapsed time during the month that this variable has a positive value. Hours with a zero value are not included. HoursNonPositive - The HoursNonPositive option adds up the elapsed time during the month that this variable has non-positive value. Hours with a negative value and hours with a zero value are all included. HoursNegative - The HoursNegative option adds up the elapsed time during the month that this variable has a negative value. Hours with a zero value are not included. HoursNonNegative - The HoursNonNegative option adds up the elapsed time during the month that this variable has non-negative value. Hours with a positive value and hours with a zero value are all included. SumOrAverageDuringHoursShown - Provides the sum or average of the named variable when during the hours that the previous variable displayed with any of the Aggregation Types starting with "Hours". For "sum" type variables adds up the values for each timestep and reports the sum of the value monthly during the hours reported on the previous variable. For "average" type variables, the value shown will be the average for the month during the hours reported on the previous variable. Order of the variables in the report is important when using this Aggregation Type. MaximumDuringHoursShown - Reports the maximum value and the time that the maximum value occurred but only during the hours reported with the previous "hours-" Aggregation Type. When the Maximum option is used with an average variable the value is divided by the length of the timestep. Order of the variables in the report is important when using this Aggregation Type. MinimumDuringHoursShown - Reports the minimum value and the time that the minimum value occurred but only during the hours reported with the previous "hours-" Aggregation Type. When the Minimum option is used with an average variable the value is divided by the length of the timestep. Order of the variables in the report is important when using this Aggregation Type.
+   */
+  aggregation_type_for_variable_or_meter?: "HoursNegative" | "HoursNonNegative" | "HoursNonPositive" | "HoursNonZero" | "HoursPositive" | "HoursZero" | "Maximum" | "MaximumDuringHoursShown" | "Minimum" | "MinimumDuringHoursShown" | "SumOrAverage" | "SumOrAverageDuringHoursShown" | "ValueWhenMaximumOrMinimum";
+};
 
 /**
  * Output:Table:Annual
@@ -66164,8 +67612,27 @@ export interface Output_Table_Annual {
    */
   schedule_name?: string;
   /** Repeating group: variable_or_meter_or_ems_variable_or_field_name, aggregation_type_for_variable_or_meter, digits_after_decimal */
-  variable_details?: ExtensibleGroup[];
+  variable_details?: Output_Table_Annual_Extensible[];
 }
+
+/** One repeat of Output:Table:Annual's `variable_details` group, as `obj.extensible` holds it. */
+export type Output_Table_Annual_Extensible = {
+  /**
+   * Variable or Meter or EMS Variable or Field Name
+   * contain the name of a variable (see Output:Variable and eplusout.rdd), meter (see Output:Meter and eplusout.mdd), or EMS Internal Variable Name or IDF Object Field name. This value is shown using the aggregation method specified.
+   */
+  variable_or_meter_or_ems_variable_or_field_name?: string;
+  /**
+   * Aggregation Type for Variable or Meter
+   * The method of aggregation for the selected variable or meter. SumOrAverage adds up the values for every timestep in the month if the variable is a sum variable. If the variable is an average variable it reports the average value. This is probably the most common Aggregation Type option to choose. Maximum and Minimum find the maximum and minimum value for the month and report it along with the time that it first occurred. When Maximum or Minimum are selected a column is automatically shown in the output report for the time that it occurred. When Maximum or Minimum are used with an average variable the value is divided by the length of the timestep. ValueWhenMaxMin looks at the previous variable in the report that sets a maximum or minimum and displays the value of the current variable at that same timestep. Order of the variables in the report is important when using ValueWhenMaxMin. This can be used when an outdoor temperature should be reported for the time of the maximum cooling load. HoursNonZero adds up the elapsed time during the month that this variable is non-zero and would be appropriate to determine the number of hour that a fan operates. HoursZero - The HoursZero option adds up the elapsed time during the month that this variable has a zero value and would be appropriate to determine the number of hour that a fan does not operate. HoursPositive - The HoursPositive option adds up the elapsed time during the month that this variable has a positive value. Hours with a zero value are not included. HoursNonPositive - The HoursNonPositive option adds up the elapsed time during the month that this variable has non-positive value. Hours with a negative value and hours with a zero value are all included. HoursNegative - The HoursNegative option adds up the elapsed time during the month that this variable has a negative value. Hours with a zero value are not included. HoursNonNegative - The HoursNonNegative option adds up the elapsed time during the month that this variable has non-negative value. Hours with a positive value and hours with a zero value are all included. HourInTenBinsMinToMax - Creates 10 columns for the specified variable and shows the number of hours in each of 10 bins based on the minimum and maximum value. The bin sizes will be rounded up to the next most significant digit value. HourInTenBinsZeroToMax - Creates 11 columns for the specified variable and shows the number of hours in each of 10 bins from zero to the maximum value and a bin for hours below zero. The bin sizes will be rounded up to the next most significant digit value. HourInTenBinsMinToZero - Creates 11 columns for the specified variable and shows the number of hours in each of 10 bins from zero to the minimum value and a bin for hours above zero. The bin sizes will be rounded up to the next most significant digit value. SumOrAverageDuringHoursShown - Provides the sum or average of the named variable when during the hours that the previous variable displayed with any of the Aggregation Types starting with "Hours". For "sum" type variables adds up the values for each timestep and reports the sum of the value monthly during the hours reported on the previous variable. For "average" type variables, the value shown will be the average for the month during the hours reported on the previous variable. Order of the variables in the report is important when using this Aggregation Type. MaximumDuringHoursShown - Reports the maximum value and the time that the maximum value occurred but only during the hours reported with the previous "hours-" Aggregation Type. When the Maximum option is used with an average variable the value is divided by the length of the timestep. Order of the variables in the report is important when using this Aggregation Type. MinimumDuringHoursShown - Reports the minimum value and the time that the minimum value occurred but only during the hours reported with the previous "hours-" Aggregation Type. When the Minimum option is used with an average variable the value is divided by the length of the timestep. Order of the variables in the report is important when using this Aggregation Type.
+   */
+  aggregation_type_for_variable_or_meter?: "HourInTenBinsMinToMax" | "HourInTenBinsMinToZero" | "HourInTenBinsZeroToMax" | "HoursNegative" | "HoursNonNegative" | "HoursNonPositive" | "HoursNonZero" | "HoursPositive" | "HoursZero" | "Maximum" | "MaximumDuringHoursShown" | "Minimum" | "MinimumDuringHoursShown" | "SumOrAverage" | "SumOrAverageDuringHoursShown" | "ValueWhenMaximumOrMinimum";
+  /**
+   * Digits After Decimal
+   * Default: 2
+   */
+  digits_after_decimal?: number;
+};
 
 /**
  * Output:Table:ReportPeriod
@@ -66371,8 +67838,16 @@ export interface Meter_Custom {
   /** Resource Type */
   resource_type?: "Coal" | "Diesel" | "DistrictCooling" | "DistrictHeatingSteam" | "DistrictHeatingWater" | "Electricity" | "FuelOilNo1" | "FuelOilNo2" | "Gasoline" | "Generic" | "NaturalGas" | "OtherFuel1" | "OtherFuel2" | "Propane" | "Water";
   /** Repeating group: key_name, output_variable_or_meter_name */
-  variable_details?: ExtensibleGroup[];
+  variable_details?: Meter_Custom_Extensible[];
 }
+
+/** One repeat of Meter:Custom's `variable_details` group, as `obj.extensible` holds it. */
+export type Meter_Custom_Extensible = {
+  /** Key Name */
+  key_name?: string;
+  /** Output Variable or Meter Name */
+  output_variable_or_meter_name?: string;
+};
 
 /**
  * Meter:CustomDecrement
@@ -66388,8 +67863,16 @@ export interface Meter_CustomDecrement {
    */
   source_meter_name: string;
   /** Repeating group: key_name, output_variable_or_meter_name */
-  variable_details?: ExtensibleGroup[];
+  variable_details?: Meter_CustomDecrement_Extensible[];
 }
+
+/** One repeat of Meter:CustomDecrement's `variable_details` group, as `obj.extensible` holds it. */
+export type Meter_CustomDecrement_Extensible = {
+  /** Key Name */
+  key_name?: string;
+  /** Output Variable or Meter Name */
+  output_variable_or_meter_name?: string;
+};
 
 /**
  * OutputControl:Files
@@ -66839,8 +68322,14 @@ export interface FuelFactors {
  */
 export interface Output_Diagnostics {
   /** Repeating group: key */
-  diagnostics?: ExtensibleGroup[];
+  diagnostics?: Output_Diagnostics_Extensible[];
 }
+
+/** One repeat of Output:Diagnostics's `diagnostics` group, as `obj.extensible` holds it. */
+export type Output_Diagnostics_Extensible = {
+  /** Key */
+  key?: "DisplayAdvancedReportVariables" | "DisplayAllWarnings" | "DisplayExtraWarnings" | "DisplayUnusedObjects" | "DisplayUnusedSchedules" | "DisplayWeatherMissingDataWarnings" | "DisplayZoneAirHeatBalanceOffBalance" | "DoNotMirrorAttachedShading" | "DoNotMirrorDetachedShading" | "ReportDetailedWarmupConvergence" | "ReportDuringHVACSizingSimulation" | "ReportDuringWarmup";
+};
 
 /**
  * Output:DebuggingData
@@ -66920,8 +68409,14 @@ export interface PythonPlugin_SearchPaths {
    */
   add_epin_environment_variable_to_search_path?: "No" | "Yes";
   /** Repeating group: search_path */
-  py_search_paths?: ExtensibleGroup[];
+  py_search_paths?: PythonPlugin_SearchPaths_Extensible[];
 }
+
+/** One repeat of PythonPlugin:SearchPaths's `py_search_paths` group, as `obj.extensible` holds it. */
+export type PythonPlugin_SearchPaths_Extensible = {
+  /** Search Path */
+  search_path?: string;
+};
 
 /**
  * PythonPlugin:Instance
@@ -66954,8 +68449,17 @@ export interface PythonPlugin_Instance {
  */
 export interface PythonPlugin_Variables {
   /** Repeating group: variable_name */
-  global_py_vars?: ExtensibleGroup[];
+  global_py_vars?: PythonPlugin_Variables_Extensible[];
 }
+
+/** One repeat of PythonPlugin:Variables's `global_py_vars` group, as `obj.extensible` holds it. */
+export type PythonPlugin_Variables_Extensible = {
+  /**
+   * Variable Name
+   * This variable is used to identify and create a shared variable in EnergyPlus. This variable can then be used by all running Python Plugin instances.
+   */
+  variable_name?: string;
+};
 
 /**
  * PythonPlugin:TrendVariable

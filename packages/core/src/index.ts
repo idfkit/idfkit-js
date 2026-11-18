@@ -29,7 +29,15 @@ export type {
 export { ReferenceGraph } from './references.js';
 export type { ReferenceEdge } from './references.js';
 export { ObjectShape, shapeFor, shapeOf } from './shape.js';
-export type { AnyTypeMap, ObjectOf, TypeNameOf, UntypedMap, ValuesOf } from './typemap.js';
+export type {
+  AnyTypeMap,
+  ExtensibleOf,
+  ObjectOf,
+  TypedObject,
+  TypeNameOf,
+  UntypedMap,
+  ValuesOf,
+} from './typemap.js';
 export { compareVersions, resolveVersion, versionKey } from './versions.js';
 
 // The conformance corpus level this release declares (FR-024), generated from

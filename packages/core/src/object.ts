@@ -55,7 +55,7 @@ export interface ObjectOwner {
  * identifiers and valid TS interface keys, so using them directly means the
  * on-disk name, the runtime key, and the static type all agree.
  */
-export class IdfObject {
+export class IdfObject<X extends ExtensibleGroup = ExtensibleGroup> {
   declare readonly [DATA]: Record<string, StoredValue>;
   declare readonly [SHAPE]: ObjectShape;
   declare [OWNER]: ObjectOwner | undefined;
@@ -267,16 +267,19 @@ export class IdfObject {
    * writes through the array's own index slot, which cannot be caught without charging every
    * vertex read. Writing the repeat's fields and `splice` both are heard. See `extensible.ts`.
    */
-  get extensible(): ExtensibleGroup[] {
+  get extensible(): X[] {
+    // `X` exists only in the type system. Every repeat is an `ExtensibleGroup`
+    // at run time; a typed document narrows it to the generated row type, and
+    // the casts below are the only place that narrowing is asserted.
     const key = this[SHAPE].extensibleKey;
     if (key === undefined) return [];
     const held = this[DATA][key];
-    if (held instanceof ExtensibleList) return held;
+    if (held instanceof ExtensibleList) return held as ExtensibleGroup[] as X[];
     if (this[OWNER]?.tracksExtensibleEdits() !== true) {
-      if (Array.isArray(held)) return held;
+      if (Array.isArray(held)) return held as X[];
       const empty: ExtensibleGroup[] = [];
       this[DATA][key] = empty;
-      return empty;
+      return empty as X[];
     }
 
     const list = ExtensibleList.adopt(
@@ -288,7 +291,7 @@ export class IdfObject {
       }
     );
     this[DATA][key] = list;
-    return list;
+    return list as ExtensibleGroup[] as X[];
   }
 
   /**
