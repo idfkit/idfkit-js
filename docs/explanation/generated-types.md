@@ -103,7 +103,10 @@ onto `IdfObject` instead would leave the permissive `push` overload in place, an
 a misspelled vertex field would still compile. `ExtensibleOf` falls back to
 `ExtensibleGroup` wherever `ValuesOf` falls back to `FieldValues`, and resolves
 to `never` for a known type with no group, so a push that would be dropped does
-not compile.
+not compile. It tests the type name before the map, so a name held in a `string`
+resolves at once even inside a helper generic over `M`, where every test on `M`
+is deferred; a literal name in such a helper still defers, and widening the
+object to `IdfObject` is the way out.
 
 ## Declarations only, and it is checked
 
