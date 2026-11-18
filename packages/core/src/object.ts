@@ -102,9 +102,10 @@ export class IdfObject {
     // Not a setter and not a `Proxy`: an assignment to a name found nowhere on the prototype chain
     // reaches no setter, so only a `Proxy` could intercept it, and design decision 2 rules that
     // out. The cost is the wording. In strict code (every ES module, every class body, compiled
-    // TypeScript) the write throws V8's own TypeError, which names the property but not the type;
-    // in a sloppy script it is silently ignored, so the read back is `undefined` rather than a
-    // value the save will lose. `set` and `update` give the full message with a suggestion.
+    // TypeScript) the write throws the engine's own TypeError, which never names the type and, in
+    // Safari, not even the property; in a sloppy script it is silently ignored, so the read back is
+    // `undefined` rather than a value the save will lose. `set` and `update` give the full message
+    // with a suggestion.
     Object.preventExtensions(obj);
 
     for (const [field, value] of Object.entries(values)) {
@@ -422,6 +423,11 @@ export class IdfObject {
  * refusal line and never its wording, so the suggestion inside the parentheses is free to vary.
  */
 function notAField(shape: ObjectShape, field: string): string {
+  // The name is not a field, and `set` cannot write it, but it is the one name with a property of
+  // its own; say so rather than leave the caller thinking the object has none.
+  if (String(field).toLowerCase() === 'name') {
+    return `not a field of ${shape.typeName}; the name is the name property, not a field`;
+  }
   const key = shape.extensibleKey;
   const candidates =
     key === undefined || shape.fields.includes(key) ? shape.fields : [...shape.fields, key];

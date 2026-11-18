@@ -113,12 +113,14 @@ export function extensibleValueProblem(
  * in positional order. Only ever called on an error path, so it is written for clarity, not speed.
  */
 export function closestField(field: string, candidates: Iterable<string>): string | undefined {
-  const wanted = field.toLowerCase();
+  // `String`, because plain JavaScript can hand `set` a number, and the caller is about to report
+  // the name as unknown: crashing here on `toLowerCase` would replace that message with a worse one.
+  const wanted = String(field).toLowerCase();
   const budget = Math.min(3, Math.max(1, Math.floor(wanted.length / 3)));
   let best: string | undefined;
   let bestDistance = budget + 1;
   for (const candidate of candidates) {
-    const distance = editDistance(wanted, candidate.toLowerCase(), bestDistance);
+    const distance = editDistance(wanted, candidate.toLowerCase());
     if (distance < bestDistance) {
       best = candidate;
       bestDistance = distance;
@@ -127,23 +129,18 @@ export function closestField(field: string, candidates: Iterable<string>): strin
   return best;
 }
 
-/** Levenshtein distance, giving up (returning `limit`) once every path costs at least `limit`. */
-function editDistance(a: string, b: string, limit: number): number {
-  if (Math.abs(a.length - b.length) >= limit) return limit;
+/** Levenshtein distance: the fewest single-character insertions, deletions and substitutions. */
+function editDistance(a: string, b: string): number {
   let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i += 1) {
     const current = [i];
-    let rowMin = i;
     for (let j = 1; j <= b.length; j += 1) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      const value = Math.min(previous[j]! + 1, current[j - 1]! + 1, previous[j - 1]! + cost);
-      current.push(value);
-      if (value < rowMin) rowMin = value;
+      current.push(Math.min(previous[j]! + 1, current[j - 1]! + 1, previous[j - 1]! + cost));
     }
-    if (rowMin >= limit) return limit;
     previous = current;
   }
-  return Math.min(previous[b.length]!, limit);
+  return previous[b.length]!;
 }
 
 function describe(value: unknown): string {

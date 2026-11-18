@@ -68,9 +68,10 @@ schema's fields, not the instance's keys.
 Catching an arbitrary name is exactly what a `Proxy` is for, so it is not
 available here. Instead every object is made non-extensible as it is built,
 after its internal slots exist. Strict code, which includes every ES module and
-all compiled TypeScript, gets a `TypeError` naming the property; a sloppy script
-has the write silently dropped, which at least reads back as `undefined` rather
-than as a value that will be lost. Neither message can name the object type, so
-`set()` and `update()`, which can, also suggest the field the name most likely
-meant. A non-extensible object keeps its hidden class, so this costs nothing on
+all compiled TypeScript, gets the engine's `TypeError`; a sloppy script has the
+write silently dropped, which at least reads back as `undefined` rather than as
+a value that will be lost. The engine writes that message, so it never names the
+object type, and only some engines name the property: Node and Chrome do,
+Safari does not. `set()` and `update()` write their own message, so they name
+both and suggest the field the name most likely meant. A non-extensible object keeps its hidden class, so this costs nothing on
 the read and write paths.

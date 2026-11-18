@@ -310,6 +310,46 @@ WeatherProperty:SkyTemperature,
     expect(list.toJSON()).toEqual({ branches: [{ branch_name: 'B1' }] });
     expect(doc.references.isReferenced('B1')).toBe(true);
   });
+});
+
+describe('regressions: extensible on a type with no extensible group', () => {
+  it('refuses a write through extensible on a type that has no extensible group', () => {
+    // FenestrationSurface:Detailed spells its four vertices as fixed fields. `extensible` handed
+    // back a fresh `[]`, so a push in the BuildingSurface:Detailed style returned 1 and kept nothing;
+    // the loss surfaced only as a missing vertex_1_x_coordinate when EnergyPlus ran.
+    const doc = new IdfDocument(v26);
+    const win = doc.add('FenestrationSurface:Detailed', 'S Win', {
+      surface_type: 'Window',
+      construction_name: 'Win',
+      building_surface_name: 'S',
+    });
+    const vertex = { vertex_x_coordinate: 1, vertex_y_coordinate: 0, vertex_z_coordinate: 2.5 };
+
+    expect(win.extensible).toHaveLength(0);
+    expect(Array.isArray(win.extensible)).toBe(true);
+    expect(win.extensible.map((g) => g)).toEqual([]);
+
+    expect(() => win.extensible.push(vertex)).toThrow(
+      'FenestrationSurface:Detailed has no extensible group; set vertex_1_x_coordinate ... directly'
+    );
+    expect(() => win.extensible.splice(0, 0, vertex)).toThrow(/no extensible group/);
+    expect(() => win.extensible.unshift(vertex)).toThrow(/no extensible group/);
+    expect(() => win.extensible.pop()).toThrow(/no extensible group/);
+    expect(() => {
+      win.extensible[0] = vertex;
+    }).toThrow(TypeError);
+
+    expect(win.extensible).toHaveLength(0);
+    expect(win.toJSON()).not.toHaveProperty('vertices');
+
+    // A type with a group is untouched.
+    const wall = doc.add('BuildingSurface:Detailed', 'S');
+    expect(wall.extensible.push(vertex)).toBe(1);
+    expect(wall.extensible).toHaveLength(1);
+  });
+});
+
+describe('regressions: writing a name that is not a field', () => {
   it('refuses a misspelled field write instead of storing a value every writer drops', () => {
     // Instances were extensible, so `zone.ceilng_height = 4` made an own data property: it read
     // back as 4, and `writeIdf` and `writeEpJson` walk the schema's fields, so the save lost it.
@@ -327,7 +367,7 @@ WeatherProperty:SkyTemperature,
 
     for (const [how, zone] of Object.entries(objects)) {
       const target = zone as unknown as Record<string, unknown>;
-      expect(() => (target.ceilng_height = 4), how).toThrow(/Cannot add property ceilng_height/);
+      expect(() => (target.ceilng_height = 4), how).toThrow(TypeError);
       expect(Object.hasOwn(zone, 'ceilng_height'), how).toBe(false);
       expect(target.ceilng_height, how).toBeUndefined();
       expect(Object.isExtensible(zone), how).toBe(false);
@@ -367,41 +407,15 @@ WeatherProperty:SkyTemperature,
     // Nothing close: no guess.
     expect(() => zone.set('bogus', 1)).toThrow(/^"bogus" is not a field of Zone$/);
   });
-});
-
-describe('regressions: extensible on a type with no extensible group', () => {
-  it('refuses a write through extensible on a type that has no extensible group', () => {
-    // FenestrationSurface:Detailed spells its four vertices as fixed fields. `extensible` handed
-    // back a fresh `[]`, so a push in the BuildingSurface:Detailed style returned 1 and kept nothing;
-    // the loss surfaced only as a missing vertex_1_x_coordinate when EnergyPlus ran.
-    const doc = new IdfDocument(v26);
-    const win = doc.add('FenestrationSurface:Detailed', 'S Win', {
-      surface_type: 'Window',
-      construction_name: 'Win',
-      building_surface_name: 'S',
-    });
-    const vertex = { vertex_x_coordinate: 1, vertex_y_coordinate: 0, vertex_z_coordinate: 2.5 };
-
-    expect(win.extensible).toHaveLength(0);
-    expect(Array.isArray(win.extensible)).toBe(true);
-    expect(win.extensible.map((g) => g)).toEqual([]);
-
-    expect(() => win.extensible.push(vertex)).toThrow(
-      'FenestrationSurface:Detailed has no extensible group; set vertex_1_x_coordinate ... directly'
+  it('points a name given as a field at the name property', () => {
+    const zone = new IdfDocument(v26).add('Zone', 'Office');
+    expect(() => zone.set('Name', 'Lobby')).toThrow(
+      '"Name" is not a field of Zone; the name is the name property, not a field'
     );
-    expect(() => win.extensible.splice(0, 0, vertex)).toThrow(/no extensible group/);
-    expect(() => win.extensible.unshift(vertex)).toThrow(/no extensible group/);
-    expect(() => win.extensible.pop()).toThrow(/no extensible group/);
-    expect(() => {
-      win.extensible[0] = vertex;
-    }).toThrow(TypeError);
-
-    expect(win.extensible).toHaveLength(0);
-    expect(win.toJSON()).not.toHaveProperty('vertices');
-
-    // A type with a group is untouched.
-    const wall = doc.add('BuildingSurface:Detailed', 'S');
-    expect(wall.extensible.push(vertex)).toBe(1);
-    expect(wall.extensible).toHaveLength(1);
+  });
+  it('reports a non-string field name from plain JavaScript instead of crashing on it', () => {
+    // The suggestion lowercases the name; a number from untyped code must not reach that as-is.
+    const zone = new IdfDocument(v26).add('Zone', 'Office');
+    expect(() => zone.set(5 as unknown as string, 1)).toThrow(/^"5" is not a field of Zone$/);
   });
 });
