@@ -113,7 +113,7 @@ function fieldType(def) {
   let effective = def;
   let auto = false;
   if (Array.isArray(def.anyOf)) {
-    const numeric = def.anyOf.find((b) => b.type === 'number');
+    const numeric = def.anyOf.find((b) => b.type === 'number' || b.type === 'integer');
     if (numeric) {
       // A string branch with no `enum` admits any text, not only the autosize
       // keywords: `Schedule:Compact` rows hold `Through: 12/31` and numbers in
@@ -151,6 +151,21 @@ function docComment(indent, lines) {
   if (kept.length === 0) return '';
   if (kept.length === 1) return `${indent}/** ${escapeComment(kept[0])} */\n`;
   return `${indent}/**\n${kept.map((l) => `${indent} * ${escapeComment(l)}`).join('\n')}\n${indent} */\n`;
+}
+
+/**
+ * One property line, with its doc comment, as both the object interfaces and
+ * the extensible rows render it. `def` may be undefined for a row field the
+ * schema names in `extensibles` but does not describe.
+ */
+function renderField(field, def, info, required, rendered) {
+  const comment = docComment('  ', [
+    info.field_name,
+    WITH_NOTES ? def?.note : undefined,
+    def?.units ? `Units: ${def.units}` : undefined,
+    def?.default !== undefined ? `Default: ${JSON.stringify(def.default)}` : undefined,
+  ]);
+  return `${comment}  ${propertyKey(field)}${required ? '' : '?'}: ${rendered};`;
 }
 
 /**
@@ -198,15 +213,7 @@ function extensibleRow(typeName, raw) {
     // A group field the schema does not describe is still a slot in the row;
     // type it as loosely as the runtime stores it rather than drop it.
     const rendered = def === undefined ? 'string | number' : (fieldType(def) ?? 'string | number');
-    const info = fieldInfo[field] ?? {};
-    const comment = docComment('  ', [
-      info.field_name,
-      WITH_NOTES && def ? def.note : undefined,
-      def?.units ? `Units: ${def.units}` : undefined,
-      def?.default !== undefined ? `Default: ${JSON.stringify(def.default)}` : undefined,
-    ]);
-    const optional = required.has(field) ? '' : '?';
-    lines.push(`${comment}  ${propertyKey(field)}${optional}: ${rendered};`);
+    lines.push(renderField(field, def, fieldInfo[field] ?? {}, required.has(field), rendered));
   }
   lines.push('};');
   lines.push('');
@@ -268,16 +275,7 @@ function declarations(version, packageName) {
       if (def === undefined) continue;
       const rendered = fieldType(def);
       if (rendered === null) continue;
-
-      const info = fieldInfo[field] ?? {};
-      const comment = docComment('  ', [
-        info.field_name,
-        WITH_NOTES ? def.note : undefined,
-        def.units ? `Units: ${def.units}` : undefined,
-        def.default !== undefined ? `Default: ${JSON.stringify(def.default)}` : undefined,
-      ]);
-      const optional = required.has(field) ? '' : '?';
-      out.push(`${comment}  ${propertyKey(field)}${optional}: ${rendered};`);
+      out.push(renderField(field, def, fieldInfo[field] ?? {}, required.has(field), rendered));
     }
 
     const row = extensibleRow(typeName, raw);

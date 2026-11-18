@@ -79,7 +79,7 @@ This is a real constraint on the generator, not a style preference.
 **`add()` and `all()` deliberately use different helpers.** `add()` takes
 `ValuesOf`, which resolves to the exact field interface for a known type name —
 so TypeScript's excess-property check fires on a misspelled field in an object
-literal. `all()` returns `ObjectOf`, which resolves to the interface for known
+literal. `all()` returns objects typed with `ObjectOf`, which resolves to the interface for known
 names and a permissive empty object otherwise, so version-generic code and
 untyped documents still work.
 

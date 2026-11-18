@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
 
 import { IdfDocument } from '@idfkit/core';
-import type { ExtensibleGroup, IdfObject } from '@idfkit/core';
+import type { AnyTypeMap, ExtensibleGroup, IdfObject } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
 import type {
@@ -207,5 +207,40 @@ describe('typed extensible groups', () => {
     });
     expect(count(surface)).toBe(1);
     expect(count(wall)).toBe(1);
+  });
+
+  it('admits a variable name where the schema takes any number or any text', () => {
+    // Regression: these fields were typed as numbers plus the autosize
+    // keywords, which rejected the variable names the schema accepts.
+    const doc = new IdfDocument<TypeMap>(v26);
+    const tariff = doc.add('UtilityCost:Tariff', 'T', {
+      monthly_charge_or_variable_name: 'MonthlyChargeVariable',
+    });
+    expectTypeOf(tariff.monthly_charge_or_variable_name).toEqualTypeOf<
+      number | string | undefined
+    >();
+    // An integer field with an Autosize branch admits the keyword too.
+    doc.add('AirTerminal:SingleDuct:ConstantVolume:CooledBeam', 'B', {
+      number_of_beams: 'Autosize',
+    });
+  });
+
+  it('lets a helper generic over the map push onto a group named at run time', () => {
+    const push = <M extends AnyTypeMap>(
+      doc: IdfDocument<M>,
+      type: string,
+      name: string
+    ): number => {
+      const obj = doc.require(type, name);
+      obj.extensible.push({
+        vertex_x_coordinate: 0,
+        vertex_y_coordinate: 0,
+        vertex_z_coordinate: 0,
+      });
+      return obj.extensible.length;
+    };
+    const doc = new IdfDocument<TypeMap>(v26);
+    doc.add('BuildingSurface:Detailed', 'S', {});
+    expect(push(doc, 'BuildingSurface:Detailed', 'S')).toBe(1);
   });
 });

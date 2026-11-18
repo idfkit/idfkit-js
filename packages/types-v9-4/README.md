@@ -37,8 +37,8 @@ appears in it (`npm run check:type-packages`).
 
 ## Versioning
 
-`@idfkit/core` is a **peer range**, not a pin. The map borrows one type from
-core, `ExtensibleGroup`, and carries no runtime, so a version skew between the
+`@idfkit/core` is a **peer range**, not a pin. The map imports nothing from
+core and carries no runtime, so a version skew between the
 two is a type error at your build and never a failure at run time. Pick the
 package whose version tag matches the EnergyPlus release you are reading; the
 core you install alongside it does not have to match anything.

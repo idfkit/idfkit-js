@@ -94,17 +94,19 @@ cost.
 ## Check group fields at compile time
 
 On a document parameterized with a generated `TypeMap`, each repeat is typed by
-its type's row, named after the type with `_Extensible` appended. A misspelled
+its type's row, named after the type's interface with `_Extensible` appended
+(`BuildingSurface_Detailed_Extensible`). A misspelled
 field, a string in a numeric field, or a push onto a type with no group is a
 compile error:
 
 ```ts
-import type { TypeMap, BuildingSurface_Detailed_Extensible } from '@idfkit/types-v26-1';
+import { loadIdf } from '@idfkit/core/node';
+import type { BuildingSurface_Detailed_Extensible, TypeMap } from '@idfkit/types-v26-1';
 
 const doc = await loadIdf<TypeMap>('model.idf');
 const wall = doc.require('BuildingSurface:Detailed', 'Wall-1');
 
-wall.extensible; // BuildingSurface_Detailed_Extensible[]
+const corners: BuildingSurface_Detailed_Extensible[] = wall.extensible;
 wall.extensible.push({ vertex_x_coordinat: 0 }); // compile error: typo
 doc.add('BuildingSurface:Detailed', 'S', { vertices: [{ foo: 1 }] }); // compile error
 doc.require('Zone', 'Z1').extensible.push({}); // compile error: Zone has no group

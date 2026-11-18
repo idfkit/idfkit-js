@@ -64,18 +64,27 @@ export type ValuesOf<M extends AnyTypeMap, K extends string> = K extends keyof M
  * drop the repeat. Unknown names, untyped documents and the open
  * `AnyTypeMap` keep the permissive `ExtensibleGroup`, on the same terms as
  * `ValuesOf`.
+ *
+ * The `string extends K` arm comes first and tests only the name, so a type
+ * name held in a `string` resolves to `ExtensibleGroup` even inside a function
+ * generic over `M`, where every test on `M` is deferred. Without it a helper
+ * written as `<M extends AnyTypeMap>(doc: IdfDocument<M>, type: string)` could
+ * not push a repeat at all. A literal name in such a helper still defers; widen
+ * the object to `IdfObject` there.
  */
-export type ExtensibleOf<M extends AnyTypeMap, K extends string> = string extends keyof M
+export type ExtensibleOf<M extends AnyTypeMap, K extends string> = string extends K
   ? ExtensibleGroup
-  : K extends keyof M
-    ? {
-        [P in keyof M[K]]-?: NonNullable<M[K][P]> extends ReadonlyArray<infer R>
-          ? R extends ExtensibleGroup
-            ? R
-            : ExtensibleGroup
-          : never;
-      }[keyof M[K]]
-    : ExtensibleGroup;
+  : string extends keyof M
+    ? ExtensibleGroup
+    : K extends keyof M
+      ? {
+          [P in keyof M[K]]-?: NonNullable<M[K][P]> extends ReadonlyArray<infer R>
+            ? R extends ExtensibleGroup
+              ? R
+              : ExtensibleGroup
+            : never;
+        }[keyof M[K]]
+      : ExtensibleGroup;
 
 /**
  * What `add`, `all`, `get` and `require` hand back for a type name: an

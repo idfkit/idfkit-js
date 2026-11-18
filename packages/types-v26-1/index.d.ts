@@ -28018,7 +28018,7 @@ export interface AirTerminal_SingleDuct_ConstantVolume_CooledBeam {
    * Number of individual beam units in the zone
    * Default: "Autosize"
    */
-  number_of_beams?: number;
+  number_of_beams?: number | 'Autosize' | 'Autocalculate';
   /**
    * Beam Length
    * Length of an individual beam unit
