@@ -178,8 +178,12 @@ describe('typed extensible groups', () => {
     const zone = doc.add('Zone', 'Z1');
 
     expectTypeOf(zone.extensible).toEqualTypeOf<never[]>();
-    // @ts-expect-error `Zone` has no extensible group, so a push would be dropped.
-    zone.extensible.push({ anything: 1 });
+    // Rejected twice: at compile time here, and at run time by the frozen
+    // empty array the getter returns for a type with no group.
+    expect(() =>
+      // @ts-expect-error `Zone` has no extensible group.
+      zone.extensible.push({ anything: 1 })
+    ).toThrow(TypeError);
   });
 
   it('stays permissive for untyped documents and unknown names', () => {
