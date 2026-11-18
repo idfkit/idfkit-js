@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { IdfDocument, parseIdf, shapeOf } from '@idfkit/core';
+import { IdfCollection, IdfDocument, parseIdf, shapeOf, writeIdf } from '@idfkit/core';
 import type { IdfObject } from '@idfkit/core';
 import type { Schema } from '@idfkit/schemas';
 
@@ -343,6 +343,99 @@ describe('collections', () => {
 
   it('throws a useful error from require', () => {
     expect(() => doc.require('Zone', 'Nope')).toThrow('No Zone named "Nope"');
+  });
+});
+
+/**
+ * `IdfCollection.add`: `doc.add` through a collection in hand.
+ *
+ * The companion Python behaviour is `IDFCollection.add(name, **fields)`, including adoption of the
+ * detached empty collection an absent type reads as.
+ */
+describe('IdfCollection.add', () => {
+  it('adds through a collection that already holds objects', () => {
+    doc.add('Zone', 'Z1');
+    const zones = doc.all('Zone');
+    const office = zones.add('Office', { ceiling_height: 3 });
+
+    expect(office.get('ceiling_height')).toBe(3);
+    expect(zones.names()).toEqual(['Z1', 'Office']);
+    expect(doc.get('Zone', 'Office')).toBe(office);
+  });
+
+  it('adds through the detached collection of an absent type, and stores that collection', () => {
+    const zones = doc.all('Zone');
+    expect(doc.types()).toEqual([]);
+
+    const office = zones.add('Office');
+
+    expect(zones.get('Office')).toBe(office);
+    expect(doc.all('Zone')).toBe(zones);
+    expect(doc.get('Zone', 'Office')).toBe(office);
+    expect(doc.types()).toEqual(['Zone']);
+    expect(doc.size).toBe(1);
+    expect(writeIdf(doc)).toMatch(/^Zone,\n\s+Office;/m);
+  });
+
+  it('files into the stored collection when the type was stored meanwhile', () => {
+    const early = doc.all('Zone');
+    doc.add('Zone', 'Z1');
+    const office = early.add('Office');
+
+    expect(early.size).toBe(0);
+    expect(doc.all('Zone').names()).toEqual(['Z1', 'Office']);
+    expect(doc.get('Zone', 'Office')).toBe(office);
+  });
+
+  it('canonicalizes a mis-cased type name', () => {
+    const zones = doc.all('zONE');
+    zones.add('Office');
+    expect(zones.typeName).toBe('Zone');
+    expect(doc.all('Zone')).toBe(zones);
+  });
+
+  it('keeps the reference graph current', () => {
+    doc.all('Zone').add('Office');
+    doc.all('People').add('Occupants', { zone_or_zonelist_or_space_or_spacelist_name: 'Office' });
+
+    expect(doc.references.isReferenced('Office')).toBe(true);
+    expect(doc.references.referencingObjects('Office').map((o) => o.name)).toEqual(['Occupants']);
+  });
+
+  it('rejects a duplicate name, case-insensitively', () => {
+    const zones = doc.all('Zone');
+    zones.add('Office');
+    expect(() => zones.add('OFFICE')).toThrow(/already exists/);
+    expect(zones.size).toBe(1);
+  });
+
+  it('enforces singletons', () => {
+    doc.all('Building').add('B1');
+    expect(() => doc.all('Building').add('B2')).toThrow(/singleton/);
+  });
+
+  it('takes null for anonymous types', () => {
+    const version = doc.all('Version').add(null, { version_identifier: '26.1' });
+    expect(version.isNamed).toBe(false);
+    expect(doc.all('Version').only).toBe(version);
+    expect(writeIdf(doc)).toMatch(/Version,\s*26\.1;/);
+  });
+
+  it('rejects an unknown type without storing anything', () => {
+    expect(() => doc.all('Zoen').add('X')).toThrow(/not defined in EnergyPlus 26.1.0/);
+    expect(doc.types()).toEqual([]);
+  });
+
+  it('rejects an unknown field without storing the collection', () => {
+    expect(() => doc.all('Zone').add('Z1', { celing_height: 2.7 })).toThrow(/not a field of Zone/);
+    expect(doc.types()).toEqual([]);
+  });
+
+  it('refuses on a collection that belongs to no document', () => {
+    const orphan = new IdfCollection('Zone');
+    expect(() => orphan.add('Office')).toThrow(TypeError);
+    expect(() => orphan.add('Office')).toThrow(/belongs to no document/);
+    expect(orphan.size).toBe(0);
   });
 });
 

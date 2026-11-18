@@ -125,13 +125,15 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    * collection it hands back. A read that mutates the document is wrong on its
    * own terms: probing five misspelled names used to leave five junk keys in
    * `types()`, visible to every later iteration and to `toJSON`. The collection
-   * returned for an absent type is detached from the document.
+   * returned for an absent type is detached from the document. It still knows
+   * the document, so `add()` on it works: the first object added through it
+   * stores it, and it becomes the collection later reads return.
    *
    * `idfkit` resolves and declines to store on exactly the same terms, in
    * `IDFDocument.__getitem__`.
    */
-  all<K extends TypeNameOf<M>>(type: K): IdfCollection<IdfObject & ObjectOf<M, K>> {
-    return this.collection(type) as IdfCollection<IdfObject & ObjectOf<M, K>>;
+  all<K extends TypeNameOf<M>>(type: K): IdfCollection<IdfObject & ObjectOf<M, K>, ValuesOf<M, K>> {
+    return this.collection(type) as IdfCollection<IdfObject & ObjectOf<M, K>, ValuesOf<M, K>>;
   }
 
   /**
@@ -152,7 +154,7 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    */
   collection(type: string): IdfCollection {
     const canonical = this.schema.resolve(type) ?? type;
-    return this.#collections.get(canonical) ?? new IdfCollection(canonical);
+    return this.#collections.get(canonical) ?? IdfCollection.owned(canonical, this);
   }
 
   /**
@@ -161,11 +163,20 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    * The only path that may add a key to `#collections`. Reads go through
    * `collection()`, which hands back a detached empty rather than growing the
    * document; see the note on `all()` for why that separation exists.
+   *
+   * `adopt` is the detached collection a caller of `IdfCollection.add` holds.
+   * When the type has no stored collection yet, that one is stored rather than
+   * a fresh one, so the caller's handle and every later `all()` are the same
+   * object. If the type was stored meanwhile through another path, the stored
+   * one wins and `adopt` stays detached.
    */
-  #collectionForWrite(canonical: string): IdfCollection {
+  #collectionForWrite(canonical: string, adopt?: IdfCollection): IdfCollection {
     let collection = this.#collections.get(canonical);
     if (collection === undefined) {
-      collection = new IdfCollection(canonical);
+      collection =
+        adopt?.ownedBy(this) === true && adopt.typeName === canonical && adopt.size === 0
+          ? adopt
+          : IdfCollection.owned(canonical, this);
       this.#collections.set(canonical, collection);
     }
     return collection;
@@ -208,6 +219,25 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    * deliberate seam rather than casts scattered through the parse loop.
    */
   addRaw(type: string, name: string | null, values: FieldValues = {}): IdfObject {
+    return this.#create(type, name, values, undefined);
+  }
+
+  /**
+   * The body of `IdfCollection.add`: `addRaw`, filing into `collection` if the
+   * type has no stored collection yet. See `#collectionForWrite`.
+   *
+   * @internal
+   */
+  createIn(collection: IdfCollection, name: string | null, values: FieldValues): IdfObject {
+    return this.#create(collection.typeName, name, values, collection);
+  }
+
+  #create(
+    type: string,
+    name: string | null,
+    values: FieldValues,
+    adopt: IdfCollection | undefined
+  ): IdfObject {
     const canonical = this.schema.resolve(type);
     if (canonical === undefined) {
       throw new Error(`Object type "${type}" is not defined in EnergyPlus ${this.version}`);
@@ -225,7 +255,7 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
 
     const obj = IdfObject.create(canonical, definition, name ?? '', values);
     obj[KEY] = key;
-    this.attach(obj);
+    this.#attach(obj, adopt);
     return obj;
   }
 
@@ -239,6 +269,10 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
    * mis-maps every field on reload instead of failing.
    */
   attach(obj: IdfObject): IdfObject {
+    return this.#attach(obj, undefined);
+  }
+
+  #attach(obj: IdfObject, adopt: IdfCollection | undefined): IdfObject {
     if (obj[OWNER] !== undefined && obj[OWNER] !== this) {
       throw new Error(`${obj} already belongs to another document`);
     }
@@ -253,7 +287,7 @@ export class IdfDocument<M extends AnyTypeMap = UntypedMap> implements ObjectOwn
       );
     }
 
-    const collection = this.#collectionForWrite(canonical);
+    const collection = this.#collectionForWrite(canonical, adopt);
     if (collection.get(obj.key) === obj) return obj;
     if (definition.s === 1 && collection.size > 0) {
       throw new Error(`${canonical} is a singleton and is already present`);

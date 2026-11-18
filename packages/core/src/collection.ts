@@ -1,4 +1,14 @@
-import type { IdfObject } from './object.js';
+import type { FieldValues, IdfObject } from './object.js';
+
+/**
+ * What a collection creates objects through: its document.
+ *
+ * An interface rather than an import of `IdfDocument`, which imports this module.
+ * @internal
+ */
+export interface CollectionOwner {
+  createIn(collection: IdfCollection, name: string | null, values: FieldValues): IdfObject;
+}
 
 /**
  * Name-indexed collection of objects of one type.
@@ -9,12 +19,23 @@ import type { IdfObject } from './object.js';
  *
  * Insertion order is preserved. IDF files are hand-edited and diffed, so
  * reordering objects on a round-trip would produce noisy diffs for no reason.
+ *
+ * `V` is what {@link IdfCollection.add} accepts. A typed document's `all()`
+ * sets it to the exact field interface, so a misspelled field is a compile
+ * error there exactly as it is through `IdfDocument.add`; everywhere else it is
+ * the permissive `FieldValues`.
  */
-export class IdfCollection<T extends IdfObject = IdfObject> implements Iterable<T> {
+export class IdfCollection<
+  T extends IdfObject = IdfObject,
+  V extends object = FieldValues,
+> implements Iterable<T> {
   readonly typeName: string;
 
   /** lowercased collection key -> object. */
   #byName = new Map<string, T>();
+
+  /** The document `add` creates through; `undefined` for one constructed directly. */
+  #owner: CollectionOwner | undefined;
 
   constructor(typeName: string, objects: Iterable<T> = []) {
     this.typeName = typeName;
@@ -87,7 +108,61 @@ export class IdfCollection<T extends IdfObject = IdfObject> implements Iterable<
     });
   }
 
+  /**
+   * Create an object of this collection's type and add it to the document.
+   *
+   * Shorthand for `doc.add(collection.typeName, name, values)`, and it is that
+   * call: the same schema resolution, duplicate and singleton checks, and
+   * reference-graph update, with the same typing. `doc.add` is not deprecated
+   * and stays the primary form; this one reads better when a typed collection
+   * is already in hand.
+   *
+   * ```ts
+   * const zones = doc.all('Zone');
+   * const office = zones.add('Office', { ceiling_height: 3 });
+   * doc.all('Version').add(null, { version_identifier: '26.1' });
+   * ```
+   *
+   * Anonymous types (`Version`, `Timestep`) take `null` for the name.
+   *
+   * A type with no objects yet reads as an empty collection the document does
+   * not store, since reading never adds to a document. Adding through it stores
+   * it, so `zones` above holds `Office` and is the collection a later
+   * `doc.all('Zone')` returns. If the type was stored meanwhile through another
+   * path, the object goes to the document's collection instead.
+   *
+   * @throws TypeError if the collection belongs to no document, as one
+   *   constructed directly with `new IdfCollection(...)` does.
+   */
+  add(name: string | null, values: V = {} as V): T {
+    if (this.#owner === undefined) {
+      throw new TypeError(
+        `IdfCollection(${this.typeName}) belongs to no document (constructed directly); use IdfDocument.add`
+      );
+    }
+    // `this` widened: `V` is a field interface, not `FieldValues`, on a typed collection.
+    return this.#owner.createIn(this as unknown as IdfCollection, name, values as FieldValues) as T;
+  }
+
   // --- mutation, used by IdfDocument -------------------------------------
+
+  /**
+   * An empty collection that creates objects through `owner`.
+   * @internal
+   */
+  static owned(typeName: string, owner: CollectionOwner): IdfCollection {
+    const collection = new IdfCollection(typeName);
+    collection.#owner = owner;
+    return collection;
+  }
+
+  /**
+   * Whether `owner` is the document this collection creates through.
+   * @internal
+   */
+  ownedBy(owner: CollectionOwner): boolean {
+    return this.#owner === owner;
+  }
 
   /** @internal */
   insert(obj: T): void {

@@ -32,6 +32,15 @@ design. This repository handles the model; `@idfkit/engine` handles the run. The
 meet over IDF text, which is only possible because
 [the core is synchronous and string-based](sync-core-async-edge.md).
 
+Object creation is shared but weighted differently. Both libraries create
+through a collection, `doc.all('Zone').add('Office', { ceiling_height: 3 })`
+here and `doc["Zone"].add("Office", ceiling_height=3.0)` in Python. Python
+deprecates `doc.add()` in its favour, because a Python type checker cannot map
+a type-name string to an object type without one signature per type. TypeScript
+can, so `doc.add('Zone', 'Office', { ... })` is
+[already fully checked](generated-types.md) and stays the primary form here,
+not deprecated; `collection.add` is a convenience with the same checks.
+
 ## The drift problem
 
 Two implementations of a schema-driven format will diverge. The divergence is
